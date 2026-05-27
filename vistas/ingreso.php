@@ -41,8 +41,10 @@ if ($_SESSION['compras']==1) {
     <div class="col-md-6 col-sm-12 col-xs-12" style="padding-top:25px;">
       <button type="button" class="btn btn-primary" id="btnFiltrarIngreso"><i class="fa fa-filter"></i> Filtrar</button>
       <button type="button" class="btn btn-default" id="btnLimpiarFiltroIngreso"><i class="fa fa-eraser"></i> Limpiar</button>
+      &nbsp; <span style="display:inline-block;background:#2980b9;color:#fff;padding:6px 14px;border-radius:4px;font-size:15px;font-weight:700;vertical-align:middle;">Total compras: <span id="iResTotal">S/ 0.00</span></span>
     </div>
   </div>
+
   <table id="tbllistado" class="table table-striped table-bordered table-condensed table-hover">
     <thead>
       <th>Opciones</th>
@@ -118,11 +120,15 @@ if ($_SESSION['compras']==1) {
         <th>Cantidad</th>
         <th>Precio Compra</th>
         <th>Precio Venta</th>
+        <th>N&deg; Lote</th>
+        <th>Vencimiento</th>
         <th>Subtotal</th>
         <th>Actualizar</th>
        </thead>
        <tfoot>
          <th>TOTAL</th>
+         <th></th>
+         <th></th>
          <th></th>
          <th></th>
          <th></th>
@@ -136,6 +142,40 @@ if ($_SESSION['compras']==1) {
        </tbody>
      </table>
     </div>
+    <!-- Control de temperatura (cadena de frío) -->
+    <div class="form-group col-lg-12 col-md-12 col-xs-12">
+      <div class="panel panel-default" style="margin-bottom:10px">
+        <div class="panel-heading" style="cursor:pointer;padding:8px 12px" onclick="$('#panelTemperatura').toggle()">
+          <i class="fa fa-thermometer-half text-info"></i> <strong>Control de temperatura</strong>
+          <small class="text-muted" style="margin-left:8px">(cadena de frío — click para expandir)</small>
+          <span class="pull-right"><i class="fa fa-chevron-down"></i></span>
+        </div>
+        <div class="panel-body" id="panelTemperatura" style="display:none">
+          <div class="row">
+            <div class="col-md-3 col-sm-6 col-xs-12">
+              <label><i class="fa fa-thermometer-half"></i> Temperatura de recepción (°C)</label>
+              <input type="number" step="0.1" class="form-control" name="temperatura_recepcion" id="temperatura_recepcion" placeholder="Ej: 4.5">
+              <small class="text-muted">Dejar vacío si no aplica</small>
+            </div>
+            <div class="col-md-8 col-sm-10 col-xs-12">
+              <label>Observaciones de temperatura / cadena de frío</label>
+              <input type="text" class="form-control" name="temp_observacion" id="temp_observacion" maxlength="200" placeholder="Ej: Recibido en caja refrigerada. Cadena de frío mantenida.">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group col-lg-3 col-md-3 col-sm-6 col-xs-12">
+      <label>Método de pago al proveedor</label>
+      <select class="form-control" name="metodo_pago" id="ing_metodo_pago">
+        <option value="EFECTIVO">Efectivo</option>
+        <option value="TARJETA">Tarjeta</option>
+        <option value="TRANSFERENCIA">Transferencia bancaria</option>
+        <option value="MIXTO">Mixto</option>
+      </select>
+    </div>
+
     <div class="form-group col-lg-12 col-md-12 col-sm-12 col-xs-12 form-actions-row">
       <button class="btn btn-primary" type="submit" id="btnGuardar"><i class="fa fa-save"></i>  Guardar</button>
       <button class="btn btn-danger" onclick="cancelarform()" type="button" id="btnCancelar"><i class="fa fa-arrow-circle-left"></i> Cancelar</button>

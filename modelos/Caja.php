@@ -1,5 +1,5 @@
 <?php
-require "../config/Conexion.php";
+require_once __DIR__ . "/../config/Conexion.php";
 
 class Caja
 {
@@ -35,13 +35,17 @@ class Caja
     public function resumenCaja($idcaja)
     {
         $sql = "SELECT c.idcaja,c.idusuario,c.fecha_apertura,c.fecha_cierre,c.monto_apertura,c.estado,c.observacion,
+          IFNULL(SUM(CASE WHEN m.tipo='INGRESO' AND m.concepto LIKE 'Venta %' THEN m.monto ELSE 0 END),0) AS ventas_efectivo,
+          IFNULL(SUM(CASE WHEN m.tipo='INGRESO' AND m.concepto NOT LIKE 'Venta %' THEN m.monto ELSE 0 END),0) AS ingresos_manuales,
           IFNULL(SUM(CASE WHEN m.tipo='INGRESO' THEN m.monto ELSE 0 END),0) AS total_ingresos,
           IFNULL(SUM(CASE WHEN m.tipo='EGRESO' THEN m.monto ELSE 0 END),0) AS total_egresos
         FROM caja_diaria c
         LEFT JOIN caja_movimiento m ON m.idcaja=c.idcaja
         WHERE c.idcaja='$idcaja'
         GROUP BY c.idcaja,c.idusuario,c.fecha_apertura,c.fecha_cierre,c.monto_apertura,c.estado,c.observacion";
-        return ejecutarConsultaSimpleFila($sql);
+        $row = ejecutarConsultaSimpleFila($sql);
+        if (!$row) return null;
+        return $row;
     }
 
     public function cerrarCaja($idcaja, $monto_cierre_real, $observacion)
@@ -75,15 +79,18 @@ class Caja
         return ejecutarConsulta($sql);
     }
 
-    public function historialCajas($idusuario)
+    public function historialCajas($idusuario, $esAdmin = false)
     {
+        $filtro = $esAdmin ? "" : "WHERE c.idusuario='$idusuario'";
         $sql = "SELECT c.idcaja,c.fecha_apertura,c.fecha_cierre,c.monto_apertura,c.monto_cierre_sistema,c.monto_cierre_real,c.diferencia,c.estado,
+          u.nombre AS cajero,
           IFNULL(SUM(CASE WHEN m.tipo='INGRESO' THEN m.monto ELSE 0 END),0) AS ingresos,
           IFNULL(SUM(CASE WHEN m.tipo='EGRESO' THEN m.monto ELSE 0 END),0) AS egresos
         FROM caja_diaria c
+        INNER JOIN usuario u ON u.idusuario=c.idusuario
         LEFT JOIN caja_movimiento m ON m.idcaja=c.idcaja
-        WHERE c.idusuario='$idusuario'
-        GROUP BY c.idcaja,c.fecha_apertura,c.fecha_cierre,c.monto_apertura,c.monto_cierre_sistema,c.monto_cierre_real,c.diferencia,c.estado
+        $filtro
+        GROUP BY c.idcaja,c.fecha_apertura,c.fecha_cierre,c.monto_apertura,c.monto_cierre_sistema,c.monto_cierre_real,c.diferencia,c.estado,u.nombre
         ORDER BY c.idcaja DESC";
         return ejecutarConsulta($sql);
     }

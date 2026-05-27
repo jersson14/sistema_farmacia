@@ -1,5 +1,5 @@
 <?php
-require "../config/Conexion.php";
+require_once __DIR__ . "/../config/Conexion.php";
 
 class Empresa
 {
@@ -83,13 +83,13 @@ class Empresa
         $cfg = $this->obtener();
         if (!$cfg) {
             return array(
-                "nombre" => 'PERNO CENTRO "SEÑOR DE HUANCA"',
-                "ruc" => '20603558422',
-                "direccion_linea1" => 'Bar. Santa Rosa S/N (al costado del Grifo Wari)',
-                "direccion_linea2" => 'Abancay - Apurimac',
-                "telefono" => '932381391',
-                "email" => 'ventas@pernocentro.com',
-                "logo" => 'logo1.jpeg',
+                "nombre" => 'Botica FarmaSuyana',
+                "ruc" => '',
+                "direccion_linea1" => 'Urb. Patibamba Baja, Av. Sinchi Roca Lote 1',
+                "direccion_linea2" => 'Al costado de la Iglesia Cristiana',
+                "telefono" => '',
+                "email" => '',
+                "logo" => 'farmasuyana.png',
                 "moneda" => 'PEN'
             );
         }
@@ -104,14 +104,16 @@ class Empresa
         }
 
         return array(
-            "nombre" => $decode(!empty($cfg['razon_social']) ? $cfg['razon_social'] : $cfg['nombre_comercial']),
-            "ruc" => $decode($cfg['ruc']),
+            "nombre"           => $decode(!empty($cfg['razon_social']) ? $cfg['razon_social'] : $cfg['nombre_comercial']),
+            "nombre_comercial" => $decode(!empty($cfg['nombre_comercial']) ? $cfg['nombre_comercial'] : ''),
+            "ruc"              => $decode($cfg['ruc']),
             "direccion_linea1" => $decode($direccion_linea1),
             "direccion_linea2" => $decode($direccion_linea2),
-            "telefono" => $decode(!empty($cfg['telefono']) ? $cfg['telefono'] : $cfg['celular']),
-            "email" => $decode($cfg['correo']),
-            "logo" => !empty($cfg['logo']) ? $cfg['logo'] : 'logo1.jpeg',
-            "moneda" => !empty($cfg['moneda']) ? strtoupper($cfg['moneda']) : 'PEN'
+            "telefono"         => $decode(!empty($cfg['telefono']) ? $cfg['telefono'] : $cfg['celular']),
+            "email"            => $decode($cfg['correo']),
+            "web"              => $decode(!empty($cfg['web']) ? $cfg['web'] : ''),
+            "logo"             => !empty($cfg['logo']) ? $cfg['logo'] : 'logo1.jpeg',
+            "moneda"           => !empty($cfg['moneda']) ? strtoupper($cfg['moneda']) : 'PEN'
         );
     }
 }

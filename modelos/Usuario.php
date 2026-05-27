@@ -1,6 +1,6 @@
 <?php 
 //incluir la conexion de base de datos
-require "../config/Conexion.php";
+require_once __DIR__ . "/../config/Conexion.php";
 class Usuario{
 
 
@@ -28,7 +28,8 @@ public function insertar($nombre,$tipo_documento,$num_documento,$direccion,$tele
 }
 
 public function editar($idusuario,$nombre,$tipo_documento,$num_documento,$direccion,$telefono,$email,$cargo,$login,$clave,$imagen,$permisos){
-	$sql="UPDATE usuario SET nombre='$nombre',tipo_documento='$tipo_documento',num_documento='$num_documento',direccion='$direccion',telefono='$telefono',email='$email',cargo='$cargo',login='$login',clave='$clave',imagen='$imagen' 
+	$claveSql = ($clave !== null) ? ",clave='$clave'" : "";
+	$sql="UPDATE usuario SET nombre='$nombre',tipo_documento='$tipo_documento',num_documento='$num_documento',direccion='$direccion',telefono='$telefono',email='$email',cargo='$cargo',login='$login'$claveSql,imagen='$imagen'
 	WHERE idusuario='$idusuario'";
 	 ejecutarConsulta($sql);
 

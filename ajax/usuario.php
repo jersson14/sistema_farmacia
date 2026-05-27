@@ -1,6 +1,14 @@
-<?php 
+<?php
 session_start();
 require_once "../modelos/Usuario.php";
+
+$op = $_GET["op"] ?? "";
+// Operaciones públicas (login/logout) no requieren sesión activa
+$opPublicas = ['verificar', 'salir'];
+if (!in_array($op, $opPublicas, true) && !isset($_SESSION['idusuario'])) {
+    echo json_encode(['ok' => false, 'message' => 'Sesión no válida']);
+    exit;
+}
 
 $usuario=new Usuario();
 
@@ -16,8 +24,12 @@ $login=isset($_POST["login"])? limpiarCadena($_POST["login"]):"";
 $clave=isset($_POST["clave"])? limpiarCadena($_POST["clave"]):"";
 $imagen=isset($_POST["imagen"])? limpiarCadena($_POST["imagen"]):"";
 
-switch ($_GET["op"]) {
+switch ($op) {
 	case 'guardaryeditar':
+	if (!isset($_SESSION['acceso']) || $_SESSION['acceso'] != 1) {
+		echo "Sin permiso para gestionar usuarios";
+		break;
+	}
 
 	if (!file_exists($_FILES['imagen']['tmp_name'])|| !is_uploaded_file($_FILES['imagen']['tmp_name'])) {
 		$imagen=$_POST["imagenactual"];
@@ -29,24 +41,28 @@ switch ($_GET["op"]) {
 		}
 	}
 
-	//Hash SHA256 para la contraseña
-	$clavehash=hash("SHA256", $clave);
+	$permisos = isset($_POST['permiso']) ? $_POST['permiso'] : [];
 	if (empty($idusuario)) {
-		$rspta=$usuario->insertar($nombre,$tipo_documento,$num_documento,$direccion,$telefono,$email,$cargo,$login,$clavehash,$imagen,$_POST['permiso']);
+		$clavehash = hash("SHA256", $clave);
+		$rspta=$usuario->insertar($nombre,$tipo_documento,$num_documento,$direccion,$telefono,$email,$cargo,$login,$clavehash,$imagen,$permisos);
 		echo $rspta ? "Datos registrados correctamente" : "No se pudo registrar todos los datos del usuario";
 	}else{
-		$rspta=$usuario->editar($idusuario,$nombre,$tipo_documento,$num_documento,$direccion,$telefono,$email,$cargo,$login,$clavehash,$imagen,$_POST['permiso']);
+		// Solo actualizar clave si el usuario escribió una nueva
+		$clavehash = !empty($clave) ? hash("SHA256", $clave) : null;
+		$rspta=$usuario->editar($idusuario,$nombre,$tipo_documento,$num_documento,$direccion,$telefono,$email,$cargo,$login,$clavehash,$imagen,$permisos);
 		echo $rspta ? "Datos actualizados correctamente" : "No se pudo actualizar los datos";
 	}
 	break;
 	
 
 	case 'desactivar':
+	if (!isset($_SESSION['acceso']) || $_SESSION['acceso'] != 1) { echo "Sin permiso"; break; }
 	$rspta=$usuario->desactivar($idusuario);
 	echo $rspta ? "Datos desactivados correctamente" : "No se pudo desactivar los datos";
 	break;
 
 	case 'activar':
+	if (!isset($_SESSION['acceso']) || $_SESSION['acceso'] != 1) { echo "Sin permiso"; break; }
 	$rspta=$usuario->activar($idusuario);
 	echo $rspta ? "Datos activados correctamente" : "No se pudo activar los datos";
 	break;
@@ -132,6 +148,16 @@ switch ($_GET["op"]) {
 			array_push($valores, $per->idpermiso);
 		}
 
+		// Fallback: si el usuario no tiene permisos en usuario_permiso, asignar por cargo
+		if (empty($valores)) {
+			$cargoStr = strtolower($fetch->cargo ?? '');
+			if (strpos($cargoStr, 'admin') !== false) {
+				$valores = [1,2,3,4,5,6,7,8,9,10,11];
+			} else {
+				$valores = [1,4]; // Vendedor: Escritorio + Ventas
+			}
+		}
+
 		//determinamos lo accesos al usuario
 		in_array(1, $valores)?$_SESSION['escritorio']=1:$_SESSION['escritorio']=0;
 		in_array(2, $valores)?$_SESSION['almacen']=1:$_SESSION['almacen']=0;
@@ -140,6 +166,10 @@ switch ($_GET["op"]) {
 		in_array(5, $valores)?$_SESSION['acceso']=1:$_SESSION['acceso']=0;
 		in_array(6, $valores)?$_SESSION['consultac']=1:$_SESSION['consultac']=0;
 		in_array(7, $valores)?$_SESSION['consultav']=1:$_SESSION['consultav']=0;
+		in_array(8, $valores)?$_SESSION['caja']=1:$_SESSION['caja']=0;
+		in_array(9, $valores)?$_SESSION['kardex']=1:$_SESSION['kardex']=0;
+		in_array(10,$valores)?$_SESSION['cuentas']=1:$_SESSION['cuentas']=0;
+		in_array(11,$valores)?$_SESSION['backup']=1:$_SESSION['backup']=0;
 
 	}
 	echo json_encode($fetch);

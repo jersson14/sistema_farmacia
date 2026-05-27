@@ -37,6 +37,18 @@ function init(){
    	$("#idunidad").selectpicker('refresh');
    });
    $("#imagenmuestra").hide();
+   $("#imgPlaceholder").show();
+
+   $("#imagen").on("change", function(){
+      var file = this.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(e){
+         $("#imagenmuestra").attr("src", e.target.result).show();
+         $("#imgPlaceholder").hide();
+      };
+      reader.readAsDataURL(file);
+   });
 }
 
 //funcion limpiar
@@ -46,12 +58,27 @@ function limpiar(){
 	$("#descripcion").val("");
 	$("#stock").val("");
 	$("#stock_minimo").val("1");
+	$("#precio_venta").val("0.00");
 	$("#idunidad").val("");
 	$("#idunidad").selectpicker('refresh');
-	$("#imagenmuestra").attr("src","");
+	$("#imagenmuestra").attr("src","").hide();
+	$("#imgPlaceholder").show();
 	$("#imagenactual").val("");
+	$("#imagen").val("");
 	$("#print").hide();
 	$("#idarticulo").val("");
+	// Campos farmacéuticos
+	$("#principio_activo").val("");
+	$("#concentracion").val("");
+	$("#forma_farmaceutica").val("");
+	try { $("#forma_farmaceutica").selectpicker("refresh"); } catch(e) {}
+	$("#via_administracion").val("");
+	try { $("#via_administracion").selectpicker("refresh"); } catch(e) {}
+	$("#laboratorio").val("");
+	$("#registro_sanitario").val("");
+	$("#requiere_frio").prop("checked", false);
+	$("#tipo_venta").val("OTC");
+	try { $("#tipo_venta").selectpicker("refresh"); } catch(e) {}
 }
 
 //funcion mostrar formulario
@@ -140,12 +167,25 @@ function mostrar(idarticulo){
 			$("#nombre").val(data.nombre);
 			$("#stock").val(normalizarEnteroNoNegativo(data.stock, 0));
 			$("#stock_minimo").val(normalizarEnteroNoNegativo(data.stock_minimo, 1));
+			$("#precio_venta").val(parseFloat(data.precio_venta || 0).toFixed(2));
 			$("#descripcion").val(data.descripcion);
-			$("#imagenmuestra").show();
-			$("#imagenmuestra").attr("src","../files/articulos/"+data.imagen);
+			$("#imagenmuestra").attr("src","../files/articulos/"+data.imagen).show();
+			$("#imgPlaceholder").hide();
 			$("#imagenactual").val(data.imagen);
 			$("#idarticulo").val(data.idarticulo);
 			generarbarcode(true);
+			// Campos farmacéuticos
+			$("#principio_activo").val(data.principio_activo || "");
+			$("#concentracion").val(data.concentracion || "");
+			$("#forma_farmaceutica").val(data.forma_farmaceutica || "");
+			try { $("#forma_farmaceutica").selectpicker("refresh"); } catch(e) {}
+			$("#via_administracion").val(data.via_administracion || "");
+			try { $("#via_administracion").selectpicker("refresh"); } catch(e) {}
+			$("#laboratorio").val(data.laboratorio || "");
+			$("#registro_sanitario").val(data.registro_sanitario || "");
+			$("#requiere_frio").prop("checked", data.requiere_frio == 1);
+			$("#tipo_venta").val(data.tipo_venta || "OTC");
+			try { $("#tipo_venta").selectpicker("refresh"); } catch(e) {}
 		})
 }
 

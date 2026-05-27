@@ -24,7 +24,7 @@ if ($_SESSION['acceso']==1 || $perfilPropio) {
         <div class="col-md-12">
       <div class="box">
 <div class="box-header with-border">
-  <h1 class="box-title"><?php echo $perfilPropio ? 'Mi Perfil' : 'Usuarios'; ?> <button class="btn btn-success" onclick="mostrarform(true)" id="btnagregar"><i class="fa fa-plus-circle"></i>Agregar</button></h1>
+  <h1 class="box-title"><?php echo $perfilPropio ? 'Mi Perfil' : 'Usuarios'; ?> <button class="btn btn-success" onclick="mostrarformNuevo()" id="btnagregar"><i class="fa fa-plus-circle"></i>Agregar</button></h1>
   <div class="box-tools pull-right">
     
   </div>
@@ -91,22 +91,24 @@ if ($_SESSION['acceso']==1 || $perfilPropio) {
       <input class="form-control" type="email" name="email" id="email" maxlength="70" placeholder="email">
     </div>
     <div class="form-group col-lg-6 col-md-6 col-xs-12">
-      <label for="">Cargo</label>
-      <input class="form-control" type="text" name="cargo" id="cargo" maxlength="20" placeholder="Cargo">
+      <label for="">Rol / Cargo (*)</label>
+      <select class="form-control" name="cargo" id="cargo" required>
+        <option value="Vendedor">Vendedor</option>
+        <option value="Administrador">Administrador</option>
+      </select>
+      <small class="text-muted">Al cambiar el rol se actualizan los permisos automáticamente.</small>
     </div>
     <div class="form-group col-lg-6 col-md-6 col-xs-12">
       <label for="">Login(*):</label>
       <input class="form-control" type="text" name="login" id="login" maxlength="20" placeholder="nombre de usuario" required>
     </div>
     <div class="form-group col-lg-6 col-md-6 col-xs-12">
-      <label for="">Clave(*):</label>
-      <input class="form-control" type="password" name="clave" id="clave" maxlength="64" placeholder="Clave">
+      <label for="">Clave <span id="claveLabelHint" style="font-weight:normal;color:#888">(dejar en blanco para no cambiar)</span>:</label>
+      <input class="form-control" type="password" name="clave" id="clave" maxlength="64" placeholder="Nueva clave">
     </div>
-    <div class="form-group col-lg-6 col-md-6 col-xs-12">
-      <label>Permisos</label>
-      <ul id="permisos" style="list-style: none;">
-        
-      </ul>
+    <!-- Permisos: se asignan automáticamente según el rol, no se muestran al usuario -->
+    <div id="permisosContainer" style="display:none">
+      <ul id="permisos" style="list-style:none;margin:0;padding:0;"></ul>
     </div>
         <div class="form-group col-lg-6 col-md-6 col-xs-12">
       <label for="">Imagen:</label>

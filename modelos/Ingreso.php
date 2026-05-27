@@ -1,6 +1,6 @@
 <?php 
 //incluir la conexion de base de datos
-require "../config/Conexion.php";
+require_once __DIR__ . "/../config/Conexion.php";
 class Ingreso{
 
 
@@ -79,11 +79,9 @@ private function obtenerCorrelativoInterno($tipoComprobante, $serieComprobante, 
 	);
 }
 
-private function normalizarCantidadEntera($valor){
-	$cantidad = (int)round((float)$valor);
-	if ($cantidad < 0) {
-		$cantidad = 0;
-	}
+private function normalizarCantidad($valor, $minimo = 0.0001){
+	$cantidad = round((float)$valor, 4);
+	if ($cantidad < $minimo) $cantidad = $minimo;
 	return $cantidad;
 }
 
@@ -99,10 +97,12 @@ public function obtenerSiguienteCorrelativo($tipoComprobante, $serieComprobante)
 }
 
 //metodo insertar registro
-public function insertar($idproveedor,$idusuario,$tipo_comprobante,$serie_comprobante,$num_comprobante,$fecha_hora,$impuesto,$total_compra,$idarticulo,$cantidad,$precio_compra,$precio_venta){
+public function insertar($idproveedor,$idusuario,$tipo_comprobante,$serie_comprobante,$num_comprobante,$fecha_hora,$impuesto,$total_compra,$idarticulo,$cantidad,$precio_compra,$precio_venta,$numero_lote=array(),$fecha_vencimiento=array(),$fecha_fabricacion=array(),$temperatura_recepcion=null,$temp_observacion='',$metodo_pago='EFECTIVO'){
 	global $conexion;
 	$idproveedor = (int)$idproveedor;
 	$fecha_hora = $this->normalizarFechaHora($fecha_hora);
+	$metodosOk = array('EFECTIVO','YAPE','PLIN','TARJETA','TRANSFERENCIA','MIXTO');
+	$metodo_pago = in_array(strtoupper((string)$metodo_pago), $metodosOk, true) ? strtoupper((string)$metodo_pago) : 'EFECTIVO';
 	if ($idproveedor <= 0) {
 		return array(
 			"ok"=>false,
@@ -134,7 +134,7 @@ public function insertar($idproveedor,$idusuario,$tipo_comprobante,$serie_compro
 	$detalles = array();
 	for ($i = 0; $i < count($idarticulo); $i++) {
 		$idArticuloActual = (int)$idarticulo[$i];
-		$cantidadActual = $this->normalizarCantidadEntera($cantidad[$i]);
+		$cantidadActual = $this->normalizarCantidad($cantidad[$i]);
 		$precioCompraActual = isset($precio_compra[$i]) ? (float)$precio_compra[$i] : 0;
 		$precioVentaActual = isset($precio_venta[$i]) ? (float)$precio_venta[$i] : 0;
 
@@ -157,11 +157,24 @@ public function insertar($idproveedor,$idusuario,$tipo_comprobante,$serie_compro
 			);
 		}
 
+		$numLoteActual   = isset($numero_lote[$i])      ? trim((string)$numero_lote[$i])      : '';
+		$fechaVencActual = isset($fecha_vencimiento[$i]) ? trim((string)$fecha_vencimiento[$i]) : '';
+		$fechaFabActual  = isset($fecha_fabricacion[$i]) ? trim((string)$fecha_fabricacion[$i]) : '';
+		// Validar formato de fecha de vencimiento si se proporcionó
+		if ($fechaVencActual !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaVencActual)) {
+			$fechaVencActual = '';
+		}
+		if ($fechaFabActual !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaFabActual)) {
+			$fechaFabActual = '';
+		}
 		$detalles[] = array(
-			"idarticulo"=>$idArticuloActual,
-			"cantidad"=>$cantidadActual,
-			"precio_compra"=>$precioCompraActual,
-			"precio_venta"=>$precioVentaActual
+			"idarticulo"       => $idArticuloActual,
+			"cantidad"         => $cantidadActual,
+			"precio_compra"    => $precioCompraActual,
+			"precio_venta"     => $precioVentaActual,
+			"numero_lote"      => $numLoteActual,
+			"fecha_vencimiento"=> $fechaVencActual,
+			"fecha_fabricacion"=> $fechaFabActual
 		);
 	}
 
@@ -194,7 +207,9 @@ public function insertar($idproveedor,$idusuario,$tipo_comprobante,$serie_compro
 			}
 		}
 
-		$sql="INSERT INTO ingreso (idproveedor,idusuario,tipo_comprobante,serie_comprobante,num_comprobante,fecha_hora,impuesto,total_compra,estado) VALUES ('$idproveedor','$idusuario','$tipo_comprobante','$serie_comprobante','$num_comprobante','$fecha_hora','$impuesto','$total_compra','Aceptado')";
+		$tempSql = is_null($temperatura_recepcion) ? 'NULL' : (float)$temperatura_recepcion;
+		$temp_observacion = limpiarCadena(substr(trim((string)$temp_observacion), 0, 200));
+		$sql="INSERT INTO ingreso (idproveedor,idusuario,tipo_comprobante,serie_comprobante,num_comprobante,fecha_hora,impuesto,total_compra,estado,temperatura_recepcion,temp_observacion,metodo_pago) VALUES ('$idproveedor','$idusuario','$tipo_comprobante','$serie_comprobante','$num_comprobante','$fecha_hora','$impuesto','$total_compra','Aceptado',$tempSql,'$temp_observacion','$metodo_pago')";
 		$idingresonew=ejecutarConsulta_retornarID($sql);
 		if (!$idingresonew) {
 			$conexion->rollback();
@@ -208,10 +223,34 @@ public function insertar($idproveedor,$idusuario,$tipo_comprobante,$serie_compro
 		$sw=true;
 		for ($j = 0; $j < count($detalles); $j++) {
 			$d = $detalles[$j];
-			$sql_detalle="INSERT INTO detalle_ingreso (idingreso,idarticulo,cantidad,precio_compra,precio_venta) VALUES('".$idingresonew."','".$d["idarticulo"]."','".$d["cantidad"]."','".$d["precio_compra"]."','".$d["precio_venta"]."')";
-			ejecutarConsulta($sql_detalle) or $sw=false;
-			if (!$sw) {
+			$numLote   = limpiarCadena($d["numero_lote"]);
+			$fechaVenc = $d["fecha_vencimiento"] !== '' ? "'".$d["fecha_vencimiento"]."'" : 'NULL';
+			$sql_detalle="INSERT INTO detalle_ingreso
+				(idingreso,idarticulo,cantidad,precio_compra,precio_venta,numero_lote,fecha_vencimiento)
+				VALUES('".$idingresonew."','".$d["idarticulo"]."','".$d["cantidad"]."',
+				       '".$d["precio_compra"]."','".$d["precio_venta"]."',
+				       '$numLote',$fechaVenc)";
+			$iddetalle = ejecutarConsulta_retornarID($sql_detalle);
+			if (!$iddetalle) {
+				$sw = false;
 				break;
+			}
+			// Sincronizar precio_venta en articulo para que catálogo y ventas lean siempre el precio vigente
+			if ($d["precio_venta"] > 0) {
+				ejecutarConsulta("UPDATE articulo SET precio_venta='".$d["precio_venta"]."' WHERE idarticulo='".$d["idarticulo"]."'");
+			}
+			// Crear registro en lote_articulo si se proporcionó número de lote y fecha de vencimiento
+			if ($d["numero_lote"] !== '' && $d["fecha_vencimiento"] !== '') {
+				$fechaFab = $d["fecha_fabricacion"] !== '' ? "'".$d["fecha_fabricacion"]."'" : 'NULL';
+				$sql_lote = "INSERT INTO lote_articulo
+					(idarticulo,numero_lote,fecha_vencimiento,fecha_fabricacion,cantidad_inicial,cantidad_actual,idingreso,condicion)
+					VALUES('".$d["idarticulo"]."','$numLote','".$d["fecha_vencimiento"]."',$fechaFab,
+					       '".$d["cantidad"]."','".$d["cantidad"]."','$idingresonew',1)";
+				$idlote = ejecutarConsulta_retornarID($sql_lote);
+				if ($idlote) {
+					// Actualizar detalle_ingreso con el idlote creado
+					ejecutarConsulta("UPDATE detalle_ingreso SET idlote='$idlote' WHERE iddetalle_ingreso='$iddetalle'");
+				}
 			}
 		}
 
@@ -257,7 +296,7 @@ public function mostrar($idingreso){
 }
 
 public function listarDetalle($idingreso){
-	$sql="SELECT di.idingreso,di.idarticulo,a.nombre,IFNULL(u.abreviatura,'und') as unidad,di.cantidad,di.precio_compra,di.precio_venta
+	$sql="SELECT di.idingreso,di.idarticulo,a.nombre,IFNULL(u.abreviatura,'und') as unidad,di.cantidad,di.precio_compra,di.precio_venta,di.numero_lote,di.fecha_vencimiento
 	FROM detalle_ingreso di
 	INNER JOIN articulo a ON di.idarticulo=a.idarticulo
 	LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad

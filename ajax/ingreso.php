@@ -27,9 +27,57 @@ if (!function_exists('fechaFiltroSeguroIngreso')) {
 
 
 switch ($_GET["op"]) {
+	case 'resumenPagos':
+		// Verificar si la columna metodo_pago existe
+		$colCheck = ejecutarConsultaSimpleFila("SHOW COLUMNS FROM ingreso LIKE 'metodo_pago'");
+		if (!$colCheck) {
+			// Columna aún no existe, retornar solo total general
+			$fecha_inicioRP = fechaFiltroSeguroIngreso(isset($_GET["fecha_inicio"]) ? $_GET["fecha_inicio"] : '');
+			$fecha_finRP    = fechaFiltroSeguroIngreso(isset($_GET["fecha_fin"])    ? $_GET["fecha_fin"]    : '');
+			$whereRP = array("estado='Aceptado'");
+			if ($fecha_inicioRP !== '') { $whereRP[] = "DATE(fecha_hora)>='$fecha_inicioRP'"; }
+			if ($fecha_finRP    !== '') { $whereRP[] = "DATE(fecha_hora)<='$fecha_finRP'"; }
+			$filtroRP = implode(" AND ", $whereRP);
+			$rowRP = ejecutarConsultaSimpleFila("SELECT IFNULL(SUM(total_compra),0) AS total_general, COUNT(*) AS cantidad FROM ingreso WHERE $filtroRP");
+			echo json_encode(array('ok'=>true,'data'=>array(
+				'total_efectivo'=>0,'total_yape'=>0,'total_tarjeta'=>0,
+				'total_general'=>$rowRP ? (float)$rowRP['total_general'] : 0,
+				'cantidad'=>$rowRP ? (int)$rowRP['cantidad'] : 0
+			)));
+			break;
+		}
+		$fecha_inicioRP = fechaFiltroSeguroIngreso(isset($_GET["fecha_inicio"]) ? $_GET["fecha_inicio"] : '');
+		$fecha_finRP    = fechaFiltroSeguroIngreso(isset($_GET["fecha_fin"])    ? $_GET["fecha_fin"]    : '');
+		$whereRP = array("estado='Aceptado'");
+		if ($fecha_inicioRP !== '') { $whereRP[] = "DATE(fecha_hora)>='$fecha_inicioRP'"; }
+		if ($fecha_finRP    !== '') { $whereRP[] = "DATE(fecha_hora)<='$fecha_finRP'"; }
+		$filtroRP = implode(" AND ", $whereRP);
+		$sqlRP = "SELECT
+			IFNULL(SUM(CASE WHEN metodo_pago='EFECTIVO' THEN total_compra ELSE 0 END),0) AS total_efectivo,
+			IFNULL(SUM(CASE WHEN metodo_pago IN ('YAPE','PLIN') THEN total_compra ELSE 0 END),0) AS total_yape,
+			IFNULL(SUM(CASE WHEN metodo_pago='TARJETA' THEN total_compra ELSE 0 END),0) AS total_tarjeta,
+			IFNULL(SUM(total_compra),0) AS total_general,
+			COUNT(*) AS cantidad
+			FROM ingreso WHERE $filtroRP";
+		$rowRP = ejecutarConsultaSimpleFila($sqlRP);
+		echo json_encode(array('ok'=>true,'data'=>array(
+			'total_efectivo' => $rowRP ? (float)$rowRP['total_efectivo'] : 0,
+			'total_yape'     => $rowRP ? (float)$rowRP['total_yape']     : 0,
+			'total_tarjeta'  => $rowRP ? (float)$rowRP['total_tarjeta']  : 0,
+			'total_general'  => $rowRP ? (float)$rowRP['total_general']  : 0,
+			'cantidad'       => $rowRP ? (int)$rowRP['cantidad']          : 0,
+		)));
+		break;
+
 	case 'guardaryeditar':
 	if (empty($idingreso)) {
-		$rspta=$ingreso->insertar($idproveedor,$idusuario,$tipo_comprobante,$serie_comprobante,$num_comprobante,$fecha_hora,$impuesto,$total_compra,$_POST["idarticulo"],$_POST["cantidad"],$_POST["precio_compra"],$_POST["precio_venta"]);
+		$numero_lote_arr       = isset($_POST["numero_lote"])       ? $_POST["numero_lote"]       : array();
+		$fecha_vencimiento_arr = isset($_POST["fecha_vencimiento"]) ? $_POST["fecha_vencimiento"] : array();
+		$fecha_fabricacion_arr = isset($_POST["fecha_fabricacion"]) ? $_POST["fecha_fabricacion"] : array();
+		$temperatura_recepcion = (isset($_POST["temperatura_recepcion"]) && $_POST["temperatura_recepcion"] !== '') ? (float)$_POST["temperatura_recepcion"] : null;
+		$temp_observacion      = isset($_POST["temp_observacion"]) ? limpiarCadena($_POST["temp_observacion"]) : '';
+		$metodo_pago           = limpiarCadena(isset($_POST["metodo_pago"]) ? $_POST["metodo_pago"] : 'EFECTIVO');
+		$rspta=$ingreso->insertar($idproveedor,$idusuario,$tipo_comprobante,$serie_comprobante,$num_comprobante,$fecha_hora,$impuesto,$total_compra,$_POST["idarticulo"],$_POST["cantidad"],$_POST["precio_compra"],$_POST["precio_venta"],$numero_lote_arr,$fecha_vencimiento_arr,$fecha_fabricacion_arr,$temperatura_recepcion,$temp_observacion,$metodo_pago);
 		if (is_array($rspta)) {
 			if (!empty($rspta["ok"])) {
 				echo json_encode(array(
@@ -89,11 +137,15 @@ switch ($_GET["op"]) {
         <th>Cantidad</th>
         <th>Precio Compra</th>
         <th>Precio Venta</th>
+        <th>N&deg; Lote</th>
+        <th>Vencimiento</th>
         <th>Subtotal</th>
         <th>Actualizar</th>
        </thead>';
 		while ($reg=$rspta->fetch_object()) {
 			$subtotal = (float)$reg->precio_compra * (float)$reg->cantidad;
+			$loteShow = !empty($reg->numero_lote) ? htmlspecialchars($reg->numero_lote) : '&mdash;';
+			$vencShow = !empty($reg->fecha_vencimiento) ? $reg->fecha_vencimiento : '&mdash;';
 			echo '<tr class="filas">
 			<td></td>
 			<td>'.$reg->nombre.'</td>
@@ -101,6 +153,8 @@ switch ($_GET["op"]) {
 			<td>'.number_format((float)$reg->cantidad,0).'</td>
 			<td>'.number_format((float)$reg->precio_compra,2).'</td>
 			<td>'.number_format((float)$reg->precio_venta,2).'</td>
+			<td>'.$loteShow.'</td>
+			<td>'.$vencShow.'</td>
 			<td>'.number_format($subtotal,2).'</td>
 			<td></td>
 			</tr>';
@@ -108,6 +162,8 @@ switch ($_GET["op"]) {
 		}
 		echo '<tfoot>
          <th>TOTAL</th>
+         <th></th>
+         <th></th>
          <th></th>
          <th></th>
          <th></th>

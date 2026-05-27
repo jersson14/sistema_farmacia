@@ -1,0 +1,22 @@
+# Archivos SQL (migraciones y backups no se versionan con datos reales)
+*.sql
+
+# Backups de base de datos
+files/backups/
+
+# Credenciales y configuración sensible
+config/global.php
+
+# Logo y archivos del cliente
+files/empresa/
+
+# Archivos subidos por usuarios
+files/uploads/
+
+# Logs de PHP/Apache
+*.log
+
+# Archivos temporales del sistema operativo
+Thumbs.db
+.DS_Store
+desktop.ini

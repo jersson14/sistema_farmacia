@@ -22,6 +22,7 @@ return $query;
 	function ejecutarConsultaSimpleFila($sql){
 global $conexion;
 $query=$conexion->query($sql);
+if (!$query) return null;
 $row=$query->fetch_assoc();
 return $row;
 	}

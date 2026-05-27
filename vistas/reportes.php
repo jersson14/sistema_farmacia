@@ -59,6 +59,8 @@ if ($_SESSION['consultac']==1 || $_SESSION['consultav']==1) {
               <li><a href="#tabStock" role="tab" data-toggle="tab">3) Stock crítico</a></li>
               <li><a href="#tabKardex" role="tab" data-toggle="tab">4) Kardex valorizado</a></li>
               <li><a href="#tabPersonas" role="tab" data-toggle="tab">5) Clientes / Proveedores</a></li>
+              <li><a href="#tabVentasFecha" role="tab" data-toggle="tab">6) Ventas por fecha</a></li>
+              <li><a href="#tabPdfFarmacia" role="tab" data-toggle="tab">7) PDFs Farmacia</a></li>
             </ul>
 
             <div class="tab-content" style="padding-top:12px;">
@@ -205,6 +207,89 @@ if ($_SESSION['consultac']==1 || $_SESSION['consultav']==1) {
                   </tfoot>
                 </table>
               </div>
+              <!-- Tab: Ventas por fecha / cliente -->
+              <div class="tab-pane" id="tabVentasFecha">
+                <div class="row" style="margin-bottom:10px">
+                  <div class="col-md-5 col-sm-8 col-xs-12">
+                    <label>Filtrar por cliente <span class="text-muted">(opcional)</span></label>
+                    <select id="idcliente_reporte" class="form-control selectpicker" data-live-search="true">
+                      <option value="0">-- Todos los clientes --</option>
+                    </select>
+                  </div>
+                  <div class="col-md-2 col-sm-4 col-xs-12">
+                    <label>&nbsp;</label>
+                    <button type="button" id="btnBuscarVentasFecha" class="btn btn-primary form-control">
+                      <i class="fa fa-search"></i> Buscar
+                    </button>
+                  </div>
+                </div>
+                <table id="tblventasfecha" class="table table-striped table-bordered table-condensed table-hover" style="width:100%;">
+                  <thead>
+                    <th>Fecha</th>
+                    <th>Usuario</th>
+                    <th>Cliente</th>
+                    <th>Comprobante</th>
+                    <th>Serie / N°</th>
+                    <th>Total</th>
+                    <th>Impuesto</th>
+                    <th>Estado</th>
+                  </thead>
+                  <tbody></tbody>
+                  <tfoot>
+                    <th>Fecha</th>
+                    <th>Usuario</th>
+                    <th>Cliente</th>
+                    <th>Comprobante</th>
+                    <th>Serie / N°</th>
+                    <th>Total</th>
+                    <th>Impuesto</th>
+                    <th>Estado</th>
+                  </tfoot>
+                </table>
+              </div>
+
+              <!-- Tab: PDFs Farmacia -->
+              <div class="tab-pane" id="tabPdfFarmacia">
+                <div class="row" style="margin-top:12px">
+
+                  <!-- Rotación de inventario -->
+                  <div class="col-md-6 col-sm-12" style="margin-bottom:16px">
+                    <div class="box box-info">
+                      <div class="box-header with-border">
+                        <h3 class="box-title"><i class="fa fa-bar-chart"></i> Rotación de inventario</h3>
+                      </div>
+                      <div class="box-body">
+                        <p class="text-muted">PDF con los 50 productos más vendidos en el período seleccionado.</p>
+                        <p><small>Usa las fechas de la parte superior de esta página.</small></p>
+                        <button type="button" class="btn btn-info btn-block" id="btnRptRotacion">
+                          <i class="fa fa-file-pdf-o"></i> Generar PDF de rotación
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Trazabilidad de lote -->
+                  <div class="col-md-6 col-sm-12" style="margin-bottom:16px">
+                    <div class="box box-warning">
+                      <div class="box-header with-border">
+                        <h3 class="box-title"><i class="fa fa-barcode"></i> Trazabilidad de lote</h3>
+                      </div>
+                      <div class="box-body">
+                        <p class="text-muted">Rastrear en qué ventas se usó un lote específico.</p>
+                        <div class="input-group" style="margin-bottom:10px">
+                          <span class="input-group-addon">ID de lote</span>
+                          <input type="number" class="form-control" id="inputIdLote" placeholder="Ej: 42" min="1">
+                        </div>
+                        <button type="button" class="btn btn-warning btn-block" id="btnRptTrazabilidad">
+                          <i class="fa fa-file-pdf-o"></i> Generar PDF de trazabilidad
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
             </div>
           </div>
         </div>

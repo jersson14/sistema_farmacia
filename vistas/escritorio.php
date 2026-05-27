@@ -11,6 +11,18 @@ if ($_SESSION['escritorio'] == 1) {
   require_once "../modelos/Consultas.php";
   $consulta = new Consultas();
 
+  // Alertas de vencimiento (silencia errores si la migración aún no fue ejecutada)
+  $cntVencidos = 0;
+  $cntVence30  = 0;
+  $cntVence60  = 0;
+  try {
+    require_once "../modelos/Lote.php";
+    $loteMdl    = new Lote();
+    $cntVencidos = $loteMdl->contarVencidos();
+    $cntVence30  = $loteMdl->contarProximosVencer(30);
+    $cntVence60  = $loteMdl->contarProximosVencer(60);
+  } catch (Throwable $exLote) {}
+
   $hoy = date("Y-m-d");
   $inicioDefault = date("Y-m-01");
 
@@ -140,6 +152,37 @@ if ($_SESSION['escritorio'] == 1) {
       "total" => (float)$reg->total
     );
   }
+
+  // Stock por categoría
+  $stockCategorias = array();
+  $rsCat = $consulta->stockporcategoria();
+  if ($rsCat) {
+    while ($reg = $rsCat->fetch_object()) {
+      $stockCategorias[] = array(
+        "categoria"        => $reg->categoria,
+        "total_productos"  => (int)$reg->total_productos,
+        "total_stock"      => (int)$reg->total_stock,
+        "agotados"         => (int)$reg->agotados,
+        "criticos"         => (int)$reg->criticos,
+      );
+    }
+  }
+  $labelsCat  = array_column($stockCategorias, 'categoria');
+  $dataCatStock = array_column($stockCategorias, 'total_stock');
+
+  // Productos con stock crítico/agotado (≤ stock_minimo)
+  $stockProductos = array();
+  $rsstock = $consulta->stockporproducto(15);
+  if ($rsstock) {
+    while ($reg = $rsstock->fetch_object()) {
+      $stockProductos[] = array(
+        "nombre"       => $reg->nombre,
+        "categoria"    => $reg->categoria,
+        "stock"        => (int)$reg->stock,
+        "stock_minimo" => (int)$reg->stock_minimo,
+      );
+    }
+  }
 ?>
 <div class="content-wrapper">
   <section class="content dashboard-wrap">
@@ -168,6 +211,35 @@ if ($_SESSION['escritorio'] == 1) {
       </div>
     </div>
 
+    <?php if ($cntVencidos > 0 || $cntVence30 > 0): ?>
+    <div class="row" style="margin-bottom:10px;">
+      <?php if ($cntVencidos > 0): ?>
+      <div class="col-md-4 col-sm-6 col-xs-12">
+        <a href="vencimientos.php" class="alert alert-danger" style="display:block;padding:10px 16px;text-decoration:none;">
+          <strong><i class="fa fa-exclamation-triangle"></i> <?php echo $cntVencidos; ?> lote(s) VENCIDO(S)</strong>
+          <span style="float:right;">Revisar &rarr;</span>
+        </a>
+      </div>
+      <?php endif; ?>
+      <?php if ($cntVence30 > 0): ?>
+      <div class="col-md-4 col-sm-6 col-xs-12">
+        <a href="vencimientos.php" class="alert alert-warning" style="display:block;padding:10px 16px;text-decoration:none;">
+          <strong><i class="fa fa-clock-o"></i> <?php echo $cntVence30; ?> lote(s) vencen en 30 días</strong>
+          <span style="float:right;">Revisar &rarr;</span>
+        </a>
+      </div>
+      <?php endif; ?>
+      <?php if ($cntVence60 > $cntVence30): ?>
+      <div class="col-md-4 col-sm-6 col-xs-12">
+        <a href="vencimientos.php" class="alert alert-info" style="display:block;padding:10px 16px;text-decoration:none;">
+          <strong><i class="fa fa-info-circle"></i> <?php echo ($cntVence60 - $cntVence30); ?> lote(s) vencen en 31-60 días</strong>
+          <span style="float:right;">Revisar &rarr;</span>
+        </a>
+      </div>
+      <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
     <div class="row dashboard-kpis">
       <div class="col-lg-3 col-md-6 col-sm-6 col-xs-12">
         <a href="venta.php" class="kpi-card kpi-sales">
@@ -188,13 +260,13 @@ if ($_SESSION['escritorio'] == 1) {
         </a>
       </div>
       <div class="col-lg-3 col-md-6 col-sm-6 col-xs-12">
-        <div class="kpi-card kpi-stock">
-          <div class="kpi-icon"><i class="fa fa-cubes"></i></div>
+        <a href="#stock-productos" class="kpi-card kpi-stock" style="scroll-behavior:smooth;" onclick="document.getElementById('stock-productos').scrollIntoView({behavior:'smooth'});return false;">
+          <div class="kpi-icon"><i class="bi bi-boxes"></i></div>
           <div class="kpi-meta">
-            <span>Stock Total</span>
+            <span>Unidades en Stock</span>
             <strong><?php echo number_format($stockTotal, 0); ?></strong>
           </div>
-        </div>
+        </a>
       </div>
       <div class="col-lg-3 col-md-6 col-sm-6 col-xs-12">
         <div class="kpi-card kpi-month">
@@ -284,7 +356,7 @@ if ($_SESSION['escritorio'] == 1) {
       <div class="col-lg-6 col-md-6 col-sm-12 col-xs-12">
         <div class="box dashboard-box">
           <div class="box-header with-border">
-            <h3 class="box-title">Top Productos Vendidos</h3>
+            <h3 class="box-title"><i class="bi bi-trophy" style="color:#d97706;margin-right:6px;"></i>Top Productos Vendidos</h3>
           </div>
           <div class="box-body">
             <canvas id="chartTopProductos" height="180"></canvas>
@@ -294,28 +366,22 @@ if ($_SESSION['escritorio'] == 1) {
       <div class="col-lg-6 col-md-6 col-sm-12 col-xs-12">
         <div class="box dashboard-box">
           <div class="box-header with-border">
-            <h3 class="box-title">Ultimos Movimientos</h3>
+            <h3 class="box-title"><i class="bi bi-clock-history" style="color:#0284c7;margin-right:6px;"></i>Últimos Movimientos</h3>
           </div>
           <div class="box-body table-responsive">
             <table class="table table-striped table-condensed">
               <thead>
                 <tr>
-                  <th>Tipo</th>
-                  <th>Fecha</th>
-                  <th>Documento</th>
-                  <th>Persona</th>
-                  <th>Total</th>
+                  <th>Tipo</th><th>Fecha</th><th>Documento</th><th>Persona</th><th>Total</th>
                 </tr>
               </thead>
               <tbody>
                 <?php if (count($movimientos) === 0) { ?>
-                <tr>
-                  <td colspan="5">Sin movimientos recientes.</td>
-                </tr>
+                <tr><td colspan="5" class="text-center text-muted" style="padding:20px;">Sin movimientos en el período.</td></tr>
                 <?php } else { foreach ($movimientos as $mov) { ?>
                 <tr>
                   <td>
-                    <span class="label <?php echo $mov["tipo"] === "Venta" ? "bg-green" : "bg-aqua"; ?>">
+                    <span class="mov-badge <?php echo $mov["tipo"] === "Venta" ? "mov-venta" : "mov-compra"; ?>">
                       <?php echo $mov["tipo"]; ?>
                     </span>
                   </td>
@@ -331,6 +397,102 @@ if ($_SESSION['escritorio'] == 1) {
         </div>
       </div>
     </div>
+
+    <!-- ── STOCK: CATEGORÍAS + CRÍTICOS ─────────────── -->
+    <div class="row" id="stock-productos">
+
+      <!-- Stock por Categoría — gráfico de barras -->
+      <div class="col-lg-7 col-md-7 col-sm-12 col-xs-12">
+        <div class="box dashboard-box">
+          <div class="box-header with-border">
+            <h3 class="box-title">
+              <i class="bi bi-bar-chart-steps" style="margin-right:6px;"></i>
+              Stock por Categoría
+            </h3>
+          </div>
+          <div class="box-body">
+            <?php if (empty($stockCategorias)): ?>
+              <p class="text-muted text-center" style="padding:40px 0;">Sin datos de inventario.</p>
+            <?php else: ?>
+            <canvas id="chartStockCat" height="200"></canvas>
+            <!-- Tarjetas resumen de categorías -->
+            <div class="cat-stock-grid">
+              <?php
+              $colores = ['#1D4ED8','#7c3aed','#0284c7','#16a34a','#f59e0b','#dc2626','#0d9488','#db2777'];
+              foreach ($stockCategorias as $idx => $cat):
+                $color = $colores[$idx % count($colores)];
+                $pct   = $stockTotal > 0 ? round(($cat['total_stock'] / $stockTotal) * 100) : 0;
+                $alerta = ($cat['agotados'] + $cat['criticos']) > 0;
+              ?>
+              <div class="cat-stock-card">
+                <div class="cat-stock-dot" style="background:<?php echo $color; ?>;"></div>
+                <div class="cat-stock-info">
+                  <div class="cat-stock-name"><?php echo htmlspecialchars($cat['categoria']); ?></div>
+                  <div class="cat-stock-nums">
+                    <strong><?php echo number_format($cat['total_stock']); ?></strong>
+                    <span>uds · <?php echo $cat['total_productos']; ?> prod. · <?php echo $pct; ?>%</span>
+                    <?php if ($alerta): ?>
+                    <span class="cat-alerta"><i class="bi bi-exclamation-triangle-fill"></i> <?php echo $cat['agotados'] + $cat['criticos']; ?> alerta(s)</span>
+                    <?php endif; ?>
+                  </div>
+                </div>
+              </div>
+              <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+          </div>
+        </div>
+      </div>
+
+      <!-- Productos con stock crítico -->
+      <div class="col-lg-5 col-md-5 col-sm-12 col-xs-12">
+        <div class="box dashboard-box">
+          <div class="box-header with-border" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+            <h3 class="box-title" style="margin:0;">
+              <i class="bi bi-exclamation-triangle" style="color:#f59e0b;margin-right:6px;"></i>
+              Stock Crítico
+            </h3>
+            <a href="articulo.php" class="btn btn-xs btn-primary">
+              <i class="bi bi-arrow-right-circle"></i> Ver todo
+            </a>
+          </div>
+          <div class="box-body" style="padding:0;min-height:auto;">
+            <?php
+            $criticos = array_filter($stockProductos, function($p){ return $p['stock'] <= max(1, $p['stock_minimo']); });
+            if (empty($criticos)):
+            ?>
+              <div style="padding:32px 20px;text-align:center;">
+                <i class="bi bi-check-circle" style="font-size:32px;color:#16a34a;display:block;margin-bottom:8px;"></i>
+                <p style="color:#16a34a;font-weight:600;margin:0;">Todo el inventario está en niveles normales</p>
+              </div>
+            <?php else: ?>
+            <div class="criticos-list">
+              <?php foreach (array_values($criticos) as $sp):
+                $s  = $sp['stock'];
+                $sm = $sp['stock_minimo'];
+                if ($s <= 0)       { $cls = 'crit-agotado'; $lbl = 'Agotado'; }
+                elseif ($s <= $sm) { $cls = 'crit-critico'; $lbl = 'Crítico'; }
+                else               { $cls = 'crit-bajo';    $lbl = 'Bajo'; }
+              ?>
+              <div class="critico-item">
+                <div class="critico-info">
+                  <div class="critico-nombre"><?php echo htmlspecialchars($sp['nombre']); ?></div>
+                  <div class="critico-cat"><?php echo htmlspecialchars($sp['categoria']); ?></div>
+                </div>
+                <div class="critico-right">
+                  <div class="critico-stock"><?php echo $s; ?></div>
+                  <span class="stock-status <?php echo $cls; ?>"><?php echo $lbl; ?></span>
+                </div>
+              </div>
+              <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /row stock -->
+
   </section>
 </div>
 <?php
@@ -353,7 +515,9 @@ require 'footer.php';
   var labelsTop = <?php echo json_encode($labelsTop); ?>;
   var dataTop = <?php echo json_encode($dataTop); ?>;
   var labelsCategoria = <?php echo json_encode($labelsCategoria); ?>;
-  var dataCategoria = <?php echo json_encode($dataCategoria); ?>;
+  var dataCategoria   = <?php echo json_encode($dataCategoria); ?>;
+  var labelsCat       = <?php echo json_encode($labelsCat); ?>;
+  var dataCatStock    = <?php echo json_encode($dataCatStock); ?>;
 
   Chart.defaults.global.animation.duration = 350;
   Chart.defaults.global.defaultFontFamily = '"Trebuchet MS", "Verdana", "Segoe UI", sans-serif';
@@ -477,6 +641,37 @@ require 'footer.php';
       }
     }
   });
+  // Gráfico stock por categoría
+  var ctxCat = document.getElementById('chartStockCat');
+  if (ctxCat && labelsCat.length) {
+    var catColors = ['#1D4ED8','#7c3aed','#0284c7','#16a34a','#f59e0b','#dc2626','#0d9488','#db2777'];
+    var catBg = labelsCat.map(function(_,i){ return catColors[i % catColors.length] + '30'; });
+    var catBorder = labelsCat.map(function(_,i){ return catColors[i % catColors.length]; });
+    new Chart(ctxCat.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: labelsCat,
+        datasets: [{
+          label: 'Unidades en stock',
+          data: dataCatStock,
+          backgroundColor: catBg,
+          borderColor: catBorder,
+          borderWidth: 2,
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        legend: { display: false },
+        scales: {
+          yAxes: [{ ticks: { beginAtZero: true } }],
+          xAxes: [{ ticks: { maxRotation: 30, minRotation: 0, fontSize: 11 } }]
+        }
+      }
+    });
+  }
+
 })();
 </script>
 <?php

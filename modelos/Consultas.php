@@ -1,6 +1,6 @@
 <?php 
 //incluir la conexion de base de datos
-require "../config/Conexion.php";
+require_once __DIR__ . "/../config/Conexion.php";
 class Consultas{
 
 
@@ -16,8 +16,27 @@ public function comprasfecha($fecha_inicio,$fecha_fin){
 }
 
 
-public function ventasfechacliente($fecha_inicio,$fecha_fin,$idcliente){
-	$sql="SELECT DATE(v.fecha_hora) as fecha, u.nombre as usuario, p.nombre as cliente, v.tipo_comprobante,v.serie_comprobante, v.num_comprobante , v.total_venta, v.impuesto, v.estado FROM venta v INNER JOIN persona p ON v.idcliente=p.idpersona INNER JOIN usuario u ON v.idusuario=u.idusuario WHERE DATE(v.fecha_hora)>='$fecha_inicio' AND DATE(v.fecha_hora)<='$fecha_fin' AND v.idcliente='$idcliente'";
+public function ventasfechacliente($fecha_inicio, $fecha_fin, $idcliente = 0) {
+	$filtroCliente = ($idcliente > 0) ? "AND v.idcliente='$idcliente'" : "";
+	$sql="SELECT DATE_FORMAT(v.fecha_hora,'%d/%m/%Y %H:%i') as fecha,
+		u.nombre as usuario,
+		IFNULL(p.nombre,'-') as cliente,
+		v.tipo_comprobante, v.serie_comprobante, v.num_comprobante,
+		v.total_venta, v.impuesto, v.estado
+		FROM venta v
+		INNER JOIN persona p ON v.idcliente=p.idpersona
+		INNER JOIN usuario u ON v.idusuario=u.idusuario
+		WHERE DATE(v.fecha_hora)>='$fecha_inicio'
+		AND DATE(v.fecha_hora)<='$fecha_fin'
+		$filtroCliente
+		ORDER BY v.fecha_hora DESC";
+	return ejecutarConsulta($sql);
+}
+
+public function listarClientesSelect() {
+	$sql="SELECT idpersona, nombre FROM persona
+		WHERE tipo_persona='Cliente' AND condicion=1
+		ORDER BY nombre ASC";
 	return ejecutarConsulta($sql);
 }
 
@@ -70,6 +89,33 @@ public function kpisgenerales(){
 	(SELECT COUNT(*) FROM persona WHERE tipo_persona='Cliente') AS clientes,
 	(SELECT COUNT(*) FROM persona WHERE tipo_persona='Proveedor') AS proveedores,
 	(SELECT IFNULL(SUM(stock),0) FROM articulo WHERE condicion=1) AS stock_total";
+	return ejecutarConsulta($sql);
+}
+
+public function stockporcategoria(){
+	$sql = "SELECT IFNULL(c.nombre,'Sin categoría') AS categoria,
+	               COUNT(a.idarticulo) AS total_productos,
+	               IFNULL(SUM(a.stock),0) AS total_stock,
+	               IFNULL(SUM(CASE WHEN a.stock <= 0 THEN 1 ELSE 0 END),0) AS agotados,
+	               IFNULL(SUM(CASE WHEN a.stock > 0 AND a.stock <= IFNULL(a.stock_minimo,0) THEN 1 ELSE 0 END),0) AS criticos
+	        FROM articulo a
+	        LEFT JOIN categoria c ON a.idcategoria = c.idcategoria
+	        WHERE a.condicion = 1
+	        GROUP BY c.idcategoria, c.nombre
+	        ORDER BY total_stock DESC";
+	return ejecutarConsulta($sql);
+}
+
+public function stockporproducto($limit = 20){
+	$limit = (int)$limit;
+	if ($limit <= 0) $limit = 20;
+	$sql = "SELECT a.nombre, IFNULL(c.nombre,'—') AS categoria,
+	               a.stock, IFNULL(a.stock_minimo, 0) AS stock_minimo
+	        FROM articulo a
+	        LEFT JOIN categoria c ON a.idcategoria = c.idcategoria
+	        WHERE a.condicion = 1
+	        ORDER BY a.stock ASC, a.nombre ASC
+	        LIMIT $limit";
 	return ejecutarConsulta($sql);
 }
 

@@ -1,6 +1,6 @@
 <?php 
 //incluir la conexion de base de datos
-require "../config/Conexion.php";
+require_once __DIR__ . "/../config/Conexion.php";
 class Venta{
 
 
@@ -79,11 +79,9 @@ private function obtenerCorrelativoInterno($tipoComprobante, $serieComprobante, 
 	);
 }
 
-private function normalizarCantidadEntera($valor){
-	$cantidad = (int)round((float)$valor);
-	if ($cantidad < 0) {
-		$cantidad = 0;
-	}
+private function normalizarCantidad($valor, $minimo = 0.0001){
+	$cantidad = round((float)$valor, 4);
+	if ($cantidad < $minimo) $cantidad = $minimo;
 	return $cantidad;
 }
 
@@ -99,23 +97,29 @@ public function obtenerSiguienteCorrelativo($tipoComprobante, $serieComprobante)
 }
 
 //metodo insertar registro
-public function insertar($idcliente,$idusuario,$tipo_comprobante,$serie_comprobante,$num_comprobante,$fecha_hora,$impuesto,$total_venta,$idarticulo,$cantidad,$precio_venta,$descuento){
+public function insertar($idcliente,$idusuario,$tipo_comprobante,$serie_comprobante,$num_comprobante,$fecha_hora,$impuesto,$total_venta,$idarticulo,$cantidad,$precio_venta,$descuento,$metodo_pago='EFECTIVO',$monto_efectivo=0,$monto_tarjeta=0,$monto_digital=0,$seguro_nombre='',$seguro_copago=0,$seguro_nro_autorizacion=''){
 	global $conexion;
 	$idcliente = (int)$idcliente;
 	$fecha_hora = $this->normalizarFechaHora($fecha_hora);
-	if ($idcliente <= 0) {
-		return array(
-			"ok"=>false,
-			"message"=>"Debes seleccionar un cliente valido"
-		);
-	}
 
-	$validarCliente = ejecutarConsultaSimpleFila("SELECT idpersona FROM persona WHERE idpersona='$idcliente' AND tipo_persona='Cliente' LIMIT 1");
-	if (!$validarCliente || !isset($validarCliente["idpersona"])) {
-		return array(
-			"ok"=>false,
-			"message"=>"El cliente seleccionado no existe o no es valido"
-		);
+	// Si no se seleccionó cliente (0 = Consumidor Final), buscar o crear el registro
+	if ($idcliente <= 0) {
+		$cfRow = ejecutarConsultaSimpleFila("SELECT idpersona FROM persona WHERE nombre='CONSUMIDOR FINAL' AND tipo_persona='Cliente' LIMIT 1");
+		if ($cfRow && !empty($cfRow['idpersona'])) {
+			$idcliente = (int)$cfRow['idpersona'];
+		} else {
+			ejecutarConsulta("INSERT INTO persona (tipo_persona,nombre,tipo_documento,num_documento,direccion,telefono,email) VALUES ('Cliente','CONSUMIDOR FINAL','DNI','00000000','','','')");
+			$cfNew = ejecutarConsultaSimpleFila("SELECT idpersona FROM persona WHERE nombre='CONSUMIDOR FINAL' AND tipo_persona='Cliente' LIMIT 1");
+			$idcliente = ($cfNew && !empty($cfNew['idpersona'])) ? (int)$cfNew['idpersona'] : 0;
+		}
+		if ($idcliente <= 0) {
+			return array("ok"=>false, "message"=>"No se pudo resolver el cliente por defecto.");
+		}
+	} else {
+		$validarCliente = ejecutarConsultaSimpleFila("SELECT idpersona FROM persona WHERE idpersona='$idcliente' AND tipo_persona='Cliente' LIMIT 1");
+		if (!$validarCliente || !isset($validarCliente["idpersona"])) {
+			return array("ok"=>false, "message"=>"El cliente seleccionado no existe o no es valido");
+		}
 	}
 
 	if (!is_array($idarticulo) || count($idarticulo) === 0) {
@@ -137,7 +141,7 @@ public function insertar($idcliente,$idusuario,$tipo_comprobante,$serie_comproba
 
 	for ($i = 0; $i < count($idarticulo); $i++) {
 		$idArticuloActual = (int)$idarticulo[$i];
-		$cantidadActual = $this->normalizarCantidadEntera($cantidad[$i]);
+		$cantidadActual = $this->normalizarCantidad($cantidad[$i]);
 		$precioActual = isset($precio_venta[$i]) ? (float)$precio_venta[$i] : 0;
 		$descuentoActual = isset($descuento[$i]) ? (float)$descuento[$i] : 0;
 
@@ -214,7 +218,7 @@ public function insertar($idcliente,$idusuario,$tipo_comprobante,$serie_comproba
 		while ($row = $rsStock->fetch_assoc()) {
 			$stockActual[(int)$row["idarticulo"]] = array(
 				"nombre"=>$row["nombre"],
-				"stock"=>$this->normalizarCantidadEntera($row["stock"])
+				"stock"=>(float)$row["stock"]
 			);
 		}
 
@@ -224,9 +228,9 @@ public function insertar($idcliente,$idusuario,$tipo_comprobante,$serie_comproba
 				$erroresStock[] = "Articulo ID ".$idArt." no encontrado";
 				continue;
 			}
-			$stockDisp = $this->normalizarCantidadEntera($stockActual[$idArt]["stock"]);
+			$stockDisp = (float)$stockActual[$idArt]["stock"];
 			if ($stockDisp < $cantSolicitada) {
-				$erroresStock[] = $stockActual[$idArt]["nombre"]." (stock: ".number_format($stockDisp,0).", solicitado: ".number_format($cantSolicitada,0).")";
+				$erroresStock[] = $stockActual[$idArt]["nombre"]." (stock: ".number_format($stockDisp,4).", solicitado: ".number_format($cantSolicitada,4).")";
 			}
 		}
 
@@ -239,7 +243,23 @@ public function insertar($idcliente,$idusuario,$tipo_comprobante,$serie_comproba
 			);
 		}
 
-		$sql="INSERT INTO venta (idcliente,idusuario,tipo_comprobante,serie_comprobante,num_comprobante,fecha_hora,impuesto,total_venta,estado) VALUES ('$idcliente','$idusuario','$tipo_comprobante','$serie_comprobante','$num_comprobante','$fecha_hora','$impuesto','$total_venta','Aceptado')";
+		$metodosPermitidos = array('EFECTIVO','TARJETA','TRANSFERENCIA','YAPE','PLIN','MIXTO');
+		$metodo_pago = in_array(strtoupper(trim((string)$metodo_pago)), $metodosPermitidos, true) ? strtoupper(trim((string)$metodo_pago)) : 'EFECTIVO';
+		$monto_efectivo = max(0, (float)$monto_efectivo);
+		$monto_tarjeta  = max(0, (float)$monto_tarjeta);
+		$monto_digital  = max(0, (float)$monto_digital);
+		// Columnas de seguro: opcionales (dependen de migración). Verificar si existen.
+		$colSeguro = ''; $valSeguro = '';
+		$chkSeg = ejecutarConsultaSimpleFila("SELECT COUNT(*) AS c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='venta' AND COLUMN_NAME='seguro_nombre'");
+		if ($chkSeg && (int)$chkSeg['c'] > 0) {
+			$sn = limpiarCadena(substr(trim((string)$seguro_nombre), 0, 100));
+			$sc = max(0, (float)$seguro_copago);
+			$sa = limpiarCadena(substr(trim((string)$seguro_nro_autorizacion), 0, 50));
+			$colSeguro = ',seguro_nombre,seguro_copago,seguro_nro_autorizacion';
+			$valSeguro = ",'$sn','$sc','$sa'";
+		}
+
+		$sql="INSERT INTO venta (idcliente,idusuario,tipo_comprobante,serie_comprobante,num_comprobante,fecha_hora,impuesto,total_venta,estado,metodo_pago,monto_efectivo,monto_tarjeta,monto_digital$colSeguro) VALUES ('$idcliente','$idusuario','$tipo_comprobante','$serie_comprobante','$num_comprobante','$fecha_hora','$impuesto','$total_venta','Aceptado','$metodo_pago','$monto_efectivo','$monto_tarjeta','$monto_digital'$valSeguro)";
 		$idventanew=ejecutarConsulta_retornarID($sql);
 		if (!$idventanew) {
 			$conexion->rollback();
@@ -253,10 +273,21 @@ public function insertar($idcliente,$idusuario,$tipo_comprobante,$serie_comproba
 		$sw=true;
 		for ($j = 0; $j < count($detalles); $j++) {
 			$d = $detalles[$j];
-			$sql_detalle="INSERT INTO detalle_venta (idventa,idarticulo,cantidad,precio_venta,descuento) VALUES('".$idventanew."','".$d["idarticulo"]."','".$d["cantidad"]."','".$d["precio_venta"]."','".$d["descuento"]."')";
+			// FEFO: asignar el lote con vencimiento más próximo que tenga stock
+			$idloteUsar = null;
+			$sqlLoteFEFO = "SELECT idlote FROM lote_articulo WHERE idarticulo='".$d["idarticulo"]."' AND condicion=1 AND cantidad_actual > 0 AND fecha_vencimiento >= CURDATE() ORDER BY fecha_vencimiento ASC LIMIT 1 FOR UPDATE";
+			$rowLote = ejecutarConsultaSimpleFila($sqlLoteFEFO);
+			if ($rowLote && isset($rowLote["idlote"])) {
+				$idloteUsar = (int)$rowLote["idlote"];
+			}
+			$idloteSql = $idloteUsar ? "'".$idloteUsar."'" : "NULL";
+			$sql_detalle="INSERT INTO detalle_venta (idventa,idarticulo,cantidad,precio_venta,descuento,idlote) VALUES('".$idventanew."','".$d["idarticulo"]."','".$d["cantidad"]."','".$d["precio_venta"]."','".$d["descuento"]."',".$idloteSql.")";
 			ejecutarConsulta($sql_detalle) or $sw=false;
 			if (!$sw) {
 				break;
+			}
+			if ($idloteUsar) {
+				ejecutarConsulta("UPDATE lote_articulo SET cantidad_actual = cantidad_actual - '".$d["cantidad"]."' WHERE idlote='".$idloteUsar."'");
 			}
 		}
 
@@ -271,6 +302,17 @@ public function insertar($idcliente,$idusuario,$tipo_comprobante,$serie_comproba
 
 		$conexion->commit();
 		$conexion->autocommit(true);
+
+		// Registrar cobro en caja si hay monto efectivo
+		if ($monto_efectivo > 0) {
+			require_once __DIR__ . "/Caja.php";
+			$cajaMdl = new Caja();
+			$cajaAbierta = $cajaMdl->cajaAbiertaUsuario($idusuario);
+			if ($cajaAbierta) {
+				$conceptoCaja = limpiarCadena('Venta ' . $tipo_comprobante . ' ' . $serie_comprobante . '-' . $num_comprobante);
+				$cajaMdl->agregarMovimiento($cajaAbierta['idcaja'], $idusuario, 'INGRESO', $conceptoCaja, $monto_efectivo);
+			}
+		}
 	} catch (Throwable $e) {
 		$conexion->rollback();
 		$conexion->autocommit(true);
@@ -293,8 +335,8 @@ public function insertar($idcliente,$idusuario,$tipo_comprobante,$serie_comproba
 				"idarticulo"=>$reg["idarticulo"],
 				"codigo"=>$reg["codigo"],
 				"nombre"=>$reg["nombre"],
-				"stock"=>$this->normalizarCantidadEntera($reg["stock"]),
-				"stock_minimo"=>$this->normalizarCantidadEntera($reg["stock_minimo"])
+				"stock"=>(float)$reg["stock"],
+				"stock_minimo"=>(float)$reg["stock_minimo"]
 			);
 		}
 	}
@@ -309,9 +351,21 @@ public function insertar($idcliente,$idusuario,$tipo_comprobante,$serie_comproba
 	);
 }
 
-public function anular($idventa){
+public function anular($idventa, $idusuario = null){
+	$ventaData = ejecutarConsultaSimpleFila("SELECT tipo_comprobante,serie_comprobante,num_comprobante,monto_efectivo FROM venta WHERE idventa='$idventa' LIMIT 1");
 	$sql="UPDATE venta SET estado='Anulado' WHERE idventa='$idventa'";
-	return ejecutarConsulta($sql);
+	$ok = ejecutarConsulta($sql);
+	// Registrar egreso en caja si la venta tenía cobro en efectivo
+	if ($ok && $idusuario && $ventaData && (float)$ventaData['monto_efectivo'] > 0) {
+		require_once __DIR__ . "/Caja.php";
+		$cajaMdl = new Caja();
+		$cajaAbierta = $cajaMdl->cajaAbiertaUsuario($idusuario);
+		if ($cajaAbierta) {
+			$concepto = limpiarCadena('Anulacion ' . $ventaData['tipo_comprobante'] . ' ' . $ventaData['serie_comprobante'] . '-' . $ventaData['num_comprobante']);
+			$cajaMdl->agregarMovimiento($cajaAbierta['idcaja'], $idusuario, 'EGRESO', $concepto, (float)$ventaData['monto_efectivo']);
+		}
+	}
+	return $ok;
 }
 
 
@@ -349,7 +403,7 @@ public function listarPorFecha($fechaInicio, $fechaFin){
 		$filtro = " WHERE " . implode(" AND ", $where);
 	}
 
-	$sql="SELECT v.idventa,DATE_FORMAT(v.fecha_hora,'%d/%m/%Y %H:%i') as fecha,v.idcliente,p.nombre as cliente,u.idusuario,u.nombre as usuario, v.tipo_comprobante,v.serie_comprobante,v.num_comprobante,v.total_venta,v.impuesto,v.estado
+	$sql="SELECT v.idventa,DATE_FORMAT(v.fecha_hora,'%d/%m/%Y %H:%i') as fecha,v.idcliente,p.nombre as cliente,u.idusuario,u.nombre as usuario, v.tipo_comprobante,v.serie_comprobante,v.num_comprobante,v.total_venta,v.impuesto,v.estado,IFNULL(v.metodo_pago,'EFECTIVO') as metodo_pago
 	FROM venta v
 	INNER JOIN persona p ON v.idcliente=p.idpersona
 	INNER JOIN usuario u ON v.idusuario=u.idusuario".$filtro."
@@ -359,17 +413,34 @@ public function listarPorFecha($fechaInicio, $fechaFin){
 
 
 public function ventacabecera($idventa){
-	$sql= "SELECT v.idventa, v.idcliente, p.nombre AS cliente, p.direccion, p.tipo_documento, p.num_documento, p.email, p.telefono, v.idusuario, u.nombre AS usuario, v.tipo_comprobante, v.serie_comprobante, v.num_comprobante, DATE_FORMAT(v.fecha_hora,'%d/%m/%Y %H:%i') AS fecha, v.impuesto, v.total_venta FROM venta v INNER JOIN persona p ON v.idcliente=p.idpersona INNER JOIN usuario u ON v.idusuario=u.idusuario WHERE v.idventa='$idventa'";
+	$sql= "SELECT v.idventa, v.idcliente, p.nombre AS cliente, p.direccion, p.tipo_documento, p.num_documento, p.email, p.telefono, v.idusuario, u.nombre AS usuario, v.tipo_comprobante, v.serie_comprobante, v.num_comprobante, DATE_FORMAT(v.fecha_hora,'%d/%m/%Y %H:%i') AS fecha, v.impuesto, v.total_venta, IFNULL(v.metodo_pago,'') AS metodo_pago, IFNULL(v.monto_efectivo,0) AS monto_efectivo FROM venta v INNER JOIN persona p ON v.idcliente=p.idpersona INNER JOIN usuario u ON v.idusuario=u.idusuario WHERE v.idventa='$idventa'";
 	return ejecutarConsulta($sql);
 }
 
 public function ventadetalles($idventa){
-	$sql="SELECT a.nombre AS articulo, a.codigo, IFNULL(u.abreviatura,'und') as unidad, d.cantidad, d.precio_venta, d.descuento, (d.cantidad*d.precio_venta-d.descuento) AS subtotal
-	FROM detalle_venta d
-	INNER JOIN articulo a ON d.idarticulo=a.idarticulo
-	LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad
-	WHERE d.idventa='$idventa'";
-         return ejecutarConsulta($sql);
+	// Intentar query con campos farmacéuticos; si las migraciones no se ejecutaron, fallback sin ellos
+	$sqlFull="SELECT a.nombre AS articulo, a.codigo, IFNULL(u.abreviatura,'und') as unidad,
+	          d.cantidad, d.precio_venta, d.descuento, (d.cantidad*d.precio_venta-d.descuento) AS subtotal,
+	          IFNULL(a.principio_activo,'') AS principio_activo,
+	          IFNULL(la.numero_lote,'') AS numero_lote,
+	          la.fecha_vencimiento
+	          FROM detalle_venta d
+	          INNER JOIN articulo a ON d.idarticulo=a.idarticulo
+	          LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad
+	          LEFT JOIN lote_articulo la ON d.idlote=la.idlote
+	          WHERE d.idventa='$idventa'";
+	try {
+		$rs = ejecutarConsulta($sqlFull);
+		if ($rs) return $rs;
+	} catch (Throwable $e) { /* columnas farmacéuticas no existen, usar fallback */ }
+	$sqlBase="SELECT a.nombre AS articulo, a.codigo, IFNULL(u.abreviatura,'und') as unidad,
+	          d.cantidad, d.precio_venta, d.descuento, (d.cantidad*d.precio_venta-d.descuento) AS subtotal,
+	          '' AS principio_activo, '' AS numero_lote, NULL AS fecha_vencimiento
+	          FROM detalle_venta d
+	          INNER JOIN articulo a ON d.idarticulo=a.idarticulo
+	          LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad
+	          WHERE d.idventa='$idventa'";
+	return ejecutarConsulta($sqlBase);
 }
 
 

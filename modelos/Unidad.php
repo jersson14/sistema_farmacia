@@ -1,5 +1,5 @@
 <?php
-require "../config/Conexion.php";
+require_once __DIR__ . "/../config/Conexion.php";
 
 class Unidad{
 	public function __construct(){

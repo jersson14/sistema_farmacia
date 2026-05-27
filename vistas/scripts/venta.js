@@ -1,5 +1,11 @@
 var tabla;
 var tablaArticulos;
+var recetaModalConfirmada = false;
+
+// POS grid state
+var posProductos = [];         // full product list loaded from server
+var posCatActiva = '';         // '' = all
+var posSearchTimer = null;
 var empresaDefaults = {
 	serie_boleta: "B001",
 	serie_factura: "F001",
@@ -25,22 +31,24 @@ function notifyVenta(type, message){
 
 function normalizarEnteroNoNegativo(valor){
 	var num = parseFloat(valor);
-	if (!isFinite(num)) {
-		return 0;
-	}
+	if (!isFinite(num)) { return 0; }
 	num = Math.round(num);
-	if (num < 0) {
-		num = 0;
-	}
+	if (num < 0) { num = 0; }
 	return num;
 }
 
-function normalizarCantidadEntera(valor, minimo){
-	var num = normalizarEnteroNoNegativo(valor);
-	if (num < minimo) {
-		num = minimo;
-	}
+// Mantiene decimales (hasta 4 decimales) para venta fraccionada
+function normalizarCantidad(valor, minimo){
+	var num = parseFloat(valor);
+	if (!isFinite(num) || num < 0) { num = minimo || 0.5; }
+	num = Math.round(num * 10000) / 10000;
+	if (minimo !== undefined && num < minimo) { num = minimo; }
 	return num;
+}
+
+// Alias mantenido por compatibilidad — ahora permite decimales
+function normalizarCantidadEntera(valor, minimo){
+	return normalizarCantidad(valor, minimo);
 }
 
 function fechaHoraActualInput(){
@@ -74,6 +82,207 @@ function normalizarFechaHoraInput(valor){
 	return fechaHoraActualInput();
 }
 
+// ── POS Product Grid ─────────────────────────────────────────────
+
+function cargarProductosGrid() {
+	$("#posProductGrid").html('<div class="pos-grid-loading"><i class="fa fa-spinner fa-spin fa-2x"></i><p>Cargando productos...</p></div>');
+	$.get("../ajax/venta.php?op=listarArticulosGrid", function(resp) {
+		var r = {};
+		try { r = JSON.parse(resp); } catch(e) {}
+		if (!r.ok || !r.data) {
+			$("#posProductGrid").html('<div class="pos-grid-empty"><i class="fa fa-exclamation-circle fa-2x"></i><br>No se pudieron cargar los productos.</div>');
+			return;
+		}
+		posProductos = r.data;
+		renderGrid();
+	}).fail(function() {
+		$("#posProductGrid").html('<div class="pos-grid-empty">Error al cargar productos.</div>');
+	});
+}
+
+function cargarCategoriasGrid() {
+	$.get("../ajax/venta.php?op=listarCategoriasVenta", function(resp) {
+		var r = {};
+		try { r = JSON.parse(resp); } catch(e) {}
+		if (!r.ok || !r.data) return;
+		var $bar = $("#posCatBar");
+		r.data.forEach(function(cat) {
+			var $pill = $('<button type="button" class="pos-cat-pill">' + $('<span>').text(cat.nombre).html() + '</button>');
+			$pill.attr('data-cat', cat.idcategoria);
+			$bar.append($pill);
+		});
+	});
+}
+
+function renderGrid() {
+	var termino = ($("#posSearchInput").val() || "").toLowerCase().trim();
+	var catId   = posCatActiva ? parseInt(posCatActiva) : 0;
+
+	var lista = posProductos.filter(function(p) {
+		if (catId && p.idcategoria !== catId) return false;
+		if (termino) {
+			var haystack = (p.nombre + ' ' + p.principio_activo + ' ' + p.codigo + ' ' + p.categoria).toLowerCase();
+			return haystack.indexOf(termino) !== -1;
+		}
+		return true;
+	});
+
+	if (lista.length === 0) {
+		$("#posProductGrid").html('<div class="pos-grid-empty"><i class="fa fa-search fa-2x"></i><br>Sin resultados.</div>');
+		return;
+	}
+
+	var html = '';
+	lista.forEach(function(p) {
+		var sinStock = p.stock <= 0;
+		var precio   = (p.precio_venta > 0) ? ((window.appCurrencySymbol || 'S/') + ' ' + p.precio_venta.toFixed(2)) : 'Sin precio';
+		var badgeCls = p.tipo_venta === 'OTC' ? 'badge-otc' : (p.tipo_venta === 'RX' ? 'badge-rx' : 'badge-ctrl');
+		var badgeTxt = p.tipo_venta === 'CONTROL_ESPECIAL' ? 'CTRL' : p.tipo_venta;
+		var imgSrc   = p.imagen ? '../files/articulos/' + p.imagen : '../public/img/default-50x50.gif';
+		var generico = p.principio_activo ? (p.principio_activo + (p.concentracion ? ' ' + p.concentracion : '')) : '';
+
+		var cardCls = 'pos-card' + (sinStock ? ' sin-stock' : '');
+		var onclick  = sinStock ? '' : 'onclick="posCardClick(' + p.idarticulo + ')"';
+
+		html += '<div class="' + cardCls + '" data-id="' + p.idarticulo + '" ' + onclick + '>' +
+			'<img class="pos-card-img" src="' + imgSrc + '" onerror="this.src=\'../public/img/default-50x50.gif\'" alt="">' +
+			'<div class="pos-card-nombre">' + $('<span>').text(p.nombre).html() + '</div>' +
+			(generico ? '<div class="pos-card-generico">' + $('<span>').text(generico).html() + '</div>' : '') +
+			'<div class="pos-card-footer">' +
+				'<span class="pos-card-precio">' + precio + '</span>' +
+				'<span class="pos-card-badge ' + badgeCls + '">' + badgeTxt + '</span>' +
+			'</div>' +
+		'</div>';
+	});
+	$("#posProductGrid").html(html);
+}
+
+function posCardClick(idarticulo) {
+	var p = null;
+	for (var i = 0; i < posProductos.length; i++) {
+		if (posProductos[i].idarticulo === idarticulo) { p = posProductos[i]; break; }
+	}
+	if (!p) return;
+	if (p.precio_venta <= 0) {
+		notifyVenta("warning", "Este producto no tiene precio de venta asignado. Actualiza el precio en el módulo de Ingresos.");
+		return;
+	}
+	agregarDetalle(p.idarticulo, p.nombre, p.precio_venta, p.abreviatura, p.stock, p.tipo_venta);
+}
+
+// ── Visual cart ───────────────────────────────────────────────────
+
+function renderCarritoVisual() {
+	var filas = document.querySelectorAll('#detalles .filas');
+	var $cont = $("#posCarritoItems");
+
+	if (filas.length === 0) {
+		$cont.html(
+			'<div class="pos-carrito-empty" id="posCarritoEmpty">' +
+			'<i class="fa fa-shopping-basket fa-3x"></i>' +
+			'<p>Sin productos en el carrito</p>' +
+			'<small>Selecciona un medicamento o escanea su código</small>' +
+			'</div>'
+		);
+		return;
+	}
+
+	var html = '';
+	for (var i = 0; i < filas.length; i++) {
+		var fila   = filas[i];
+		var idx    = fila.id.replace('fila', '');
+		var tds    = fila.querySelectorAll('td');
+		var nombre = tds[1] ? tds[1].textContent.trim() : '';
+		var unidad = tds[2] ? tds[2].textContent.trim() : '';
+		var cantInp   = fila.querySelector('input[name="cantidad[]"]');
+		var precioInp = fila.querySelector('input[name="precio_venta[]"]');
+		var stockInp  = fila.querySelector('input[name="stock_disponible[]"]');
+		var cantidad  = cantInp  ? parseFloat(cantInp.value  || 1)    : 1;
+		var precio    = precioInp ? parseFloat(precioInp.value || 0)   : 0;
+		var stockMax  = stockInp  ? parseFloat(stockInp.value || 9999) : 9999;
+		var subtotal  = (cantidad * precio).toFixed(2);
+		var sym       = window.appCurrencySymbol || 'S/';
+
+		html += '<div class="pos-item" id="posItem' + idx + '">' +
+			'<div class="pos-item-info">' +
+				'<div class="pos-item-nombre" title="' + $('<span>').text(nombre).html() + '">' + $('<span>').text(nombre).html() + '</div>' +
+				(unidad ? '<div class="pos-item-generico">' + $('<span>').text(unidad).html() + '</div>' : '') +
+			'</div>' +
+			'<div class="pos-item-controls">' +
+				'<button type="button" class="pos-item-qty-btn" onclick="posItemDecrement(' + idx + ',' + stockMax + ')">&#8722;</button>' +
+				'<input type="text" class="pos-item-qty" id="posItemQty' + idx + '" value="' + cantidad + '" onchange="posItemQtyChange(' + idx + ',' + stockMax + ',this.value)" onclick="this.select()">' +
+				'<button type="button" class="pos-item-qty-btn" onclick="posItemIncrement(' + idx + ',' + stockMax + ')">&#43;</button>' +
+			'</div>' +
+			'<div class="pos-item-precio">' + sym + ' ' + subtotal + '</div>' +
+			'<button type="button" class="pos-item-del" onclick="eliminarDetalle(' + idx + ')" title="Quitar"><i class="fa fa-times"></i></button>' +
+		'</div>';
+	}
+	$cont.html(html);
+}
+
+function posItemDecrement(idx, stockMax) {
+	var cantInp = document.querySelector('#fila' + idx + ' input[name="cantidad[]"]');
+	if (!cantInp) return;
+	var actual = normalizarCantidad(cantInp.value, 0.5);
+	var paso   = (actual > 1) ? 1 : 0.5;
+	var nuevo  = Math.max(0.5, actual - paso);
+	cantInp.value = nuevo;
+	modificarSubtotales();
+}
+
+function posItemIncrement(idx, stockMax) {
+	var cantInp = document.querySelector('#fila' + idx + ' input[name="cantidad[]"]');
+	if (!cantInp) return;
+	var actual = normalizarCantidad(cantInp.value, 0.5);
+	var nuevo  = actual + 1;
+	if (stockMax > 0 && nuevo > stockMax) {
+		notifyVenta("warning", "Stock máximo disponible: " + stockMax);
+		return;
+	}
+	cantInp.value = nuevo;
+	modificarSubtotales();
+}
+
+function posItemQtyChange(idx, stockMax, valor) {
+	var cantInp = document.querySelector('#fila' + idx + ' input[name="cantidad[]"]');
+	if (!cantInp) return;
+	var num = normalizarCantidad(valor, 0.5);
+	if (stockMax > 0 && num > stockMax) { num = stockMax; }
+	cantInp.value = num;
+	modificarSubtotales();
+}
+
+// ── POS totals display ────────────────────────────────────────────
+
+function actualizarTotalesPOS(total) {
+	var impPct = parseFloat($("#impuesto").val() || 0);
+	var sym    = window.appCurrencySymbol || 'S/';
+	var subtotalSinIgv, igvMonto, totalFinal;
+
+	if (impPct > 0) {
+		subtotalSinIgv = total / (1 + impPct / 100);
+		igvMonto       = total - subtotalSinIgv;
+		totalFinal     = total;
+		$("#posIgvRow").show();
+		$("#posIgvLabel").text("IGV (" + impPct + "%)");
+		$("#posIgvMonto").text(sym + ' ' + igvMonto.toFixed(2));
+	} else {
+		subtotalSinIgv = total;
+		igvMonto       = 0;
+		totalFinal     = total;
+		$("#posIgvRow").hide();
+	}
+
+	$("#posTotalSinIgv").text(sym + ' ' + subtotalSinIgv.toFixed(2));
+	$("#posTotalFinal").text(sym + ' ' + totalFinal.toFixed(2));
+	$("#btnCobrarTotal").text(sym + ' ' + totalFinal.toFixed(2));
+	$("#posSerieBadge").text(
+		($("#serie_comprobante").val() || '···') +
+		($("#num_comprobante").val() ? '-' + $("#num_comprobante").val() : '')
+	);
+	actualizarFloatCartBtn();
+}
+
 //funcion que se ejecuta al inicio
 function init(){
    mostrarform(false);
@@ -85,14 +294,53 @@ function init(){
 
    $("#btnFiltrarVenta").on("click", function(){
    	recargarListadoVenta();
+   	cargarResumenPagosVenta();
    });
    $("#btnLimpiarFiltroVenta").on("click", function(){
    	$("#filtro_venta_inicio").val("");
    	$("#filtro_venta_fin").val("");
    	recargarListadoVenta();
+   	cargarResumenPagosVenta();
    });
 
+   cargarResumenPagosVenta();
    cargarClientes();
+   cargarCategoriasGrid();
+
+   // POS search bar
+   $("#posSearchInput").on("input keyup", function() {
+   	clearTimeout(posSearchTimer);
+   	posSearchTimer = setTimeout(renderGrid, 200);
+   });
+   $("#posSearchInput").on("keydown", function(e) {
+   	if (e.key === "Enter") { clearTimeout(posSearchTimer); renderGrid(); }
+   });
+
+   // Category pills (delegated, pills added dynamically)
+   $(document).on("click", ".pos-cat-pill", function() {
+   	$(".pos-cat-pill").removeClass("active");
+   	$(this).addClass("active");
+   	posCatActiva = $(this).attr("data-cat") || '';
+   	renderGrid();
+   });
+
+   // Document type toggle buttons
+   $(document).on("click", ".pos-doc-btn", function() {
+   	$(".pos-doc-btn").removeClass("active");
+   	$(this).addClass("active");
+   	var tipo = $(this).attr("data-tipo") || "Boleta";
+   	$("#tipo_comprobante").val(tipo);
+   	aplicarSerieImpuesto();
+   });
+
+   // Payment method buttons
+   $(document).on("click", ".pos-metodo-btn", function() {
+   	$(".pos-metodo-btn").removeClass("active");
+   	$(this).addClass("active");
+   	var metodo = $(this).attr("data-metodo") || "EFECTIVO";
+   	$("#metodo_pago").val(metodo);
+   	sincronizarMontoPago();
+   });
 
    $("#myModal").on("shown.bs.modal", function(){
    	if (!tablaArticulos) {
@@ -122,6 +370,38 @@ function init(){
    	numeroComprobanteManual = true;
    });
 
+   // Receta médica Rx
+   $("#btnConfirmarReceta").on("click", function(){
+   	var nombreMedico = $.trim($("#rx_nombre_medico").val());
+   	var colegiatura  = $.trim($("#rx_colegiatura").val());
+   	if (!nombreMedico) {
+   		notifyVenta("warning", "El nombre del médico es obligatorio para medicamentos Rx.");
+   		$("#rx_nombre_medico").focus();
+   		return;
+   	}
+   	if (!colegiatura) {
+   		notifyVenta("warning", "El número de colegiatura es obligatorio para medicamentos Rx.");
+   		$("#rx_colegiatura").focus();
+   		return;
+   	}
+   	recetaModalConfirmada = true;
+   	$('#modalReceta').modal('hide');
+   	ejecutarGuardarVenta();
+   });
+   $("#btnCancelarReceta").on("click", function(){
+   	recetaModalConfirmada = false;
+   	$('#modalReceta').modal('hide');
+   });
+
+   // Método de pago
+   $("#metodo_pago").on("change", function(){
+   	sincronizarMontoPago();
+   	try { $("#metodo_pago").selectpicker("refresh"); } catch(e) {}
+   });
+   $(".vis-monto").on("input", function(){
+   	sincronizarMontoPago();
+   });
+
    $("#btnBuscarCodigo").on("click", function(){
    	encolarCodigoPOS($("#codigo_rapido").val());
    });
@@ -146,6 +426,14 @@ function init(){
    	cargarCorrelativoComprobante();
    });
 
+   // Búsqueda rápida de cliente por DNI
+   $("#btnBuscarDni").on("click", function(){
+   	buscarClientePorDni();
+   });
+   $("#posDniBuscar").on("keydown", function(e){
+   	if (e.key === "Enter") { e.preventDefault(); buscarClientePorDni(); }
+   });
+
    $(document).on("keydown", function(e){
    	if (e.ctrlKey && (e.key === "b" || e.key === "B")) {
    		e.preventDefault();
@@ -155,7 +443,7 @@ function init(){
    		e.preventDefault();
    		$('#myModal').modal('show');
    	}
-   	if (e.key === "F4") {
+   	if (e.key === "F10") {
    		e.preventDefault();
    		if ($("#btnGuardar").is(":visible")) {
    			$("#formulario").trigger("submit");
@@ -230,6 +518,96 @@ function guardarClienteRapido(e){
 	});
 }
 
+/* ── Carrito móvil (bottom-sheet) ────────────────────────── */
+function esMobil(){
+	return window.innerWidth <= 599;
+}
+
+function abrirCarritoMobile(){
+	if (!esMobil()) return;
+	$("#posCarritoPanel").addClass("carrito-open");
+	$("#posCarritoBackdrop").addClass("active");
+	document.body.style.overflow = "hidden";
+}
+
+function cerrarCarritoMobile(){
+	$("#posCarritoPanel").removeClass("carrito-open");
+	$("#posCarritoBackdrop").removeClass("active");
+	document.body.style.overflow = "";
+}
+
+function actualizarFloatCartBtn(){
+	if (!esMobil()) return;
+	var count = document.querySelectorAll('#detalles .filas').length;
+	var total = $("#posTotalFinal").text() || "S/ 0.00";
+	$("#posFloatBadge").text(count);
+	$("#posFloatTotal").text(total);
+	// Mostrar/ocultar según si hay productos
+	if (count > 0) {
+		$("#posFloatCartBtn").fadeIn(150);
+	} else {
+		$("#posFloatCartBtn").hide();
+		cerrarCarritoMobile();
+	}
+}
+
+function buscarClientePorDni(){
+	var dni = $.trim($("#posDniBuscar").val());
+	if (!dni || dni.length < 3) {
+		notifyVenta("warning", "Ingresa al menos 3 dígitos del DNI.");
+		$("#posDniBuscar").focus();
+		return;
+	}
+	$.get("../ajax/venta.php?op=buscarClienteDni&dni=" + encodeURIComponent(dni), function(resp){
+		var r = {};
+		try { r = JSON.parse(resp); } catch(e) {}
+		if (r.ok) {
+			// Intentar seleccionar en el select existente
+			var encontrado = false;
+			$("#idcliente option").each(function(){
+				if (String($(this).val()) === String(r.idpersona)) {
+					encontrado = true;
+					return false;
+				}
+			});
+			if (encontrado) {
+				$("#idcliente").val(r.idpersona);
+				$("#idcliente").selectpicker("refresh");
+				notifyVenta("success", "Cliente: " + r.nombre);
+			} else {
+				cargarClientes(r.idpersona);
+				notifyVenta("success", "Cliente: " + r.nombre);
+			}
+			$("#posDniBuscar").val("").focus();
+		} else {
+			// No encontrado: abrir modal pre-llenado con el DNI
+			limpiarFormClienteRapido();
+			$("#cli_tipo_documento").val("DNI");
+			$("#cli_num_documento").val(dni);
+			$("#modalClienteVenta").modal("show");
+			setTimeout(function(){ $("#cli_nombre").focus(); }, 350);
+			notifyVenta("info", "DNI no encontrado. Registra el nuevo cliente.");
+		}
+	}).fail(function(){
+		notifyVenta("error", "Error al buscar cliente por DNI.");
+	});
+}
+
+function cargarResumenPagosVenta() {
+	var fi = $("#filtro_venta_inicio").val() || "";
+	var ff = $("#filtro_venta_fin").val() || "";
+	var sym = window.appCurrencySymbol || "S/";
+	$.get("../ajax/venta.php?op=resumenPagos", {fecha_inicio: fi, fecha_fin: ff}, function(r) {
+		if (!r || !r.ok || !r.data) return;
+		var d = r.data;
+		var fmt = function(v){ return sym + " " + parseFloat(v || 0).toFixed(2); };
+		$("#vResEfectivo").text(fmt(d.total_efectivo));
+		$("#vResYape").text(fmt(d.total_yape));
+		$("#vResTarjeta").text(fmt(d.total_tarjeta));
+		$("#vResTotal").text(fmt(d.total_general) + " (" + (d.cantidad || 0) + " ventas)");
+	}, "json");
+}
+
 function cargarDefaultsEmpresa(){
 	$.get("../ajax/empresa.php?op=defaults", function(resp){
 		try{
@@ -264,8 +642,29 @@ function limpiar(){
 
 	$("#total_venta").val("");
 	$(".filas").remove();
+	detalles = 0;
+	cont = 0;
 	$("#total").html(window.appMoney ? window.appMoney(0,2) : ((window.appCurrencySymbol || "S/") + " 0.00"));
 	actualizarContadorItems();
+	renderCarritoVisual();
+	actualizarTotalesPOS(0);
+
+	// Reset pago
+	$(".pos-metodo-btn").removeClass("active");
+	$('.pos-metodo-btn[data-metodo="EFECTIVO"]').addClass("active");
+	$(".pos-doc-btn").removeClass("active");
+	$('.pos-doc-btn[data-tipo="Boleta"]').addClass("active");
+	$("#metodo_pago").val("EFECTIVO");
+	try { $("#metodo_pago").selectpicker("refresh"); } catch(e) {}
+	$("#seccionMixto").hide();
+	$("#vis_efectivo, #vis_tarjeta, #vis_digital").val("0");
+	$("#monto_efectivo, #monto_tarjeta, #monto_digital").val("0");
+
+	// Reset receta
+	recetaModalConfirmada = false;
+	$("#rx_nombre_medico, #rx_colegiatura, #rx_establecimiento, #rx_observaciones").val("");
+	$("#rx_fecha_emision").val("");
+	$("#rx_tipo_receta").val("SIMPLE");
 
 	$("#fecha_hora").val(fechaHoraActualInput());
 
@@ -282,15 +681,20 @@ function mostrarform(flag){
 	if(flag){
 		$("#listadoregistros").hide();
 		$("#formularioregistros").show();
-		//$("#btnGuardar").prop("disabled",false);
 		$("#btnagregar").hide();
-
 		$("#btnGuardar").hide();
 		$("#btnCancelar").show();
 		detalles=0;
 		$("#btnAgregarArt").show();
-
-
+		// Load product grid only once; reload if empty
+		if (posProductos.length === 0) {
+			cargarProductosGrid();
+		} else {
+			renderGrid();
+		}
+		renderCarritoVisual();
+		// Focus search input
+		setTimeout(function(){ $("#posSearchInput").focus(); }, 150);
 	}else{
 		$("#listadoregistros").show();
 		$("#formularioregistros").hide();
@@ -378,44 +782,93 @@ function recargarListadoVenta(){
 }
 //funcion para guardaryeditar
 function guardaryeditar(e){
-     e.preventDefault();//no se activara la accion predeterminada 
-     var clienteSeleccionado = ($("#idcliente").val() || "").toString().trim();
-     if (!clienteSeleccionado) {
-     	notifyVenta("warning", "Selecciona un cliente antes de guardar.");
-     	return;
+     e.preventDefault();
+     // 0 = "Consumidor Final" — es válido vender sin identificar al cliente
+     var clienteSeleccionado = ($("#idcliente").val() || "0").toString().trim();
+     if (clienteSeleccionado === "") {
+     	$("#idcliente").val("0").trigger("change");
+     	clienteSeleccionado = "0";
      }
-     if (!validarStockDetalleAntesGuardar()) {
-     	return;
-     }
-     //$("#btnGuardar").prop("disabled",true);
-     var formData=new FormData($("#formulario")[0]);
+     if (!validarStockDetalleAntesGuardar()) return;
+     sincronizarMontoPago();
+     if (!validarMontoPago()) return;
 
+     if (tieneArticulosRx()) {
+     	abrirModalReceta();
+     } else {
+     	ejecutarGuardarVenta();
+     }
+}
+
+function tieneArticulosControlEspecial(){
+	var filas = document.querySelectorAll('#detalles .filas');
+	for (var i = 0; i < filas.length; i++) {
+		if ((filas[i].getAttribute('data-tipo-venta') || '') === 'CONTROL_ESPECIAL') return true;
+	}
+	return false;
+}
+
+function tieneArticulosRx(){
+	var filas = document.querySelectorAll('#detalles .filas');
+	for (var i = 0; i < filas.length; i++) {
+		var tv = filas[i].getAttribute('data-tipo-venta') || 'OTC';
+		if (tv === 'RX' || tv === 'CONTROL_ESPECIAL') return true;
+	}
+	return false;
+}
+
+function abrirModalReceta(){
+	var nombres = [];
+	$('#detalles .filas').each(function(){
+		var tv = $(this).attr('data-tipo-venta') || 'OTC';
+		if (tv === 'RX' || tv === 'CONTROL_ESPECIAL') {
+			var nombreTd = $(this).find('td').eq(1).text().trim();
+			nombres.push(nombreTd || 'Medicamento Rx');
+		}
+	});
+	var plural = nombres.length > 1 ? 'medicamentos requieren' : 'medicamento requiere';
+	var msg = '<strong>' + nombres.length + '</strong> ' + plural + ' receta médica:<br><em>' + nombres.join(', ') + '</em>';
+	$('#rxAlertaProductos').html(msg);
+	var hoy = new Date();
+	var yyyy = hoy.getFullYear();
+	var mm = ("0"+(hoy.getMonth()+1)).slice(-2);
+	var dd = ("0"+hoy.getDate()).slice(-2);
+	$('#rx_fecha_emision').val(yyyy+'-'+mm+'-'+dd);
+	$('#modalReceta').modal('show');
+	setTimeout(function(){ $('#rx_nombre_medico').focus(); }, 350);
+}
+
+function ejecutarGuardarVenta(){
+     var formData=new FormData($("#formulario")[0]);
      $.ajax({
      	url: "../ajax/venta.php?op=guardaryeditar",
      	type: "POST",
      	data: formData,
      	contentType: false,
      	processData: false,
-
      	success: function(datos){
      		var r = null;
-     		try {
-     			r = JSON.parse(datos);
-     		} catch (e) {
-     			r = null;
-     		}
-
+     		try { r = JSON.parse(datos); } catch(e) {}
      		if (r && typeof r.ok !== "undefined") {
      			if (r.ok) {
-     				notifyVenta("success", r.message || "Datos registrados correctamente");
-     				if (r.alertas && r.alertas.length > 0) {
-     					var texto = "Alerta de stock bajo: " + r.alertas.map(function(a){
-     						return (a.nombre || "Articulo") + " (" + normalizarEnteroNoNegativo(a.stock) + ")";
-     					}).join(", ");
-     					notifyVenta("warning", texto);
+     				var idventaNueva = r.idventa || 0;
+     				var hayControlEsp = tieneArticulosControlEspecial();
+     				if (recetaModalConfirmada && idventaNueva > 0) {
+     					guardarReceta(idventaNueva, function(idrecetaNueva){
+     						if (hayControlEsp && idventaNueva > 0) {
+     							guardarControlEspecial(idventaNueva, idrecetaNueva || 0, function(){
+     								recetaModalConfirmada = false;
+     								procesarExitoVenta(r);
+     							});
+     						} else {
+     							recetaModalConfirmada = false;
+     							procesarExitoVenta(r);
+     						}
+     					});
+     				} else {
+     					recetaModalConfirmada = false;
+     					procesarExitoVenta(r);
      				}
-     				mostrarform(false);
-     				listar();
      			} else {
      				notifyVenta("error", r.message || "No se pudo registrar la venta.");
      			}
@@ -426,6 +879,70 @@ function guardaryeditar(e){
      		}
     	}
      });
+}
+
+function guardarControlEspecial(idventa, idreceta, callback){
+	$.post("../ajax/control_especial.php?op=guardarDesdeVenta", {
+		idventa:  idventa,
+		idreceta: idreceta || 0
+	}, function(resp){
+		// Fallo silencioso: la venta ya está guardada, solo loggear
+		var r = {};
+		try { r = JSON.parse(resp); } catch(e) {}
+		if (!r.ok) {
+			console.warn("Control especial no registrado:", r.message || "");
+		}
+		if (typeof callback === "function") callback();
+	}).fail(function(){
+		if (typeof callback === "function") callback();
+	});
+}
+
+function guardarReceta(idventa, callback){
+	$.post("../ajax/receta.php?op=guardar", {
+		idventa:         idventa,
+		idcliente:       $("#idcliente").val() || 0,
+		nombre_medico:   $.trim($("#rx_nombre_medico").val()),
+		colegiatura:     $.trim($("#rx_colegiatura").val()),
+		establecimiento: $.trim($("#rx_establecimiento").val()),
+		fecha_emision:   $("#rx_fecha_emision").val(),
+		tipo_receta:     $("#rx_tipo_receta").val(),
+		observaciones:   $.trim($("#rx_observaciones").val())
+	}, function(resp){
+		var r = {};
+		try { r = JSON.parse(resp); } catch(e) {}
+		if (!r.ok) {
+			notifyVenta("warning", "Venta guardada pero no se pudo registrar la receta: " + (r.message || ""));
+		}
+		if (typeof callback === "function") callback(r.idreceta || 0);
+	}).fail(function(){
+		if (typeof callback === "function") callback(0);
+	});
+}
+
+function procesarExitoVenta(r){
+	notifyVenta("success", r.message || "Datos registrados correctamente");
+	if (r.alertas && r.alertas.length > 0) {
+		var texto = "Alerta de stock bajo: " + r.alertas.map(function(a){
+			return (a.nombre || "Articulo") + " (" + normalizarEnteroNoNegativo(a.stock) + ")";
+		}).join(", ");
+		notifyVenta("warning", texto);
+	}
+	// Abrir comprobante automáticamente en nueva pestaña para imprimir
+	var idventaNueva = r.idventa || 0;
+	var tipoComp = ($("#tipo_comprobante").val() || "Boleta");
+	if (idventaNueva > 0) {
+		var urlComp = (tipoComp === "Factura")
+			? "../reportes/exFactura.php?id=" + idventaNueva
+			: "../reportes/exTicket.php?id="  + idventaNueva;
+		var ventana = window.open(urlComp, "_blank");
+		if (!ventana) {
+			// El navegador bloqueó el popup — mostrar botón manual
+			notifyVenta("info", 'Ticket listo. <a href="' + urlComp + '" target="_blank" style="color:#fff;text-decoration:underline">Abrir ticket</a>');
+		}
+	}
+	mostrarform(false);
+	listar();
 }
 
 function mostrar(idventa){
@@ -526,13 +1043,17 @@ function cargarCorrelativoComprobante(){
 			$("#num_comprobante").val(r.numero || "");
 			numeroComprobanteManual = false;
 		}
+		var serieActual = r.serie_comprobante || $("#serie_comprobante").val() || '···';
+		var numActual   = r.numero || $("#num_comprobante").val() || '';
+		$("#posSerieBadge").text(serieActual + (numActual ? '-' + numActual : ''));
 	});
 }
 
-function agregarDetalle(idarticulo,articulo,precio_venta,unidad,stockDisponible){
+function agregarDetalle(idarticulo,articulo,precio_venta,unidad,stockDisponible,tipoVenta){
 	var cantidad=1;
 	var descuento=0;
 	var unidadTexto = unidad || "und";
+	var tipoVentaNorm = (tipoVenta || 'OTC').toUpperCase();
 	var stockDisponibleNum = normalizarEnteroNoNegativo(stockDisponible || 0);
 	var articulos = document.getElementsByName("idarticulo[]");
 	var cantidades = document.getElementsByName("cantidad[]");
@@ -552,17 +1073,18 @@ function agregarDetalle(idarticulo,articulo,precio_venta,unidad,stockDisponible)
 				}
 				cantidades[i].value = nuevaCantidadNum;
 				modificarSubtotales();
+				renderCarritoVisual();
 				$('#myModal').modal('hide');
 				notifyVenta("info", "El articulo ya estaba agregado. Se incremento la cantidad.");
 				return;
 			}
 		}
 		var subtotal=cantidad*precio_venta;
-		var fila='<tr class="filas" id="fila'+cont+'">'+
+		var fila='<tr class="filas" id="fila'+cont+'" data-tipo-venta="'+tipoVentaNorm+'">'+
         '<td><button type="button" class="btn btn-danger" onclick="eliminarDetalle('+cont+')">X</button></td>'+
         '<td><input type="hidden" name="idarticulo[]" value="'+idarticulo+'"><input type="hidden" name="stock_disponible[]" value="'+stockDisponibleNum+'">'+articulo+'</td>'+
         '<td>'+unidadTexto+'</td>'+
-        '<td><input type="number" step="1" min="1" max="'+stockDisponibleNum+'" name="cantidad[]" id="cantidad[]" value="'+cantidad+'" oninput="modificarSubtotales()"></td>'+
+        '<td><input type="number" step="0.5" min="0.5" max="'+stockDisponibleNum+'" name="cantidad[]" id="cantidad[]" value="'+cantidad+'" oninput="modificarSubtotales()"></td>'+
         '<td><input type="number" step="0.01" min="0.01" name="precio_venta[]" id="precio_venta[]" value="'+precio_venta+'" oninput="modificarSubtotales()"></td>'+
         '<td><input type="number" step="0.01" min="0.00" name="descuento[]" value="'+descuento+'" oninput="modificarSubtotales()"></td>'+
         '<td><span id="subtotal'+cont+'" name="subtotal">'+subtotal+'</span></td>'+
@@ -573,6 +1095,7 @@ function agregarDetalle(idarticulo,articulo,precio_venta,unidad,stockDisponible)
 		$('#detalles').append(fila);
 		modificarSubtotales();
 		actualizarContadorItems();
+		renderCarritoVisual();
 		$('#myModal').modal('hide');
 		notifyVenta("success", "Articulo agregado a la venta.");
 	}else{
@@ -591,11 +1114,9 @@ function modificarSubtotales(){
 		var inpP=prev[i];
 		var inpS=sub[i];
 		var des=desc[i];
-		var maxStock = normalizarEnteroNoNegativo((stockDisp[i] && stockDisp[i].value) ? stockDisp[i].value : 0);
-		var cantidadActual = normalizarCantidadEntera(inpV.value, 1);
-		if (cantidadActual <= 0) {
-			cantidadActual = 1;
-		}
+		var maxStock = parseFloat((stockDisp[i] && stockDisp[i].value) ? stockDisp[i].value : 0) || 0;
+		var cantidadActual = normalizarCantidad(inpV.value, 0.5);
+		if (cantidadActual <= 0) { cantidadActual = 0.5; }
 		if (maxStock > 0 && cantidadActual > maxStock) {
 			cantidadActual = maxStock;
 			huboAjusteStock = true;
@@ -608,22 +1129,21 @@ function modificarSubtotales(){
 		notifyVenta("warning", "Se ajusto la cantidad al stock disponible.");
 	}
 	calcularTotales();
+	renderCarritoVisual();
 }
 function validarStockDetalleAntesGuardar(){
 	var cant=document.getElementsByName("cantidad[]");
 	var stockDisp=document.getElementsByName("stock_disponible[]");
 	for (var i = 0; i < cant.length; i++) {
-		var cantidad = normalizarCantidadEntera(cant[i].value, 1);
-		var stock = normalizarEnteroNoNegativo((stockDisp[i] && stockDisp[i].value) ? stockDisp[i].value : 0);
+		var cantidad = normalizarCantidad(cant[i].value, 0.5);
+		var stock = parseFloat((stockDisp[i] && stockDisp[i].value) ? stockDisp[i].value : 0) || 0;
 		cant[i].value = cantidad;
 		if (isNaN(cantidad) || cantidad <= 0) {
 			notifyVenta("warning", "Hay un articulo con cantidad invalida. Corrige antes de guardar.");
 			return false;
 		}
-		if (isNaN(stock) || stock < 0) {
-			stock = 0;
-		}
-		if (cantidad > stock) {
+		if (isNaN(stock) || stock < 0) { stock = 0; }
+		if (stock > 0 && cantidad > stock) {
 			notifyVenta("warning", "Hay un articulo con cantidad mayor al stock disponible. Corrige antes de guardar.");
 			return false;
 		}
@@ -639,7 +1159,47 @@ function calcularTotales(){
 	}
 	$("#total").html(window.appMoney ? window.appMoney(total,2) : ((window.appCurrencySymbol || "S/") + " " + total.toFixed(2)));
 	$("#total_venta").val(total.toFixed(2));
+	sincronizarMontoPago();
+	actualizarTotalesPOS(total);
 	evaluar();
+}
+
+// --- Lógica de método de pago ---
+function sincronizarMontoPago() {
+	var metodo = ($("#metodo_pago").val() || "EFECTIVO").toUpperCase();
+	var total  = parseFloat($("#total_venta").val() || 0);
+
+	if (metodo === "MIXTO") {
+		$("#seccionMixto").show();
+		// En MIXTO, el usuario llena los campos visibles; sincronizar a ocultos
+		$("#monto_efectivo").val(parseFloat($("#vis_efectivo").val() || 0).toFixed(2));
+		$("#monto_tarjeta").val(parseFloat($("#vis_tarjeta").val()   || 0).toFixed(2));
+		$("#monto_digital").val(parseFloat($("#vis_digital").val()   || 0).toFixed(2));
+	} else {
+		$("#seccionMixto").hide();
+		// Para métodos simples, el monto va todo al campo correspondiente
+		var ef = 0, tj = 0, dg = 0;
+		if (metodo === "EFECTIVO")      { ef = total; }
+		else if (metodo === "TARJETA" || metodo === "TRANSFERENCIA") { tj = total; }
+		else if (metodo === "YAPE" || metodo === "PLIN")             { dg = total; }
+		$("#monto_efectivo").val(ef.toFixed(2));
+		$("#monto_tarjeta").val(tj.toFixed(2));
+		$("#monto_digital").val(dg.toFixed(2));
+	}
+}
+
+function validarMontoPago() {
+	var metodo = ($("#metodo_pago").val() || "EFECTIVO").toUpperCase();
+	if (metodo !== "MIXTO") return true;
+	var total = parseFloat($("#total_venta").val() || 0);
+	var suma  = parseFloat($("#vis_efectivo").val() || 0)
+	          + parseFloat($("#vis_tarjeta").val()  || 0)
+	          + parseFloat($("#vis_digital").val()  || 0);
+	if (Math.abs(suma - total) > 0.01) {
+		notifyVenta("warning", "La suma de montos (" + suma.toFixed(2) + ") no coincide con el total de la venta (" + total.toFixed(2) + ").");
+		return false;
+	}
+	return true;
 }
 
 function evaluar(){
@@ -656,11 +1216,11 @@ function evaluar(){
 }
 
 function eliminarDetalle(indice){
-$("#fila"+indice).remove();
-calcularTotales();
-detalles=detalles-1;
-actualizarContadorItems();
-
+	$("#fila"+indice).remove();
+	calcularTotales();
+	detalles=detalles-1;
+	actualizarContadorItems();
+	renderCarritoVisual();
 }
 
 function actualizarContadorItems(){
@@ -701,8 +1261,25 @@ function procesarColaPOS(){
 	});
 }
 
+function extraerCodigoDeQR(raw) {
+	var s = (raw || "").trim();
+	// Si parece una URL, extraer parámetro "code", "codigo" o el último segmento del path
+	if (/^https?:\/\//i.test(s)) {
+		try {
+			var url = new URL(s);
+			var code = url.searchParams.get("code") || url.searchParams.get("codigo") || url.searchParams.get("sku");
+			if (code) return code.trim();
+			// último segmento del path
+			var segs = url.pathname.split("/").filter(Boolean);
+			if (segs.length > 0) return segs[segs.length - 1].trim();
+		} catch(e) {}
+	}
+	return s;
+}
+
 function buscarCodigoRapido(codigoForzado, callback){
-	var codigo = (codigoForzado || $("#codigo_rapido").val() || "").trim();
+	var codigoRaw = (codigoForzado || $("#codigo_rapido").val() || "").trim();
+	var codigo = extraerCodigoDeQR(codigoRaw);
 	if (!codigo) {
 		notifyVenta("warning", "Ingresa o escanea un codigo de producto.");
 		if (typeof callback === "function") {
@@ -731,7 +1308,7 @@ function buscarCodigoRapido(codigoForzado, callback){
 			return;
 		}
 
-		agregarDetalle(r.idarticulo, r.nombre, r.precio_venta || 0, r.unidad || "und", r.stock || 0);
+		agregarDetalle(r.idarticulo, r.nombre, r.precio_venta || 0, r.unidad || "und", r.stock || 0, r.tipo_venta || 'OTC');
 		$("#codigo_rapido").focus();
 		if (typeof callback === "function") {
 			callback();
@@ -739,4 +1316,79 @@ function buscarCodigoRapido(codigoForzado, callback){
 	});
 }
 
+// Auto-foco en el campo de escaneo cuando no hay modales activos
+$(document).on("click", function(e){
+	if ($(".modal.in").length > 0) return;
+	if ($("#formularioregistros").is(":visible")) {
+		var $t = $(e.target);
+		if (!$t.is("input,select,textarea,button,a") && !$t.closest("input,select,textarea,button,a,table").length) {
+			$("#codigo_rapido").focus();
+		}
+	}
+});
+// Re-foco después de cerrar cualquier modal
+$(document).on("hidden.bs.modal", ".modal", function(){
+	if ($("#formularioregistros").is(":visible")) {
+		setTimeout(function(){ $("#codigo_rapido").focus(); }, 200);
+	}
+});
+
 init();
+
+// ── Perfil farmacológico del paciente ────────────────────────────
+function verPerfilPaciente(){
+	var idcliente = ($("#idcliente").val() || "").toString().trim();
+	if (!idcliente || idcliente === "0") {
+		notifyVenta("warning", "Selecciona un cliente antes de ver el perfil.");
+		return;
+	}
+	$("#perfilMsg").hide();
+	$("#pp_alergias,#pp_condiciones,#pp_medicamentos,#pp_observaciones").val("");
+	$("#perfilNombrePaciente").text("");
+	$("#modalPerfilPaciente").modal("show");
+	$.get("../ajax/paciente_perfil.php?op=obtener&idpersona=" + idcliente, function(resp){
+		var r = {};
+		try { r = (typeof resp === "string") ? JSON.parse(resp) : resp; } catch(e) {}
+		if (r.ok && r.data && r.data.idperfil) {
+			$("#pp_alergias").val(r.data.alergias || "");
+			$("#pp_condiciones").val(r.data.condiciones_cron || "");
+			$("#pp_medicamentos").val(r.data.medicamentos_cron || "");
+			$("#pp_observaciones").val(r.data.observaciones || "");
+			$("#perfilNombrePaciente").text("Paciente: " + (r.data.nombre || ""));
+			if (r.data.alergias && r.data.alergias.trim()) {
+				$("#perfilMsg").removeClass("alert-info alert-success").addClass("alert alert-danger")
+					.html("<strong><i class='fa fa-exclamation-triangle'></i> ALERTA:</strong> Este paciente tiene alergias registradas: " + r.data.alergias)
+					.show();
+			}
+		} else {
+			var nombre = $("#idcliente option:selected").text();
+			$("#perfilNombrePaciente").text("Paciente: " + nombre + " (sin perfil registrado aún)");
+		}
+	});
+}
+
+function guardarPerfilPaciente(){
+	var idcliente = ($("#idcliente").val() || "").toString().trim();
+	if (!idcliente) { notifyVenta("warning", "Selecciona un cliente primero."); return; }
+	var fd = new FormData();
+	fd.append("idpersona",        idcliente);
+	fd.append("alergias",         $("#pp_alergias").val());
+	fd.append("condiciones_cron", $("#pp_condiciones").val());
+	fd.append("medicamentos_cron",$("#pp_medicamentos").val());
+	fd.append("observaciones",    $("#pp_observaciones").val());
+	var $btn = $("#btnGuardarPerfil").prop("disabled", true).html('<i class="fa fa-spinner fa-spin"></i> Guardando...');
+	fetch("../ajax/paciente_perfil.php?op=guardar", {method:"POST", body:fd})
+		.then(function(r){ return r.json(); })
+		.then(function(r){
+			$btn.prop("disabled", false).html('<i class="fa fa-save"></i> Guardar perfil');
+			if (r.ok) {
+				notifyVenta("success", "Perfil guardado correctamente.");
+				$("#modalPerfilPaciente").modal("hide");
+			} else {
+				notifyVenta("error", r.message || "No se pudo guardar el perfil.");
+			}
+		})
+		.catch(function(){
+			$btn.prop("disabled", false).html('<i class="fa fa-save"></i> Guardar perfil');
+		});
+}

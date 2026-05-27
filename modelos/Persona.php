@@ -1,6 +1,6 @@
 <?php 
 //incluir la conexion de base de datos
-require "../config/Conexion.php";
+require_once __DIR__ . "/../config/Conexion.php";
 class Persona{
 
 
@@ -47,6 +47,13 @@ public function listarp(){
 public function listarc(){
 	$sql="SELECT * FROM persona WHERE tipo_persona='Cliente'";
 	return ejecutarConsulta($sql);
+}
+
+public function buscarPorDocumento($num){
+	$sql="SELECT idpersona, nombre, num_documento FROM persona WHERE tipo_persona='Cliente' AND num_documento='$num' LIMIT 1";
+	$r = ejecutarConsulta($sql);
+	if ($r && $r->num_rows > 0) return $r->fetch_assoc();
+	return null;
 }
 }
 

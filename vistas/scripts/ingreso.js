@@ -74,13 +74,16 @@ function init(){
 
    $("#btnFiltrarIngreso").on("click", function(){
    	recargarListadoIngreso();
+   	cargarResumenPagosIngreso();
    });
    $("#btnLimpiarFiltroIngreso").on("click", function(){
    	$("#filtro_ingreso_inicio").val("");
    	$("#filtro_ingreso_fin").val("");
    	recargarListadoIngreso();
+   	cargarResumenPagosIngreso();
    });
 
+   cargarResumenPagosIngreso();
    cargarProveedores();
 
    $("#myModal").on("shown.bs.modal", function(){
@@ -178,6 +181,17 @@ function guardarProveedorRapido(e){
 			$("#btnGuardarProveedorRapido").prop("disabled", false);
 		}
 	});
+}
+
+function cargarResumenPagosIngreso() {
+	var fi = $("#filtro_ingreso_inicio").val() || "";
+	var ff = $("#filtro_ingreso_fin").val() || "";
+	var sym = window.appCurrencySymbol || "S/";
+	$.get("../ajax/ingreso.php?op=resumenPagos", {fecha_inicio: fi, fecha_fin: ff}, function(r) {
+		if (!r || !r.ok || !r.data) return;
+		var d = r.data;
+		$("#iResTotal").text(sym + " " + parseFloat(d.total_general || 0).toFixed(2) + " (" + (d.cantidad || 0) + " compras)");
+	}, "json");
 }
 
 function cargarDefaultsEmpresaIngreso(){
@@ -500,6 +514,8 @@ function agregarDetalle(idarticulo,articulo,unidad,precio_compra_ref){
         '<td><input type="number" step="1" min="1" name="cantidad[]" id="cantidad[]" value="'+cantidad+'" oninput="modificarSubtotales()"></td>'+
         '<td><input type="number" step="0.01" min="0.01" name="precio_compra[]" id="precio_compra[]" value="'+precio_compra.toFixed(2)+'" oninput="modificarSubtotales()"></td>'+
         '<td><input type="number" step="0.01" min="0.01" name="precio_venta[]" value="'+precio_venta.toFixed(2)+'"></td>'+
+        '<td><input type="text" name="numero_lote[]" maxlength="50" placeholder="N° Lote" style="width:90px"></td>'+
+        '<td><input type="date" name="fecha_vencimiento[]" style="width:130px"></td>'+
         '<td><span id="subtotal'+cont+'" name="subtotal">'+subtotal.toFixed(2)+'</span></td>'+
         '<td><button type="button" onclick="modificarSubtotales()" class="btn btn-info"><i class="fa fa-refresh"></i></button></td>'+
 		'</tr>';

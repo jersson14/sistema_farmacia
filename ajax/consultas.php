@@ -1,4 +1,9 @@
-<?php 
+<?php
+if (strlen(session_id()) < 1) session_start();
+if (!isset($_SESSION['idusuario'])) {
+    echo json_encode(['ok' => false, 'message' => 'Sesión no válida']);
+    exit;
+}
 require_once "../modelos/Consultas.php";
 
 $consulta = new Consultas();
@@ -17,6 +22,10 @@ switch ($_GET["op"]) {
 	
 
     case 'comprasfecha':
+    if (!isset($_SESSION['consultac']) || $_SESSION['consultac'] != 1) {
+        echo json_encode(['sEcho'=>1,'iTotalRecords'=>0,'iTotalDisplayRecords'=>0,'aaData'=>[]]);
+        break;
+    }
     $fecha_inicio=$_REQUEST["fecha_inicio"];
     $fecha_fin=$_REQUEST["fecha_fin"];
 
@@ -43,10 +52,14 @@ switch ($_GET["op"]) {
 		echo json_encode($results);
 		break;
 
-     case 'ventasfechacliente':
-    $fecha_inicio=$_REQUEST["fecha_inicio"];
-    $fecha_fin=$_REQUEST["fecha_fin"];
-    $idcliente=$_REQUEST["idcliente"];
+    case 'ventasfechacliente':
+    if (!isset($_SESSION['consultav']) || $_SESSION['consultav'] != 1) {
+        echo json_encode(['sEcho'=>1,'iTotalRecords'=>0,'iTotalDisplayRecords'=>0,'aaData'=>[]]);
+        break;
+    }
+    $fecha_inicio = fechaSeguro(isset($_REQUEST["fecha_inicio"]) ? $_REQUEST["fecha_inicio"] : '', date("Y-m-01"));
+    $fecha_fin    = fechaSeguro(isset($_REQUEST["fecha_fin"])    ? $_REQUEST["fecha_fin"]    : '', date("Y-m-d"));
+    $idcliente    = (int)(isset($_REQUEST["idcliente"]) ? $_REQUEST["idcliente"] : 0);
 
         $rspta=$consulta->ventasfechacliente($fecha_inicio,$fecha_fin,$idcliente);
         $data=Array();
@@ -64,14 +77,33 @@ switch ($_GET["op"]) {
               );
         }
         $results=array(
-             "sEcho"=>1,//info para datatables
-             "iTotalRecords"=>count($data),//enviamos el total de registros al datatable
-             "iTotalDisplayRecords"=>count($data),//enviamos el total de registros a visualizar
-             "aaData"=>$data); 
+             "sEcho"=>1,
+             "iTotalRecords"=>count($data),
+             "iTotalDisplayRecords"=>count($data),
+             "aaData"=>$data);
         echo json_encode($results);
         break;
 
+    case 'clientesselect':
+    if (!isset($_SESSION['consultav']) || $_SESSION['consultav'] != 1) {
+        echo json_encode(['ok'=>false,'clientes'=>[]]);
+        break;
+    }
+        $rspta = $consulta->listarClientesSelect();
+        $clientes = array();
+        if ($rspta) {
+            while ($reg = $rspta->fetch_object()) {
+                $clientes[] = array('idpersona'=>(int)$reg->idpersona, 'nombre'=>$reg->nombre);
+            }
+        }
+        echo json_encode(['ok'=>true,'clientes'=>$clientes]);
+        break;
+
     case 'utilidadperiodo':
+    if ((!isset($_SESSION['consultav']) || $_SESSION['consultav'] != 1) && (!isset($_SESSION['acceso']) || $_SESSION['acceso'] != 1)) {
+        echo json_encode(['sEcho'=>1,'iTotalRecords'=>0,'iTotalDisplayRecords'=>0,'aaData'=>[]]);
+        break;
+    }
         $fecha_inicio = fechaSeguro(isset($_REQUEST["fecha_inicio"]) ? $_REQUEST["fecha_inicio"] : '', date("Y-m-01"));
         $fecha_fin = fechaSeguro(isset($_REQUEST["fecha_fin"]) ? $_REQUEST["fecha_fin"] : '', date("Y-m-d"));
 
@@ -103,6 +135,10 @@ switch ($_GET["op"]) {
         break;
 
     case 'topproductos':
+    if ((!isset($_SESSION['consultav']) || $_SESSION['consultav'] != 1) && (!isset($_SESSION['acceso']) || $_SESSION['acceso'] != 1)) {
+        echo json_encode(['sEcho'=>1,'iTotalRecords'=>0,'iTotalDisplayRecords'=>0,'aaData'=>[]]);
+        break;
+    }
         $fecha_inicio = fechaSeguro(isset($_REQUEST["fecha_inicio"]) ? $_REQUEST["fecha_inicio"] : '', date("Y-m-01"));
         $fecha_fin = fechaSeguro(isset($_REQUEST["fecha_fin"]) ? $_REQUEST["fecha_fin"] : '', date("Y-m-d"));
         $limite = isset($_REQUEST["limite"]) ? (int)$_REQUEST["limite"] : 20;
@@ -137,6 +173,10 @@ switch ($_GET["op"]) {
         break;
 
     case 'stockcritico':
+    if ((!isset($_SESSION['kardex']) || $_SESSION['kardex'] != 1) && (!isset($_SESSION['almacen']) || $_SESSION['almacen'] != 1) && (!isset($_SESSION['acceso']) || $_SESSION['acceso'] != 1)) {
+        echo json_encode(['sEcho'=>1,'iTotalRecords'=>0,'iTotalDisplayRecords'=>0,'aaData'=>[]]);
+        break;
+    }
         $rspta = $consulta->stockCritico();
         $data = array();
 
@@ -174,6 +214,10 @@ switch ($_GET["op"]) {
         break;
 
     case 'kardexvalorizado':
+    if ((!isset($_SESSION['kardex']) || $_SESSION['kardex'] != 1) && (!isset($_SESSION['acceso']) || $_SESSION['acceso'] != 1)) {
+        echo json_encode(['sEcho'=>1,'iTotalRecords'=>0,'iTotalDisplayRecords'=>0,'aaData'=>[]]);
+        break;
+    }
         $fecha_inicio = fechaSeguro(isset($_REQUEST["fecha_inicio"]) ? $_REQUEST["fecha_inicio"] : '', date("Y-m-01"));
         $fecha_fin = fechaSeguro(isset($_REQUEST["fecha_fin"]) ? $_REQUEST["fecha_fin"] : '', date("Y-m-d"));
 
@@ -202,6 +246,10 @@ switch ($_GET["op"]) {
         break;
 
     case 'clientesproveedores':
+    if ((!isset($_SESSION['consultav']) || $_SESSION['consultav'] != 1) && (!isset($_SESSION['acceso']) || $_SESSION['acceso'] != 1)) {
+        echo json_encode(['sEcho'=>1,'iTotalRecords'=>0,'iTotalDisplayRecords'=>0,'aaData'=>[]]);
+        break;
+    }
         $fecha_inicio = fechaSeguro(isset($_REQUEST["fecha_inicio"]) ? $_REQUEST["fecha_inicio"] : '', date("Y-m-01"));
         $fecha_fin = fechaSeguro(isset($_REQUEST["fecha_fin"]) ? $_REQUEST["fecha_fin"] : '', date("Y-m-d"));
         $tipo = isset($_REQUEST["tipo"]) ? strtoupper(trim($_REQUEST["tipo"])) : 'TODOS';
