@@ -11,6 +11,10 @@ if (mysqli_connect_errno()) {
 	exit();
 }
 
+// Zona horaria Lima, Perú (UTC-5) — PHP y MySQL sincronizados
+date_default_timezone_set('America/Lima');
+mysqli_query($conexion, "SET time_zone = '-05:00'"  );
+
 if (!function_exists('ejecutarConsulta')) {
 	Function ejecutarConsulta($sql){ 
 global $conexion;
