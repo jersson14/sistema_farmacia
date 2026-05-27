@@ -1,197 +1,415 @@
-# MI_TIENDA - Sistema de Inventario, Compras y Ventas
+# Sistema de Gestión para Farmacia
 
-Aplicacion web en PHP (sin framework) para gestionar:
-- Inventario por articulos y categorias
-- Unidades de medida administrables
-- Compras e ingresos
-- Ventas
-- Clientes y proveedores
-- Reportes (tabla + exportacion + PDF)
-- Configuracion de empresa (logo, colores, series, moneda)
-- Modulos pro (kardex, alertas, utilidad, cuentas por cobrar/pagar, etc.)
+Sistema de punto de venta, inventario, compras y reportes diseñado para **farmacias independientes o cadenas pequeñas** en Perú. Basado en el motor ITVentas, adaptado al dominio farmacéutico con soporte para lotes, vencimientos, recetas médicas, control especial y regulación DIGEMID.
 
-## 1) Tecnologias usadas
+---
+
+## Tecnologías
 
 ### Backend
-- PHP 8.x (probado en esta maquina con PHP 8.2.12)
+- PHP 8.x (probado con PHP 8.2)
 - MySQL / MariaDB
-- mysqli (conexion nativa)
-- Arquitectura tipo MVC simple:
-  - `modelos/`
-  - `ajax/` (controladores endpoint)
-  - `vistas/`
+- `mysqli` nativo — sin ORM, sin Composer
+- Arquitectura MVC artesanal
 
 ### Frontend
-- AdminLTE (tema base)
-- Bootstrap 3
+- AdminLTE + Bootstrap 3
 - jQuery
-- DataTables + Buttons (Excel/CSV/PDF)
+- DataTables + Buttons (Excel / CSV / PDF)
 - Chart.js (dashboard)
-- Bootbox
-- Bootstrap Select
+- Bootbox · Bootstrap Select
 
-### Reportes
-- FPDF (`fpdf181/`)
+### Reportes y periféricos
+- FPDF 1.81 (`fpdf181/`) — reportes PDF
 - Ticket HTML imprimible (`reportes/exTicket.php`)
+- Impresora térmica + gaveta de dinero (via nombre compartido en Windows)
 
-## 2) Estructura del proyecto
+---
 
-```text
-mi_tienda/
-├─ ajax/                  # Endpoints (JSON/HTML) por modulo
-├─ config/                # Conexion y configuracion global
-├─ files/                 # Archivos subidos (usuarios, articulos, backups)
-├─ fpdf181/               # Libreria PDF
-├─ migrations/            # Scripts SQL incrementales
-├─ modelos/               # Logica y consultas SQL
-├─ public/                # CSS/JS/assets de UI
-├─ reportes/              # Reportes PDF/print
-├─ vistas/                # Pantallas del sistema
-├─ mi_tienda.sql          # Dump recomendado (base completa actual)
-└─ index.php              # Redirige a vistas/login.html
+## Estructura del proyecto
+
+```
+farmacia/
+├── ajax/                  # Endpoints HTTP — responden JSON o HTML
+├── config/
+│   ├── global.php         # Constantes de conexión y nombre del sistema
+│   └── Conexion.php       # Helpers: ejecutarConsulta(), limpiarCadena(), formatearMoneda()
+├── files/
+│   ├── articulos/         # Imágenes de productos
+│   ├── usuarios/          # Fotos de usuarios
+│   ├── empresa/           # Logo del cliente
+│   └── backups/           # Dumps SQL generados desde el panel
+├── fpdf181/               # Librería FPDF (no modificar)
+├── migrations/            # Scripts SQL versionados (YYYYMMDD_descripcion.sql)
+├── modelos/               # Clases PHP con lógica de negocio
+├── public/                # CSS, JS, Bootstrap, AdminLTE, plugins
+├── reportes/              # Generadores PDF individuales
+├── vistas/                # Templates HTML con PHP embebido
+│   └── scripts/           # JS por vista (cuando se separa del HTML)
+└── index.php              # Entry point → redirige a login
 ```
 
-## 3) Requisitos para correrlo
+### Convención de nombres
 
-- PHP >= 8.1
+| Tipo | Patrón |
+|---|---|
+| Modelo | `modelos/NombreEntidad.php` |
+| Controlador | `ajax/entidad.php` — switch por `$_GET["op"]` |
+| Vista | `vistas/entidad.php` |
+| Script JS | `vistas/scripts/entidad.js` |
+| Reporte PDF | `reportes/exEntidad.php` |
+| Migración | `migrations/YYYYMMDD_descripcion.sql` |
+
+---
+
+## Módulos del sistema
+
+| Módulo | Permiso de sesión | Descripción |
+|---|---|---|
+| Dashboard | `escritorio` | KPIs del día, gráficos de ventas |
+| Almacén | `almacen` | Medicamentos, categorías, unidades de medida |
+| Compras | `compras` | Ingresos de mercadería, proveedores |
+| Ventas | `ventas` | POS, carrito, comprobantes |
+| Caja | `caja` | Apertura/cierre de caja, movimientos |
+| Reportes compras | `consultac` | Historial e informes de compras |
+| Reportes ventas | `consultav` | Historial e informes de ventas |
+| Kardex / Alertas | `kardex` | ProCenter, alertas de stock y vencimientos |
+| Cuentas | `cuentas` | CxC y CxP |
+| Acceso | `acceso` | Usuarios, permisos, configuración de empresa |
+| Backup | `backup` | Respaldos de base de datos |
+
+---
+
+## Esquema de base de datos
+
+### Tablas principales
+
+| Tabla | Rol |
+|---|---|
+| `articulo` | Catálogo de medicamentos y productos |
+| `categoria` | Clasificación (incluye categorías ATC farmacéuticas) |
+| `unidad_medida` | Unidades (tableta, frasco, ampolla, etc.) |
+| `persona` | Clientes y proveedores |
+| `usuario` | Cuentas de acceso al sistema |
+| `usuario_permiso` | Relación usuario–permiso |
+| `permiso` | Permisos por módulo |
+| `ingreso` + `detalle_ingreso` | Compras / recepción de mercadería |
+| `venta` + `detalle_venta` | Ventas / despacho |
+| `lote_articulo` | Lotes con fecha de vencimiento (FEFO) |
+| `receta_medica` | Registro de recetas para medicamentos Rx |
+| `control_especial` | Registro de psicotrópicos y narcóticos |
+| `cuenta_cobrar` + `pago_cuenta_cobrar` | CxC |
+| `cuenta_pagar` + `pago_cuenta_pagar` | CxP |
+| `caja_diaria` + `caja_movimiento` | Control de caja por turno |
+| `configuracion_empresa` | Logo, series, moneda, impuesto, impresora |
+| `backup_log` | Historial de respaldos |
+
+### Reglas de BD
+
+- Toda modificación de esquema va en `migrations/` con nombre `YYYYMMDD_descripcion.sql`
+- Las migraciones usan `IF NOT EXISTS` — son idempotentes
+- Los triggers se documentan en el mismo archivo de migración
+- Los registros no se eliminan físicamente: campo `condicion` (1 = activo, 0 = inactivo)
+
+### Migraciones disponibles (en orden)
+
+```
+20260321_unidades_medida.sql
+20260321_fase_comercial.sql
+20260525_metodo_pago_venta.sql
+20260525_atributos_medicamento.sql
+20260525_lotes_vencimientos.sql
+20260525_receta_medica.sql
+20260525_control_especial.sql
+20260525_tienda_online.sql
+20260525_categorias_atc.sql
+20260525_temperatura_ingreso.sql
+20260525_seguro_venta.sql
+20260525_cantidad_decimal.sql
+20260525_paciente_perfil.sql
+20260525_permisos_granulares.sql
+20260525_permisos_base_completo.sql
+20260526_insert_unidades_medida.sql
+20260526_insert_categorias_y_articulos.sql
+20260526_insert_proveedores_peru.sql
+20260526_add_precio_venta_articulo.sql
+20260526_add_tipo_entrega_pedido.sql
+20260526_add_metodo_pago_ingreso.sql
+20260527_consumidor_final.sql
+20260527_printer_config.sql
+```
+
+---
+
+## Requisitos
+
+- PHP >= 8.1 con extensiones: `mysqli`, `mbstring`, `gd`
 - MySQL >= 5.7 o MariaDB equivalente
-- Apache (ej. XAMPP)
-- Extensiones PHP comunes:
-  - `mysqli`
-  - `mbstring`
-  - `gd` (recomendado para imagenes)
+- Apache (XAMPP en desarrollo)
 
-## 4) Instalacion local (XAMPP)
+---
 
-1. Copiar el proyecto a:
-   - `C:\xampp\htdocs\mi_tienda`
-2. Crear la BD:
-   - `mi_tienda`
-3. Importar SQL principal:
-   - `mi_tienda.sql` (recomendado)
-4. Levantar Apache + MySQL.
-5. Abrir:
-   - `http://localhost/mi_tienda`
+## Instalación local (XAMPP)
 
-## 5) Credenciales de prueba
+1. Copiar el proyecto a `C:\xampp\htdocs\farmacia\`
+2. Crear la base de datos (ver nombre en `config/global.php`)
+3. Importar el dump SQL principal
+4. Aplicar migraciones pendientes en el orden indicado arriba
+5. Levantar Apache + MySQL desde el panel XAMPP
+6. Abrir `http://localhost/farmacia/`
 
-En el dump existen usuarios de ejemplo con clave SHA256 compartida.
-El hash corresponde a la clave plana:
-- `12345`
+---
 
-Ejemplo de login que viene en el dump:
-- usuario: `jersson123`
-- clave: `12345`
+## Configuración de conexión
 
-## 6) Donde cambiar la conexion para produccion (IMPORTANTE)
-
-Archivo:
-- `config/global.php`
-
-Constantes a cambiar:
-- `DB_HOST`
-- `DB_NAME`
-- `DB_USERNAME`
-- `DB_PASSWORD`
-- `DB_ENCODE` (normalmente `utf8`)
-
-Ejemplo:
+Editar `config/global.php`:
 
 ```php
-define("DB_HOST", "localhost");
-define("DB_NAME", "mi_tienda_prod");
-define("DB_USERNAME", "usuario_prod");
-define("DB_PASSWORD", "clave_super_segura");
-define("DB_ENCODE", "utf8");
+define("DB_HOST",     "localhost");
+define("DB_NAME",     "farmacia_db");      // nombre de tu BD
+define("DB_USERNAME", "usuario");
+define("DB_PASSWORD", "clave_segura");
+define("DB_ENCODE",   "utf8");
+define("PRO_NOMBRE",  "Farmacia XYZ");
 ```
 
-Luego verificar que `config/Conexion.php` conecte correctamente.
+Crear `config/global.example.php` con valores en blanco como referencia para el repo.
 
-## 7) Paso a produccion (guia rapida)
+---
 
-1. Subir codigo al servidor (sin `.git`).
-2. Crear base de datos y usuario en hosting/cPanel.
-3. Importar `mi_tienda.sql`.
-4. Editar `config/global.php` con credenciales reales.
-5. Verificar permisos de escritura:
-   - `files/articulos/`
-   - `files/usuarios/`
-   - `files/empresa/` (si no existe, se crea al subir logo desde panel)
-   - `files/backups/`
-6. Probar login, ventas, compras y reportes PDF.
-7. Activar HTTPS y revisar `display_errors=Off` en produccion.
+## Configuración dinámica (panel Empresa)
 
-## 8) Migraciones (si vienes de version antigua)
+Se edita desde el módulo **Acceso → Empresa** y se guarda en la tabla `configuracion_empresa`:
 
-Si partes de un esquema viejo (`mitienda.sql` o similar), aplicar en este orden:
+| Campo | Descripción |
+|---|---|
+| `logo` | Imagen del negocio (aparece en reportes y login) |
+| `color_primario` / `color_secundario` | Colores del tema |
+| `serie_boleta`, `serie_factura`, `serie_ticket` | Series de comprobantes |
+| `impuesto_default` | IGV (18% por defecto) |
+| `moneda` | PEN, USD, EUR, MXN, COP, CLP, ARS, BOB |
+| `nombre_impresora` | Nombre compartido de la ticketera (para gaveta) |
 
-1. `migrations/20260321_unidades_medida.sql`
-2. `migrations/20260321_fase_comercial.sql`
+---
 
-Notas:
-- Los scripts son idempotentes (pensados para reintentos).
-- Si usas `mi_tienda.sql` actual, normalmente ya no necesitas estas migraciones.
+## Gaveta de dinero y ticketera térmica
 
-## 9) Configuracion de marca (logo, colores, moneda)
+La gaveta se abre automáticamente al confirmar cada venta.
 
-Se maneja desde modulo **Configuracion de Empresa**.
-Se guarda en tabla:
-- `configuracion_empresa`
+**Configuración (una sola vez):**
 
-Campos importantes:
-- `logo`
-- `color_primario`
-- `color_secundario`
-- `serie_boleta`, `serie_factura`, `serie_ticket`
-- `impuesto_default`
-- `moneda`
+1. En Windows: `Inicio → Dispositivos e impresoras → clic derecho en ticketera → Propiedades → Compartir`
+2. Anotar el **nombre del recurso compartido** (ej. `XP365B`)
+3. En el sistema: `Gestión Pro → Empresa → campo "Nombre de impresora (gaveta)"` → ingresar el nombre → Guardar
 
-Impacto:
-- Login
-- Header/menu/panel
-- Reportes
-- Montos en modulos (segun moneda configurada)
+---
 
-## 10) Modulos pro y estado actual
+## Flujos de negocio
 
-Hay modulos comerciales avanzados (kardex, alertas, utilidad, cuentas por cobrar/pagar, compras sugeridas).
+### Venta
 
-El modulo de caja en esta version puede estar deshabilitado por bandera en:
-- `vistas/caja.php`
-
-Variable:
-```php
-$moduloCajaHabilitado = false;
+```
+1. Buscar medicamento (nombre comercial, genérico, laboratorio o código de barras)
+2. Agregar al carrito — se valida stock en tiempo real
+3. Elegir tipo de comprobante (Boleta / Factura / Ticket)
+4. Ingresar método de pago (default: Efectivo)
+5. Confirmar venta → transacción MySQL reduce stock y registra lote despachado (FEFO)
+6. Ticket se abre automáticamente en nueva pestaña para imprimir
+7. Gaveta se abre si es pago en efectivo
 ```
 
-## 11) Seguridad minima recomendada antes de entregar
+**Atajos de teclado en pantalla de venta:**
 
-- Cambiar todas las claves demo.
-- Forzar claves nuevas por usuario.
-- Usar HTTPS.
-- Limitar acceso a phpMyAdmin.
-- Respaldos periodicos de BD.
+| Atajo | Acción |
+|---|---|
+| `Enter` en buscador | Buscar medicamento |
+| `F2` | Limpiar carrito |
+| `F10` | Confirmar venta |
+| `Esc` | Cerrar modal activo |
 
-Para cambiar clave por SQL (SHA256):
+### Compra / Recepción de mercadería
+
+```
+1. Seleccionar proveedor
+2. Agregar medicamentos con precio de compra, precio de venta, número de lote y fecha de vencimiento
+3. Guardar → trigger tr_updStockIngreso actualiza stock y registra lote
+4. Se genera comprobante PDF de ingreso
+```
+
+### Control de stock
+
+- `articulo.stock` sube por trigger al insertar en `detalle_ingreso`
+- `articulo.stock` baja dentro de la transacción en `Venta::insertar()`
+- Al llegar a `stock_minimo` se dispara alerta en la respuesta JSON
+- El despacho sigue política **FEFO** (primero vence, primero sale)
+
+### Caja diaria
+
+```
+Inicio de turno:
+  → Sistema detecta caja cerrada
+  → Cajero ingresa monto de apertura
+  → Caja queda ABIERTA — módulo de ventas habilitado
+
+Durante el turno:
+  → Ventas, ingresos y egresos se acumulan automáticamente
+  → Panel muestra total esperado en tiempo real
+
+Cierre:
+  → Cajero ingresa monto contado en físico
+  → Sistema calcula diferencia
+  → Genera reporte PDF de cierre
+```
+
+---
+
+## Dominio farmacéutico — conceptos clave
+
+| Término | Descripción |
+|---|---|
+| **Lote** | Conjunto de medicamentos de un mismo proceso de fabricación. Permite trazabilidad y retiro de mercado (recall). |
+| **FEFO** | First Expired First Out — el lote que vence antes se despacha primero. |
+| **DCI** | Denominación Común Internacional — nombre genérico del principio activo. |
+| **OTC** | Over The Counter — medicamentos sin receta. |
+| **Rx** | Medicamentos que requieren receta médica para su dispensación. |
+| **Psicotrópico / narcótico** | Medicamento de control especial con registro obligatorio por ley. |
+| **DIGEMID** | Autoridad regulatoria de medicamentos en Perú. |
+
+---
+
+## Seguridad
+
+- Toda entrada de usuario pasa por `limpiarCadena()` antes de usarse en queries (`mysqli_real_escape_string` + `htmlspecialchars`)
+- Nunca concatenar `$_POST` / `$_GET` directamente en SQL
+- Contraseñas almacenadas en SHA-256
+- Cada vista verifica `$_SESSION['idusuario']` antes de renderizar
+- Los permisos se verifican por `$_SESSION['modulo']` — sin permiso redirige a `vistas/noacceso.php`
+- Uploads: solo `jpg`, `jpeg`, `png`, `gif`; se renombra el archivo al guardar
+- En producción: `display_errors = Off` en `php.ini`
+
+**Archivos que nunca deben commitearse con datos reales:**
+
+```
+config/global.php        # credenciales BD
+files/backups/*.sql      # dumps de producción
+files/empresa/*.png      # logo del cliente
+```
+
+**Cambiar clave de un usuario (SQL):**
 
 ```sql
 UPDATE usuario
-SET clave = SHA2('NuevaClaveSegura123', 256)
-WHERE login = 'jersson123';
+SET clave = SHA2('NuevaClaveSegura', 256)
+WHERE login = 'nombre_usuario';
 ```
 
-## 12) Checklist final para tu pupilo
+---
 
-- [ ] Proyecto subido al servidor
-- [ ] BD importada
-- [ ] `config/global.php` configurado
-- [ ] Login funciona
-- [ ] Logo y datos de empresa configurados
-- [ ] Ventas/compras registran correctamente
-- [ ] Reportes PDF/ticket generan sin error
-- [ ] Permisos de carpetas `files/*` correctos
+## Patrones de código
+
+### Modelo
+
+```php
+class Articulo {
+    private $tabla = "articulo";
+
+    public function listar() {
+        $sql = "SELECT idarticulo, nombre, stock FROM {$this->tabla} WHERE condicion = 1";
+        return ejecutarConsulta($sql);
+    }
+
+    public function insertar() {
+        $sql = "INSERT INTO {$this->tabla} (nombre, stock) VALUES (...)";
+        return ejecutarConsulta($sql);
+    }
+}
+```
+
+### Controlador AJAX
+
+```php
+// ajax/articulo.php
+session_start();
+require_once "../modelos/Articulo.php";
+
+$op  = $_GET["op"] ?? "";
+$obj = new Articulo();
+
+switch ($op) {
+    case "listar":
+        echo json_encode($obj->listar());
+        break;
+    case "guardar":
+        $nombre = limpiarCadena($_POST["nombre"]);
+        echo json_encode($obj->insertar());
+        break;
+}
+```
+
+### Respuesta JSON estándar
+
+```json
+{ "ok": true,  "message": "Venta registrada correctamente", "data": {} }
+{ "ok": false, "message": "No hay stock suficiente de Paracetamol 500mg" }
+```
+
+### Convenciones obligatorias
+
+- Métodos del modelo en español: `insertar`, `editar`, `listar`, `mostrar`, `desactivar`, `activar`
+- Usar `START TRANSACTION / COMMIT / ROLLBACK` en operaciones que tocan múltiples tablas
+- No usar `SELECT *` en tablas grandes — seleccionar solo las columnas necesarias
+- No hacer lógica de negocio en las vistas
+- No eliminar registros físicamente si tienen relaciones — usar campo `condicion`
 
 ---
- 
- 
-Si luego quieres, te armo una segunda version del README orientada a cliente final (manual de uso por modulo) y otra tecnica para desarrolladores (debug, estructura SQL, convenciones, roadmap).
+
+## Monedas soportadas
+
+`PEN` (S/) · `USD` ($) · `EUR` · `MXN` · `COP` · `CLP` · `ARS` · `BOB`
+
+Usar siempre `obtenerSimboloMoneda()` y `formatearMoneda()` para mostrar precios.
+
+---
+
+## Arquitectura de despliegue
+
+El sistema opera en modo **local primario** — la venta, caja, gaveta y ticketera corren en XAMPP dentro de la farmacia sin depender de internet. Opcionalmente se puede sincronizar con un hosting para que el dueño vea reportes y dashboard en tiempo real desde cualquier dispositivo (ver `ARQUITECTURA_HIBRIDA.md`).
+
+---
+
+## Paso a producción — checklist
+
+- [ ] Copiar proyecto al servidor (sin `.git`)
+- [ ] Crear BD y usuario dedicado en hosting / cPanel
+- [ ] Importar dump SQL y aplicar migraciones
+- [ ] Editar `config/global.php` con credenciales reales
+- [ ] Verificar permisos de escritura en `files/articulos/`, `files/usuarios/`, `files/empresa/`, `files/backups/`
+- [ ] Activar HTTPS
+- [ ] Configurar `display_errors = Off` en `php.ini`
+- [ ] Cambiar todas las claves demo
+- [ ] Configurar nombre de impresora térmica / gaveta
+- [ ] Probar login, venta, compra, caja y reportes PDF
+
+---
+
+## Perfiles de usuario
+
+| Perfil | Módulos principales | Lo que más necesita que sea rápido |
+|---|---|---|
+| Cajero / Técnico | Venta, Caja | Búsqueda de medicamentos, cierre de venta, ticket |
+| Químico Farmacéutico | Venta (Rx), Alertas | Validación de receta, alertas de vencimiento |
+| Almacenero | Compras, Almacén | Registro de lotes, actualización de stock |
+| Administrador | Todo | Reportes, configuración, usuarios |
+| Dueño / Supervisor | Dashboard, Reportes | KPIs del día, cierre de caja, resumen de ventas |
+
+---
+
+## Referencias internas
+
+| Archivo | Contenido |
+|---|---|
+| `CLAUDE.md` | Guía técnica completa para desarrollo (patrones, reglas, BD) |
+| `ANALISIS_FARMACIA.md` | Brechas del sistema base vs. requisitos farmacéuticos |
+| `ARQUITECTURA_HIBRIDA.md` | Opciones de despliegue local + web |
+| `GAVETA_CONFIGURACION.md` | Configuración detallada de gaveta e impresora térmica |
+| `CONTRATO_SOFTWARE.md` | Términos de entrega del sistema |
