@@ -32,6 +32,7 @@ function cargarEmpresa() {
     $("#serie_ticket").val(r.serie_ticket || "T001");
     $("#impuesto_default").val(r.impuesto_default || "18.00");
     $("#moneda").val(r.moneda || "PEN");
+    $("#nombre_impresora").val(r.nombre_impresora || "");
     $("#logoactual").val(r.logo || "");
 
     if (r.logo) {

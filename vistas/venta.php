@@ -419,6 +419,10 @@ if ($_SESSION['ventas']==1) {
             <label>Observaciones</label>
             <textarea class="form-control" id="rx_observaciones" rows="2" maxlength="500"></textarea>
           </div>
+          <div class="form-group" id="rx_bloque_diagnostico" style="display:none;">
+            <label>Diagnóstico del paciente <small class="text-muted">(requerido para psicotrópicos/estupefacientes)</small></label>
+            <input type="text" class="form-control" id="rx_diagnostico" maxlength="300" placeholder="Ej: Trastorno de ansiedad generalizada, insomnio crónico">
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-default" id="btnCancelarReceta">

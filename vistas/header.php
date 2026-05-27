@@ -663,8 +663,11 @@ if ($_SESSION['consultac']==1 || $_SESSION['consultav']==1) {
   if ($_SESSION['consultav']==1) {
     echo '<li><a href="ventasfechacliente.php"><i class="bi bi-person-lines-fill"></i> Ventas por cliente</a></li>';
   }
-  echo '<li><a href="reportes.php"><i class="bi bi-collection"></i> Centro de reportes</a></li>
-          </ul>
+  echo '<li><a href="reportes.php"><i class="bi bi-collection"></i> Centro de reportes</a></li>';
+  if ($_SESSION['consultac']==1 || $_SESSION['consultav']==1 || (!empty($_SESSION['acceso']) && $_SESSION['acceso']==1)) {
+    echo '<li><a href="resultados.php"><i class="bi bi-graph-up-arrow"></i> Estado de Resultados</a></li>';
+  }
+  echo '</ul>
         </li>';
 }
         ?>

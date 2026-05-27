@@ -33,6 +33,7 @@ class Empresa
         $serie_ticket = $data['serie_ticket'];
         $impuesto_default = $data['impuesto_default'];
         $moneda = $data['moneda'];
+        $nombre_impresora = $data['nombre_impresora'] ?? '';
 
         if ($exist) {
             $sql = "UPDATE configuracion_empresa SET
@@ -51,7 +52,8 @@ class Empresa
                 serie_factura='$serie_factura',
                 serie_ticket='$serie_ticket',
                 impuesto_default='$impuesto_default',
-                moneda='$moneda'
+                moneda='$moneda',
+                nombre_impresora='$nombre_impresora'
                 WHERE idconfig='" . $exist['idconfig'] . "'";
             return ejecutarConsulta($sql);
         }

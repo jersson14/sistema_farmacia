@@ -63,7 +63,15 @@ public function mostrar($idarticulo){
 //listar registros
 public function listar(){
 	$sql="SELECT a.idarticulo,a.idcategoria,a.idunidad,c.nombre as categoria,u.nombre as unidad,u.abreviatura,
-		a.codigo,a.nombre,a.stock,a.stock_minimo,a.precio_venta,a.descripcion,a.imagen,a.condicion
+		a.codigo,a.nombre,a.stock,a.stock_minimo,a.precio_venta,a.descripcion,a.imagen,a.condicion,
+		(SELECT DATE_FORMAT(la.fecha_vencimiento,'%d/%m/%Y')
+		 FROM lote_articulo la
+		 WHERE la.idarticulo=a.idarticulo AND la.condicion=1 AND la.cantidad_actual>0
+		 ORDER BY la.fecha_vencimiento ASC LIMIT 1) AS prox_vencimiento,
+		(SELECT DATEDIFF(la2.fecha_vencimiento, CURDATE())
+		 FROM lote_articulo la2
+		 WHERE la2.idarticulo=a.idarticulo AND la2.condicion=1 AND la2.cantidad_actual>0
+		 ORDER BY la2.fecha_vencimiento ASC LIMIT 1) AS dias_para_vencer
 	FROM articulo a
 	INNER JOIN categoria c ON a.idcategoria=c.idcategoria
 	LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad";

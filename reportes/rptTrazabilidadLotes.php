@@ -65,10 +65,14 @@ $sym  = obtenerSimboloMoneda(!empty($emp['moneda']) ? $emp['moneda'] : 'PEN');
 
 // PDF
 class PDF_Trazabilidad extends FPDF {
-    var $empresa = '';
+    var $empresa = ''; var $logo = '';
     function Header(){
+        if (!empty($this->logo) && file_exists($this->logo)) {
+            $this->Image($this->logo, 10, 5, 28, 0);
+        }
         $this->SetFont('Arial','B',13);
-        $this->Cell(0,7, iconv('UTF-8','ISO-8859-1//TRANSLIT',$this->empresa),0,1,'C');
+        $this->SetXY(40, 6);
+        $this->Cell(0,7, iconv('UTF-8','ISO-8859-1//TRANSLIT',$this->empresa),0,1,'L');
         $this->SetFont('Arial','B',12);
         $this->SetFillColor(40,40,40); $this->SetTextColor(255,255,255);
         $this->Cell(0,7,'TRAZABILIDAD DE LOTE',0,1,'C',true);
@@ -90,9 +94,21 @@ class PDF_Trazabilidad extends FPDF {
     }
 }
 
+$_logoPath = '';
+if (!empty($emp['logo'])) {
+    $l = realpath(__DIR__ . '/../files/empresa/' . $emp['logo']);
+    if ($l && file_exists($l)) $_logoPath = $l;
+}
+if (!$_logoPath) {
+    foreach ([__DIR__.'/logo1.jpeg', __DIR__.'/logo.png'] as $_p) {
+        if (file_exists($_p)) { $_logoPath = $_p; break; }
+    }
+}
+
 $pdf = new PDF_Trazabilidad('P','mm','A4');
 $pdf->AliasNbPages();
 $pdf->empresa = !empty($emp['nombre']) ? $emp['nombre'] : 'FARMACIA';
+$pdf->logo    = $_logoPath;
 $pdf->AddPage();
 $pdf->SetAutoPageBreak(true,18);
 

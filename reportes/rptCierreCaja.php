@@ -94,18 +94,25 @@ class PDF_CierreCaja extends FPDF
   var $empresa    = '';
   var $ruc        = '';
   var $direccion  = '';
+  var $logo       = '';
 
   function Header()
   {
-    $this->SetFont('Arial', 'B', 14);
-    $this->Cell(0, 7, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $this->empresa), 0, 1, 'C');
+    if (!empty($this->logo) && file_exists($this->logo)) {
+      $this->Image($this->logo, 10, 5, 28, 0);
+    }
+    $this->SetFont('Arial', 'B', 13);
+    $this->SetXY(40, 6);
+    $this->Cell(0, 6, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $this->empresa), 0, 1, 'L');
     if ($this->ruc) {
-      $this->SetFont('Arial', '', 10);
-      $this->Cell(0, 5, 'RUC: ' . $this->ruc, 0, 1, 'C');
+      $this->SetFont('Arial', '', 9);
+      $this->SetX(40);
+      $this->Cell(0, 5, 'RUC: ' . $this->ruc, 0, 1, 'L');
     }
     if ($this->direccion) {
-      $this->SetFont('Arial', '', 9);
-      $this->Cell(0, 5, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $this->direccion), 0, 1, 'C');
+      $this->SetFont('Arial', '', 8);
+      $this->SetX(40);
+      $this->Cell(0, 4, iconv('UTF-8', 'ISO-8859-1//TRANSLIT', $this->direccion), 0, 1, 'L');
     }
     $this->SetFont('Arial', 'B', 13);
     $this->SetFillColor(40, 40, 40);
@@ -140,11 +147,23 @@ class PDF_CierreCaja extends FPDF
   }
 }
 
+$_logoPath = '';
+if (!empty($cfg['logo'])) {
+  $l = realpath(__DIR__ . '/../files/empresa/' . $cfg['logo']);
+  if ($l && file_exists($l)) $_logoPath = $l;
+}
+if (!$_logoPath) {
+  foreach ([__DIR__.'/logo1.jpeg', __DIR__.'/logo.png'] as $_p) {
+    if (file_exists($_p)) { $_logoPath = $_p; break; }
+  }
+}
+
 $pdf = new PDF_CierreCaja('P', 'mm', 'A4');
 $pdf->AliasNbPages();
 $pdf->empresa   = $nombreEmpresa;
 $pdf->ruc       = $rucEmpresa;
 $pdf->direccion = $dirEmpresa;
+$pdf->logo      = $_logoPath;
 $pdf->AddPage();
 $pdf->SetAutoPageBreak(true, 20);
 

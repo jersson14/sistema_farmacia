@@ -7,11 +7,12 @@ class ControlEspecial
      * Registra en el libro de control todos los artículos CONTROL_ESPECIAL
      * de una venta. Se llama después de guardar venta + receta.
      */
-    public function guardarDesdeVenta($idventa, $idreceta, $idusuario_qf)
+    public function guardarDesdeVenta($idventa, $idreceta, $idusuario_qf, $diagnostico = '')
     {
         $idventa      = (int)$idventa;
         $idreceta     = $idreceta ? (int)$idreceta : null;
         $idusuario_qf = $idusuario_qf ? (int)$idusuario_qf : null;
+        $diagnosticoE = limpiarCadena((string)$diagnostico);
 
         if ($idventa <= 0) return false;
 
@@ -78,12 +79,12 @@ class ControlEspecial
                         (idventa, idarticulo, idcliente, idreceta,
                          nombre_medico, colegiatura, cantidad,
                          idlote, numero_lote, fecha_vencimiento,
-                         idusuario_qf, nombre_qf, colegiatura_qf)
+                         idusuario_qf, nombre_qf, colegiatura_qf, diagnostico)
                        VALUES
                         ('$idventa','$idarticulo',$idcliente,$idrecetaSql,
                          '$nombre_medicoE','$colegiaturaE','$cantidad',
                          $idlote,'$numero_lote',$fVenc,
-                         $idusuarioQfSql,'$nombre_qfE','$colegiatura_qfE')";
+                         $idusuarioQfSql,'$nombre_qfE','$colegiatura_qfE','$diagnosticoE')";
             ejecutarConsulta($sqlIns) or $sw = false;
         }
         return $sw;
@@ -101,6 +102,8 @@ class ControlEspecial
                        a.nombre AS medicamento, a.codigo,
                        IFNULL(p.nombre,'---') AS paciente,
                        ce.cantidad,
+                       (a.stock + IFNULL((SELECT SUM(ce2.cantidad) FROM control_especial ce2
+                        WHERE ce2.idarticulo = ce.idarticulo AND ce2.idcontrol > ce.idcontrol), 0)) AS saldo,
                        ce.numero_lote,
                        IF(ce.fecha_vencimiento IS NULL,'---',DATE_FORMAT(ce.fecha_vencimiento,'%d/%m/%Y')) AS fecha_vencimiento,
                        ce.nombre_medico, ce.colegiatura,
@@ -135,6 +138,8 @@ class ControlEspecial
                        IFNULL(p.nombre,'Sin nombre') AS paciente,
                        IFNULL(p.num_documento,'') AS num_documento,
                        ce.cantidad,
+                       (a.stock + IFNULL((SELECT SUM(ce2.cantidad) FROM control_especial ce2
+                        WHERE ce2.idarticulo = ce.idarticulo AND ce2.idcontrol > ce.idcontrol), 0)) AS saldo,
                        ce.numero_lote,
                        IF(ce.fecha_vencimiento IS NULL,'',DATE_FORMAT(ce.fecha_vencimiento,'%d/%m/%Y')) AS fecha_vencimiento,
                        ce.nombre_medico, ce.colegiatura,

@@ -47,11 +47,13 @@ if ($_SESSION['ventas'] == 1 || $_SESSION['acceso'] == 1) {
                 <th>Medicamento</th>
                 <th>Paciente</th>
                 <th>Cant.</th>
+                <th>Saldo</th>
                 <th>N° Lote</th>
                 <th>Venc.</th>
                 <th>Médico</th>
                 <th>Colegiatura</th>
                 <th>QF Dispensador</th>
+                <th>Diagnóstico</th>
                 <th>Venta</th>
               </tr>
             </thead>

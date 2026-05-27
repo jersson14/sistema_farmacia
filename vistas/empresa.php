@@ -87,6 +87,19 @@ if ($_SESSION['acceso']==1) {
                   <input type="number" step="0.01" min="0" class="form-control" name="impuesto_default" id="impuesto_default" value="18.00">
                 </div>
                 <div class="form-group col-lg-6 col-md-6 col-sm-12 col-xs-12">
+                  <label>
+                    Nombre de impresora (gaveta)
+                    <span data-toggle="tooltip" title="Nombre del recurso compartido de la ticketera en Windows. Ejemplo: XP365B. Deja vacío si no tienes gaveta." style="cursor:help;">
+                      <i class="fa fa-question-circle text-info"></i>
+                    </span>
+                  </label>
+                  <input type="text" class="form-control" name="nombre_impresora" id="nombre_impresora" placeholder="Ej: XP365B" maxlength="100">
+                  <span class="help-block" style="font-size:11px;">
+                    <i class="fa fa-info-circle"></i>
+                    En Windows: Panel de Control → Dispositivos e impresoras → clic derecho en tu ticketera → <strong>Propiedades de impresora → Compartir</strong> → activa "Compartir esta impresora" y copia el nombre aquí.
+                  </span>
+                </div>
+                <div class="form-group col-lg-6 col-md-6 col-sm-12 col-xs-12">
                   <label>Logo</label>
                   <input type="file" class="form-control" name="logo" id="logo" accept="image/*">
                   <input type="hidden" name="logoactual" id="logoactual">

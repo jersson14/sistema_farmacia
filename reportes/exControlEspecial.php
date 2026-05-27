@@ -75,8 +75,8 @@ class PDFLibroControl extends FPDF
         $this->SetTextColor(255, 255, 255);
         $this->SetFont('Arial', 'B', 7.5);
         $this->SetXY(8, 20);
-        $cols  = array('Fecha/Hora','Medicamento','Paciente','Cant','Lote','Venc.','Médico / Colegiatura','QF Dispensador');
-        $widths = array(28, 52, 38, 10, 18, 18, 62, 43);
+        $cols  = array('Fecha/Hora','Medicamento','Paciente','Cant','Saldo','Lote','Venc.','Médico / Colegiatura','QF Dispensador','Diagnóstico');
+        $widths = array(26, 44, 30, 10, 12, 15, 14, 46, 36, 48);
         for ($i = 0; $i < count($cols); $i++) {
             $this->Cell($widths[$i], 6, u8($cols[$i]), 1, 0, 'C', true);
         }
@@ -102,7 +102,7 @@ $pdf->SetMargins(8, 30, 8);
 $pdf->SetAutoPageBreak(true, 16);
 $pdf->AddPage();
 
-$widths = array(28, 52, 38, 10, 18, 18, 62, 43);
+$widths = array(26, 44, 30, 10, 12, 15, 14, 46, 36, 48);
 
 $pdf->SetFont('Arial', '', 8);
 $fila = 0;
@@ -123,13 +123,15 @@ while ($reg = $rs->fetch_object()) {
     $medicoCol = $reg->nombre_medico . ($reg->colegiatura ? ' / ' . $reg->colegiatura : '');
 
     $pdf->Cell($widths[0], 5, u8($reg->fecha_registro),     1, 0, 'L', $fill);
-    $pdf->Cell($widths[1], 5, u8(mb_strimwidth($medicamento, 0, 45, '...')), 1, 0, 'L', $fill);
-    $pdf->Cell($widths[2], 5, u8(mb_strimwidth($reg->paciente, 0, 30, '...')), 1, 0, 'L', $fill);
+    $pdf->Cell($widths[1], 5, u8(mb_strimwidth($medicamento, 0, 38, '...')), 1, 0, 'L', $fill);
+    $pdf->Cell($widths[2], 5, u8(mb_strimwidth($reg->paciente, 0, 25, '...')), 1, 0, 'L', $fill);
     $pdf->Cell($widths[3], 5, u8(number_format((float)$reg->cantidad, 0)), 1, 0, 'C', $fill);
-    $pdf->Cell($widths[4], 5, u8($reg->numero_lote),         1, 0, 'C', $fill);
-    $pdf->Cell($widths[5], 5, u8($reg->fecha_vencimiento),   1, 0, 'C', $fill);
-    $pdf->Cell($widths[6], 5, u8(mb_strimwidth($medicoCol, 0, 55, '...')), 1, 0, 'L', $fill);
-    $pdf->Cell($widths[7], 5, u8(mb_strimwidth($reg->nombre_qf . ($reg->colegiatura_qf ? ' / '.$reg->colegiatura_qf : ''), 0, 38, '...')), 1, 1, 'L', $fill);
+    $pdf->Cell($widths[4], 5, u8(number_format((float)$reg->saldo, 0)),    1, 0, 'C', $fill);
+    $pdf->Cell($widths[5], 5, u8($reg->numero_lote),         1, 0, 'C', $fill);
+    $pdf->Cell($widths[6], 5, u8($reg->fecha_vencimiento),   1, 0, 'C', $fill);
+    $pdf->Cell($widths[7], 5, u8(mb_strimwidth($medicoCol, 0, 42, '...')), 1, 0, 'L', $fill);
+    $pdf->Cell($widths[8], 5, u8(mb_strimwidth($reg->nombre_qf . ($reg->colegiatura_qf ? ' / '.$reg->colegiatura_qf : ''), 0, 33, '...')), 1, 0, 'L', $fill);
+    $pdf->Cell($widths[9], 5, u8(mb_strimwidth((string)$reg->diagnostico, 0, 42, '...')), 1, 1, 'L', $fill);
 }
 
 if ($fila === 0) {

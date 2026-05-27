@@ -505,5 +505,6 @@ body {
   /* Quitar emoji si no imprime bien */
   .gracias-icon { display: none !important; }
 
-  .btn-print { display: none !important; }
+  .btn-print   { display: none !important; }
+  #print-tip   { display: none !important; }
 }

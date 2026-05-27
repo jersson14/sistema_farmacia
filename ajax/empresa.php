@@ -108,7 +108,8 @@ switch ($_GET['op']) {
             'serie_factura' => limpiarCadena(isset($_POST['serie_factura']) ? $_POST['serie_factura'] : 'F001'),
             'serie_ticket' => limpiarCadena(isset($_POST['serie_ticket']) ? $_POST['serie_ticket'] : 'T001'),
             'impuesto_default' => limpiarCadena(isset($_POST['impuesto_default']) ? $_POST['impuesto_default'] : '18.00'),
-            'moneda' => limpiarCadena(isset($_POST['moneda']) ? $_POST['moneda'] : 'PEN')
+            'moneda' => limpiarCadena(isset($_POST['moneda']) ? $_POST['moneda'] : 'PEN'),
+            'nombre_impresora' => limpiarCadena(isset($_POST['nombre_impresora']) ? $_POST['nombre_impresora'] : '')
         );
 
         if ($data['nombre_comercial'] === '') {

@@ -384,6 +384,18 @@ public function listarDetalle($idventa){
 	return ejecutarConsulta($sql);
 }
 
+public function listarDetalleJSON($idventa){
+	$sql="SELECT dv.idarticulo, a.nombre, IFNULL(u.abreviatura,'und') as unidad,
+	             dv.cantidad, dv.precio_venta, dv.descuento,
+	             (dv.cantidad*dv.precio_venta-dv.descuento) as subtotal,
+	             IFNULL(a.stock, 0) as stock
+	      FROM detalle_venta dv
+	      INNER JOIN articulo a ON dv.idarticulo=a.idarticulo
+	      LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad
+	      WHERE dv.idventa='$idventa'";
+	return ejecutarConsulta($sql);
+}
+
 //listar registros
 public function listar(){
 	$sql="SELECT v.idventa,DATE_FORMAT(v.fecha_hora,'%d/%m/%Y %H:%i') as fecha,v.idcliente,p.nombre as cliente,u.idusuario,u.nombre as usuario, v.tipo_comprobante,v.serie_comprobante,v.num_comprobante,v.total_venta,v.impuesto,v.estado FROM venta v INNER JOIN persona p ON v.idcliente=p.idpersona INNER JOIN usuario u ON v.idusuario=u.idusuario ORDER BY v.idventa DESC";

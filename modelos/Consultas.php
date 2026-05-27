@@ -486,6 +486,52 @@ public function topproductosvendidosrango($fecha_inicio,$fecha_fin,$limit=7){
 	return ejecutarConsulta($sql);
 }
 
+public function ventasdiariasrango($fecha_inicio, $fecha_fin) {
+	$sql = "SELECT DATE(fecha_hora) AS fecha, IFNULL(SUM(total_venta),0) AS total
+	        FROM venta
+	        WHERE DATE(fecha_hora)>='$fecha_inicio' AND DATE(fecha_hora)<='$fecha_fin'
+	        AND estado='Aceptado'
+	        GROUP BY DATE(fecha_hora)
+	        ORDER BY DATE(fecha_hora) ASC";
+	return ejecutarConsulta($sql);
+}
+
+public function resumenResultados($fecha_inicio, $fecha_fin) {
+	$sqlVentas  = "SELECT IFNULL(SUM(total_venta),0) AS total_ventas
+	               FROM venta
+	               WHERE DATE(fecha_hora)>='$fecha_inicio' AND DATE(fecha_hora)<='$fecha_fin'
+	               AND estado='Aceptado'";
+	$sqlCompras = "SELECT IFNULL(SUM(total_compra),0) AS total_compras
+	               FROM ingreso
+	               WHERE DATE(fecha_hora)>='$fecha_inicio' AND DATE(fecha_hora)<='$fecha_fin'";
+	$sqlCaja    = "SELECT
+	                 IFNULL(SUM(CASE WHEN m.tipo='INGRESO' AND m.concepto NOT LIKE 'Venta %' THEN m.monto ELSE 0 END),0) AS ingresos_caja,
+	                 IFNULL(SUM(CASE WHEN m.tipo='EGRESO' THEN m.monto ELSE 0 END),0) AS egresos_caja
+	               FROM caja_movimiento m
+	               INNER JOIN caja_diaria c ON c.idcaja = m.idcaja
+	               WHERE DATE(c.fecha_apertura) >= '$fecha_inicio' AND DATE(c.fecha_apertura) <= '$fecha_fin'";
+
+	$v = ejecutarConsultaSimpleFila($sqlVentas);
+	$c = ejecutarConsultaSimpleFila($sqlCompras);
+	$k = ejecutarConsultaSimpleFila($sqlCaja);
+
+	$ventas        = (float)($v['total_ventas']  ?? 0);
+	$compras       = (float)($c['total_compras'] ?? 0);
+	$utilidadBruta = $ventas - $compras;
+	$ingresosCaja  = (float)($k['ingresos_caja'] ?? 0);
+	$egresosCaja   = (float)($k['egresos_caja']  ?? 0);
+	$resultado     = $utilidadBruta + $ingresosCaja - $egresosCaja;
+
+	return [
+		'total_ventas'   => $ventas,
+		'total_compras'  => $compras,
+		'utilidad_bruta' => $utilidadBruta,
+		'ingresos_caja'  => $ingresosCaja,
+		'egresos_caja'   => $egresosCaja,
+		'resultado'      => $resultado,
+	];
+}
+
 public function ultimomovimientosrango($fecha_inicio,$fecha_fin,$limit=10){
 	$limit=(int)$limit;
 	if ($limit<=0) $limit=10;

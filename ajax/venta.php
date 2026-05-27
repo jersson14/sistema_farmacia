@@ -128,6 +128,25 @@ switch ($_GET["op"]) {
 		echo json_encode($rspta);
 		break;
 
+	case 'listarDetalleJSON':
+		$id = (int)($_GET['id'] ?? 0);
+		$rs = $venta->listarDetalleJSON($id);
+		$items = [];
+		while ($r = $rs->fetch_assoc()) {
+			$items[] = [
+				'idarticulo'  => (int)$r['idarticulo'],
+				'nombre'      => $r['nombre'],
+				'unidad'      => $r['unidad'],
+				'cantidad'    => (float)$r['cantidad'],
+				'precio_venta'=> (float)$r['precio_venta'],
+				'descuento'   => (float)$r['descuento'],
+				'subtotal'    => (float)$r['subtotal'],
+				'stock'       => (float)$r['stock'],
+			];
+		}
+		echo json_encode($items);
+		break;
+
 	case 'listarDetalle':
 		//recibimos el idventa
 		$id=$_GET['id'];

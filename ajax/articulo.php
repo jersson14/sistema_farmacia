@@ -89,6 +89,16 @@ switch ($_GET["op"]) {
 		$data=Array();
 
 		while ($reg=$rspta->fetch_object()) {
+			$dias = ($reg->dias_para_vencer !== null) ? (int)$reg->dias_para_vencer : null;
+			if ($reg->prox_vencimiento === null) {
+				$vencCol = '<span class="text-muted">Sin lotes</span>';
+			} elseif ($dias < 0) {
+				$vencCol = '<span class="label bg-red"><i class="fa fa-times-circle"></i> Vencido ' . $reg->prox_vencimiento . '</span>';
+			} elseif ($dias <= 30) {
+				$vencCol = '<span class="label bg-orange"><i class="fa fa-warning"></i> ' . $reg->prox_vencimiento . ' (' . $dias . ' d)</span>';
+			} else {
+				$vencCol = '<span class="label bg-green">' . $reg->prox_vencimiento . '</span>';
+			}
 			$data[]=array(
             "0"=>($reg->condicion)?'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idarticulo.')"><i class="fa fa-pencil"></i></button>'.' '.'<button class="btn btn-danger btn-xs" onclick="desactivar('.$reg->idarticulo.')"><i class="fa fa-close"></i></button>':'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idarticulo.')"><i class="fa fa-pencil"></i></button>'.' '.'<button class="btn btn-primary btn-xs" onclick="activar('.$reg->idarticulo.')"><i class="fa fa-check"></i></button>',
             "1"=>$reg->nombre,
@@ -100,7 +110,8 @@ switch ($_GET["op"]) {
             "7"=>formatearMoneda((float)$reg->precio_venta),
             "8"=>"<img src='../files/articulos/".$reg->imagen."' height='50px' width='50px'>",
             "9"=>$reg->descripcion,
-            "10"=>($reg->condicion)?'<span class="label bg-green">Activado</span>':'<span class="label bg-red">Desactivado</span>'
+            "10"=>($reg->condicion)?'<span class="label bg-green">Activado</span>':'<span class="label bg-red">Desactivado</span>',
+            "11"=>$vencCol
               );
 		}
 		$results=array(

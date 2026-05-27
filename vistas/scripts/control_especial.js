@@ -28,7 +28,7 @@ function initTblCE() {
         "iDisplayLength": 25,
         "order": [[0, "desc"]],
         "columnDefs": [
-            { "orderable": false, "targets": [9] }
+            { "orderable": false, "targets": [11] }
         ]
     }).DataTable();
 }

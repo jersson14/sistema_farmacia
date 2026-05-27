@@ -352,9 +352,16 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
   Imprimir ticket
 </button>
 
-<div id="print-tip" style="margin-top:10px;font-size:11px;color:#555;font-family:Arial,sans-serif;text-align:center;max-width:302px;line-height:1.6">
-  <strong>Ticketera:</strong> en el di&aacute;logo selecciona tu impresora t&eacute;rmica<br>
-  como <em>Destino</em> &mdash; el tama&ntilde;o 80mm se aplica solo.
+<div id="print-tip" style="margin-top:14px;font-family:Arial,sans-serif;text-align:left;max-width:302px;background:#fffbe6;border:1px solid #f0c040;border-radius:6px;padding:10px 12px;">
+  <div style="font-size:11px;font-weight:700;color:#333;margin-bottom:6px;">&#128438; C&oacute;mo imprimir en tu ticketera:</div>
+  <ol style="font-size:11px;color:#444;margin:0;padding-left:16px;line-height:1.8;">
+    <li><strong>Destino</strong> &rarr; selecciona <strong>XP365B</strong> (o el nombre de tu impresora t&eacute;rmica)</li>
+    <li>El tama&ntilde;o de papel cambia a <strong>80mm autom&aacute;ticamente</strong></li>
+    <li>Clic en <strong>Imprimir</strong></li>
+  </ol>
+  <div style="font-size:10px;color:#888;margin-top:6px;border-top:1px solid #f0c040;padding-top:5px;">
+    &#9888; Si el preview se ve en hoja A4, es normal &mdash; al seleccionar la ticketera el tama&ntilde;o se ajusta solo.
+  </div>
 </div>
 
 <script>

@@ -23,12 +23,13 @@ switch ($op) {
         $idventa      = isset($_POST['idventa'])      ? (int)$_POST['idventa']      : 0;
         $idreceta     = isset($_POST['idreceta'])      ? (int)$_POST['idreceta']     : 0;
         $idusuario_qf = isset($_SESSION['idusuario']) ? (int)$_SESSION['idusuario'] : 0;
+        $diagnostico  = isset($_POST['diagnostico'])  ? trim((string)$_POST['diagnostico']) : '';
 
         if ($idventa <= 0) {
             echo json_encode(array('ok'=>false,'message'=>'ID de venta invalido'));
             break;
         }
-        $ok = $ce->guardarDesdeVenta($idventa, $idreceta ?: null, $idusuario_qf ?: null);
+        $ok = $ce->guardarDesdeVenta($idventa, $idreceta ?: null, $idusuario_qf ?: null, $diagnostico);
         echo json_encode(array('ok'=>(bool)$ok));
         break;
 
@@ -39,16 +40,18 @@ switch ($op) {
         $data = array();
         while ($reg = $rs->fetch_object()) {
             $data[] = array(
-                "0" => $reg->fecha_registro,
-                "1" => htmlspecialchars($reg->medicamento),
-                "2" => htmlspecialchars($reg->paciente),
-                "3" => number_format((float)$reg->cantidad, 0),
-                "4" => htmlspecialchars($reg->numero_lote),
-                "5" => $reg->fecha_vencimiento,
-                "6" => htmlspecialchars($reg->nombre_medico),
-                "7" => htmlspecialchars($reg->colegiatura),
-                "8" => htmlspecialchars($reg->nombre_qf),
-                "9" => '<a target="_blank" href="../reportes/exTicket.php?id='.(int)$reg->idventa.'" class="btn btn-xs btn-info"><i class="fa fa-file"></i> Venta #'.(int)$reg->idventa.'</a>'
+                "0"  => $reg->fecha_registro,
+                "1"  => htmlspecialchars($reg->medicamento),
+                "2"  => htmlspecialchars($reg->paciente),
+                "3"  => number_format((float)$reg->cantidad, 0),
+                "4"  => number_format((float)$reg->saldo, 0),
+                "5"  => htmlspecialchars($reg->numero_lote),
+                "6"  => $reg->fecha_vencimiento,
+                "7"  => htmlspecialchars($reg->nombre_medico),
+                "8"  => htmlspecialchars($reg->colegiatura),
+                "9"  => htmlspecialchars($reg->nombre_qf),
+                "10" => htmlspecialchars($reg->diagnostico),
+                "11" => '<a target="_blank" href="../reportes/exTicket.php?id='.(int)$reg->idventa.'" class="btn btn-xs btn-info"><i class="fa fa-file"></i> Venta #'.(int)$reg->idventa.'</a>'
             );
         }
         echo json_encode(array(

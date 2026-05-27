@@ -704,6 +704,13 @@ function mostrarform(flag){
 
 //cancelar form
 function cancelarform(){
+	// Restaurar modo normal al salir de vista
+	$('.pos-pagos').show();
+	$('.pos-cobrar-section').show();
+	$('.pos-topbar').show();
+	$('#posSearchInput').prop('disabled', false).attr('placeholder', 'Buscar medicamento por nombre o código... (F2)');
+	$('#pos-vista-banner').remove();
+	$('#btnCancelar').html('<i class="fa fa-arrow-left"></i> Cancelar venta');
 	limpiar();
 	mostrarform(false);
 }
@@ -834,6 +841,12 @@ function abrirModalReceta(){
 	var mm = ("0"+(hoy.getMonth()+1)).slice(-2);
 	var dd = ("0"+hoy.getDate()).slice(-2);
 	$('#rx_fecha_emision').val(yyyy+'-'+mm+'-'+dd);
+	if (tieneArticulosControlEspecial()) {
+		$('#rx_bloque_diagnostico').show();
+	} else {
+		$('#rx_bloque_diagnostico').hide();
+		$('#rx_diagnostico').val('');
+	}
 	$('#modalReceta').modal('show');
 	setTimeout(function(){ $('#rx_nombre_medico').focus(); }, 350);
 }
@@ -883,8 +896,9 @@ function ejecutarGuardarVenta(){
 
 function guardarControlEspecial(idventa, idreceta, callback){
 	$.post("../ajax/control_especial.php?op=guardarDesdeVenta", {
-		idventa:  idventa,
-		idreceta: idreceta || 0
+		idventa:     idventa,
+		idreceta:    idreceta || 0,
+		diagnostico: $.trim($("#rx_diagnostico").val())
 	}, function(resp){
 		// Fallo silencioso: la venta ya está guardada, solo loggear
 		var r = {};
@@ -940,37 +954,88 @@ function procesarExitoVenta(r){
 			// El navegador bloqueó el popup — mostrar botón manual
 			notifyVenta("info", 'Ticket listo. <a href="' + urlComp + '" target="_blank" style="color:#fff;text-decoration:underline">Abrir ticket</a>');
 		}
+		// Abrir gaveta de dinero via comando ESC/POS
+		$.get("../ajax/abrirGaveta.php", function(resp) {
+			try {
+				var res = (typeof resp === 'string') ? JSON.parse(resp) : resp;
+				if (!res.ok && res.msg && res.msg.indexOf('no configurada') === -1) {
+					notifyVenta("warning", "Gaveta: " + res.msg);
+				}
+			} catch(e) {}
+		});
 	}
 	mostrarform(false);
 	listar();
 }
 
 function mostrar(idventa){
-	$.post("../ajax/venta.php?op=mostrar",{idventa : idventa},
-		function(data,status)
-		{
-			data=JSON.parse(data);
-			mostrarform(true);
+	$.post("../ajax/venta.php?op=mostrar", {idventa: idventa}, function(data) {
+		data = JSON.parse(data);
 
-			$("#idcliente").val(data.idcliente);
-			$("#idcliente").selectpicker('refresh');
-			$("#tipo_comprobante").val(data.tipo_comprobante);
-			$("#tipo_comprobante").selectpicker('refresh');
-			$("#serie_comprobante").val(data.serie_comprobante);
-			$("#num_comprobante").val(data.num_comprobante);
-			$("#fecha_hora").val(normalizarFechaHoraInput(data.fecha));
-			$("#impuesto").val(data.impuesto);
-			$("#idventa").val(data.idventa);
-			
-			//ocultar y mostrar los botones
-			$("#btnGuardar").hide();
-			$("#btnCancelar").show();
-			$("#btnAgregarArt").hide();
+		// limpiar + mostrar form primero (esto llama limpiar() internamente)
+		mostrarform(true);
+
+		$("#idcliente").val(data.idcliente);
+		$("#idcliente").selectpicker('refresh');
+		$("#tipo_comprobante").val(data.tipo_comprobante);
+		$("#tipo_comprobante").selectpicker('refresh');
+		$("#serie_comprobante").val(data.serie_comprobante);
+		$("#num_comprobante").val(data.num_comprobante);
+		$("#fecha_hora").val(normalizarFechaHoraInput(data.fecha));
+		$("#impuesto").val(data.impuesto);
+		$("#idventa").val(data.idventa);
+
+		$("#btnGuardar").hide();
+		$("#btnCancelar").show();
+		$("#btnAgregarArt").hide();
+
+		// Modo vista: ocultar cobro y pagos
+		$('.pos-pagos').hide();
+		$('.pos-cobrar-section').hide();
+		$('.pos-topbar').hide();
+		$('#posSearchInput').prop('disabled', true).attr('placeholder', 'Modo vista — solo lectura');
+
+		if (!$('#pos-vista-banner').length) {
+			$('#formularioregistros').prepend(
+				'<div id="pos-vista-banner" style="background:#17a2b8;color:#fff;padding:8px 16px;font-weight:600;font-size:13px;text-align:center;">' +
+				'<i class="fa fa-eye"></i>&nbsp; MODO VISTA — Esta venta ya fue registrada' +
+				'</div>'
+			);
+		}
+		$('#btnCancelar').html('<i class="fa fa-arrow-left"></i> Volver');
+
+		// AHORA cargar el detalle (después de que limpiar() ya corrió)
+		$.get("../ajax/venta.php?op=listarDetalleJSON&id=" + idventa, function(r) {
+			var items = [];
+			try { items = JSON.parse(r); } catch(e) { return; }
+
+			$(".filas").remove();
+			cont = 0;
+			detalles = 0;
+
+			for (var i = 0; i < items.length; i++) {
+				var it  = items[i];
+				var sub = (it.cantidad * it.precio_venta - it.descuento).toFixed(2);
+				var fila = '<tr class="filas" id="fila' + cont + '" data-tipo-venta="OTC">' +
+					'<td></td>' +
+					'<td><input type="hidden" name="idarticulo[]" value="' + it.idarticulo + '">' +
+					'<input type="hidden" name="stock_disponible[]" value="' + it.stock + '">' +
+					$('<span>').text(it.nombre).html() + '</td>' +
+					'<td>' + $('<span>').text(it.unidad).html() + '</td>' +
+					'<td><input type="number" name="cantidad[]" value="' + it.cantidad + '" readonly style="width:55px;text-align:center;"></td>' +
+					'<td><input type="number" name="precio_venta[]" value="' + it.precio_venta + '" readonly style="width:70px;text-align:right;"></td>' +
+					'<td><input type="number" name="descuento[]" value="' + it.descuento + '" readonly style="width:55px;text-align:right;"></td>' +
+					'<td><span id="subtotal' + cont + '" name="subtotal">' + sub + '</span></td>' +
+					'<td></td>' +
+					'</tr>';
+				cont++;
+				detalles++;
+				$('#detalles').append(fila);
+			}
+			modificarSubtotales();
+			renderCarritoVisual();
 		});
-	$.post("../ajax/venta.php?op=listarDetalle&id="+idventa,function(r){
-		$("#detalles").html(r);
 	});
-
 }
 
 
