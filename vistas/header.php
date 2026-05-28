@@ -550,7 +550,7 @@ if (!function_exists('darkenHexColor')) {
 
                 <p>
                 <span class="hidden-xs"><?php echo $_SESSION['nombre']; ?></span>
-                  <small>2021</small>
+                  <small>2026</small>
                 </p>
               </li>
               <!-- Menu Footer-->

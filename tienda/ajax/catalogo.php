@@ -30,13 +30,9 @@ switch ($op) {
         $porPagina = 15;
         $offset    = ($pagina - 1) * $porPagina;
 
-        // Solo artículos activos. Mostrar TODOS (incluso sin stock) para que el
-        // cajero vea el catálogo completo; el botón queda deshabilitado si stock=0.
+        // Solo artículos activos. Mostrar TODOS (incluso sin stock y sin importar
+        // tipo_venta) para que el catálogo muestre el inventario completo.
         $where = array("a.condicion=1");
-
-        if ($tieneColumnasTienda) {
-            $where[] = "a.tipo_venta='OTC'";
-        }
 
         if ($busqueda !== '') {
             $busqFiltro = "(a.nombre LIKE '%$busqueda%' OR a.codigo LIKE '%$busqueda%'";
@@ -106,9 +102,6 @@ switch ($op) {
     // ── CATEGORÍAS ───────────────────────────────────────────
     case 'categorias':
         $joinFiltro = "a.condicion = 1";
-        if ($tieneColumnasTienda) {
-            $joinFiltro .= " AND a.tipo_venta = 'OTC'";
-        }
 
         $rs = ejecutarConsulta(
             "SELECT c.idcategoria, c.nombre, COUNT(a.idarticulo) AS total
@@ -139,7 +132,7 @@ switch ($op) {
         $extraSelect = $tieneColumnasRx
             ? ", IFNULL(a.principio_activo,'') AS principio_activo, IFNULL(a.concentracion,'') AS concentracion, IFNULL(a.forma_farmaceutica,'') AS forma_farmaceutica, IFNULL(a.via_administracion,'') AS via_administracion, IFNULL(a.laboratorio,'') AS laboratorio"
             : '';
-        $filtroTienda = $tieneColumnasTienda ? "AND a.tipo_venta='OTC'" : '';
+        $filtroTienda = '';
 
         $r = ejecutarConsultaSimpleFila(
             "SELECT a.idarticulo, a.nombre, a.codigo,
