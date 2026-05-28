@@ -194,11 +194,11 @@ if ($_SESSION['escritorio'] == 1) {
     <div class="box dashboard-box dashboard-filter-box">
       <div class="box-body">
         <form method="get" action="escritorio.php" class="row dashboard-filter-form">
-          <div class="col-md-3 col-sm-6 col-xs-12">
+          <div class="col-md-3 col-sm-6 col-xs-12 fecha-col">
             <label>Desde</label>
             <input type="date" class="form-control" name="fecha_inicio" value="<?php echo htmlspecialchars($fechaInicio); ?>" max="<?php echo htmlspecialchars($fechaFin); ?>">
           </div>
-          <div class="col-md-3 col-sm-6 col-xs-12">
+          <div class="col-md-3 col-sm-6 col-xs-12 fecha-col">
             <label>Hasta</label>
             <input type="date" class="form-control" name="fecha_fin" value="<?php echo htmlspecialchars($fechaFin); ?>" min="<?php echo htmlspecialchars($fechaInicio); ?>">
           </div>

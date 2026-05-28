@@ -381,9 +381,21 @@ function renderPaginacion(paginas, actual){
 function esc(s){ var d = document.createElement('span'); d.textContent = String(s || ''); return d.innerHTML; }
 
 // ── Inicio ─────────────────────────────────────────────────
-document.getElementById('buscarInput').addEventListener('keypress', function(e){
-  if (e.key === 'Enter') buscarProductos();
-});
+(function(){
+  var inp = document.getElementById('buscarInput');
+  var timer;
+  inp.addEventListener('input', function(){
+    clearTimeout(timer);
+    timer = setTimeout(function(){
+      busqueda     = inp.value.trim();
+      paginaActual = 1;
+      cargarProductos();
+    }, 400);
+  });
+  inp.addEventListener('keypress', function(e){
+    if (e.key === 'Enter'){ clearTimeout(timer); buscarProductos(); }
+  });
+})();
 
 cargarCategorias();
 cargarProductos();

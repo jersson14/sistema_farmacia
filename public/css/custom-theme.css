@@ -1552,6 +1552,15 @@ input, select, textarea {
 @media (max-width: 767px) {
   .content { padding: 10px 8px 20px; }
 
+  /* Título del módulo */
+  .dashboard-head { margin-bottom: 6px; }
+  .dashboard-head h1 { font-size: 18px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dashboard-head p  { font-size: 12px; margin-top: 2px; }
+
+  /* Fechas lado a lado en mobile */
+  .dashboard-filter-form .col-xs-12.fecha-col { width: 50%; float: left; padding-right: 6px; }
+  .dashboard-filter-form .col-xs-12.fecha-col + .col-xs-12.fecha-col { padding-right: 0; padding-left: 6px; }
+
   /* KPIs en 2 columnas en mobile */
   .dashboard-kpis .col-lg-3 { width: 50%; float: left; }
   .dashboard-kpis.secondary .col-lg-3 { width: 50%; float: left; }
@@ -1576,23 +1585,40 @@ input, select, textarea {
   /* Cat grid 1 columna */
   .cat-stock-grid { grid-template-columns: 1fr 1fr; }
 
-  /* Header */
-  .main-header .navbar { min-height: 60px !important; }
-  .main-header          { max-height: 60px; }
-  .main-header .logo    { height: 60px !important; width: 180px !important; }
-  .brand-logo-img { height: 50px !important; width: auto !important; max-width: 100% !important; }
+  /* ── Header: una sola fila compacta ──────────────────── */
+  /* AdminLTE en ≤767px fuerza logo a width:100%/float:none → se apila.
+     Sobreescribimos con !important para mantener todo en una fila. */
+  .main-header                { max-height: 54px !important; overflow: visible; }
+  .main-header .logo          { width: 54px !important; float: left !important;
+                                  height: 54px !important; padding: 0 !important; }
+  .main-header .navbar        { margin-left: 54px !important; min-height: 54px !important; }
 
-  /* Badge compacto en mobile */
-  .caja-badge { font-size: 10px; padding: 4px 10px 4px 8px; gap: 5px; }
-  .caja-dot   { width: 6px; height: 6px; }
+  /* Mostrar solo logo mini (icono) en móvil */
+  .main-header .logo .logo-lg   { display: none !important; }
+  .main-header .logo .logo-mini { display: flex !important; justify-content: center;
+                                   align-items: center; height: 100%; width: 100%; }
+  .brand-logo-mini-img          { height: 34px !important; width: auto !important;
+                                   max-width: 42px !important; border-radius: 4px; }
+
+  /* Iconos de campana más compactos */
+  .notif-bell-btn,
+  .stock-bell-btn,
+  .venc-bell-btn              { padding: 14px 8px !important; }
+  .notif-bell-icon,
+  .stock-bell-icon,
+  .venc-bell-icon             { font-size: 16px; }
+
+  /* Badge caja compacto */
+  .caja-badge { font-size: 9px; padding: 3px 8px 3px 6px; gap: 4px; }
+  .caja-dot   { width: 5px; height: 5px; }
+
+  /* Links del navbar con menos padding */
+  .skin-blue .main-header .navbar .nav > li > a { padding: 14px 8px; }
 
   /* Dashboard filter */
   .dashboard-filter-form .col-md-3 { margin-bottom: 8px; }
   .dashboard-filter-actions { gap: 6px; }
   .dashboard-filter-actions .text-muted { display: none; }
-
-  /* Dropdown usuario */
-  .skin-blue .main-header .navbar .nav > li > a { padding: 12px 10px; }
 }
 
 /* ── Botones de acción en tablas (btn-xs) más grandes ──────── */
@@ -1617,7 +1643,7 @@ input, select, textarea {
 
   /* ── Content wrapper ─────────────────────────────────────── */
   .content-wrapper {
-    min-height: calc(100dvh - 60px) !important;
+    min-height: calc(100dvh - 54px) !important;
   }
   .content-wrapper > .content {
     padding: 8px 8px 20px !important;

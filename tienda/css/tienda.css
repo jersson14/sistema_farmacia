@@ -1280,19 +1280,94 @@ body {
 
 /* ── RESPONSIVE ──────────────────────────────────────── */
 @media (max-width: 640px) {
-  .tienda-nav { padding: 0 14px; }
+
+  /* ── Navbar ── */
+  .tienda-nav {
+    padding: 0 12px;
+    height: 56px;
+    gap: 8px;
+  }
+  .tienda-nav .brand {
+    font-size: 14px;
+    gap: 7px;
+    min-width: 0;        /* permite que el flex hijo se encoja */
+    overflow: hidden;
+  }
+  .tienda-nav .brand img { height: 28px; flex-shrink: 0; }
+  .tienda-nav .brand span:not(.brand-dot) {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    max-width: 130px;
+  }
   .nav-search { display: none; }
   .nav-btn-label { display: none; }
-  .hero { padding: 36px 16px 32px; }
-  .hero-search { flex-direction: column; }
-  .products-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-  .section-wrap { padding: 0 14px; }
+  /* En móvil ocultar WhatsApp (ya está el chat accesible desde el hero) */
+  .nav-btn-wa { display: none; }
+  .nav-actions { gap: 6px; }
+  .nav-btn { padding: 7px 11px; font-size: 13px; }
+  .nav-btn-cart { padding: 7px 13px; font-size: 16px; }
+
+  /* ── Hero ── */
+  .hero { padding: 0; }
+  .hero-inner {
+    padding: 32px 16px 52px;
+  }
+  .hero-logo { height: 70px; padding: 6px 14px; margin-bottom: 14px; }
+  .hero h1 { font-size: 22px; margin-bottom: 6px; }
+  .hero-sub { font-size: 13px; margin-bottom: 20px; }
+
+  /* ── Buscador en móvil: columna limpia ── */
+  .hero-search {
+    flex-direction: column;
+    overflow: visible;
+    background: transparent;
+    box-shadow: none;
+    gap: 10px;
+    max-width: 100%;
+    border-radius: 0;
+    margin-bottom: 18px;
+  }
+  .hero-search-icon { display: none; }
+  .hero-search input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 14px 18px;
+    border-radius: 50px;
+    font-size: 15px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.18);
+    background: #fff;
+  }
+  .hero-search button {
+    width: 100%;
+    justify-content: center;
+    padding: 14px 20px;
+    border-radius: 50px;
+    font-size: 15px;
+  }
+
+  /* ── Trust pills ── */
+  .hero-trust { gap: 7px; }
+  .hero-trust span { font-size: 11px; padding: 5px 11px; }
+
+  /* ── Secciones / títulos de módulo ── */
+  .section-wrap { padding: 0 12px; }
+  .catalog-header { padding: 18px 0 2px; gap: 6px; }
+  .catalog-title { font-size: 16px; gap: 6px; }
+  .catalog-title i { font-size: 15px; }
+  .catalog-sub { font-size: 12px; }
+  .cats-section { padding: 12px 0 4px; }
+  .cats-scroll { padding: 2px 12px 6px; gap: 6px; }
+  .cat-chip { font-size: 12px; padding: 6px 13px; }
+
+  /* ── Grid y resto ── */
+  .products-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .cart-item { grid-template-columns: 56px 1fr; }
   .cart-item .qty-control, .cart-item .btn-delete { grid-column: 2; }
-  .checkout-page, .carrito-page { padding: 20px 14px 80px; }
+  .checkout-page, .carrito-page { padding: 20px 12px 80px; }
   .auth-body { padding: 20px; }
   .success-card { padding: 32px 20px; }
-  .fab-cart { width: 56px; height: 56px; bottom: 20px; right: 18px; }
+  .fab-cart { width: 54px; height: 54px; bottom: 18px; right: 16px; }
   .fab-cart i { font-size: 22px; }
 }
 
