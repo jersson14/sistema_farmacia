@@ -105,7 +105,7 @@ if ($_SESSION['almacen']==1) {
         <div class="row">
           <div class="form-group col-md-4 col-xs-6">
             <label>Stock</label>
-            <input class="form-control" type="number" step="1" min="0" name="stock" id="stock" placeholder="0" required>
+            <input class="form-control" type="number" step="1" min="0" name="stock" id="stock" placeholder="0" value="0">
           </div>
           <div class="form-group col-md-4 col-xs-6">
             <label>Stock mínimo</label>

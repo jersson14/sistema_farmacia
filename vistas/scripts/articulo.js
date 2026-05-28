@@ -56,7 +56,7 @@ function limpiar(){
 	$("#codigo").val("");
 	$("#nombre").val("");
 	$("#descripcion").val("");
-	$("#stock").val("");
+	$("#stock").val("0");
 	$("#stock_minimo").val("1");
 	$("#precio_venta").val("0.00");
 	$("#idunidad").val("");
