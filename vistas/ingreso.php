@@ -83,7 +83,7 @@ if ($_SESSION['compras']==1) {
       </button>
     </div>
       <div class="form-group col-lg-4 col-md-4 col-xs-12">
-      <label for="">Fecha(*): </label>
+      <label for="">Fecha de Compra(*): </label>
       <input class="form-control" type="datetime-local" name="fecha_hora" id="fecha_hora" required>
     </div>
      <div class="form-group col-lg-6 col-md-6 col-xs-12">
@@ -103,8 +103,8 @@ if ($_SESSION['compras']==1) {
       <input class="form-control" type="text" name="num_comprobante" id="num_comprobante" maxlength="10" placeholder="Editable" required>
     </div>
     <div class="form-group col-lg-2 col-md-2 col-xs-6">
-      <label for="">Impuesto: </label>
-      <input class="form-control" type="text" name="impuesto" id="impuesto">
+      <label for="">IGV (18%): </label>
+      <input class="form-control" type="text" name="impuesto" id="impuesto" readonly style="background:#f5f5f5;cursor:default;">
     </div>
     <div class="form-group col-lg-3 col-md-3 col-sm-6 col-xs-12">
      <a data-toggle="modal" href="#myModal">

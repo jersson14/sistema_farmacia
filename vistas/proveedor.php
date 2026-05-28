@@ -30,8 +30,8 @@ if ($_SESSION['compras']==1) {
     <thead>
       <th>Opciones</th>
       <th>Nombre</th>
-      <th>Documento</th>
-      <th>Numero</th>
+      <th>RUC / Documento</th>
+      <th>Dirección</th>
       <th>Telefono</th>
       <th>Email</th>
     </thead>
@@ -40,8 +40,8 @@ if ($_SESSION['compras']==1) {
     <tfoot>
       <th>Opciones</th>
       <th>Nombre</th>
-      <th>Documento</th>
-      <th>Numero</th>
+      <th>RUC / Documento</th>
+      <th>Dirección</th>
       <th>Telefono</th>
       <th>Email</th>
     </tfoot>   

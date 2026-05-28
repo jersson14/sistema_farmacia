@@ -42,8 +42,8 @@ switch ($_GET["op"]) {
 			$data[]=array(
             "0"=>'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idpersona.')"><i class="fa fa-pencil"></i></button>'.' '.'<button class="btn btn-danger btn-xs" onclick="eliminar('.$reg->idpersona.')"><i class="fa fa-trash"></i></button>',
             "1"=>$reg->nombre,
-            "2"=>$reg->tipo_documento,
-            "3"=>$reg->num_documento,
+            "2"=>$reg->tipo_documento.": ".$reg->num_documento,
+            "3"=>(!empty($reg->direccion) ? $reg->direccion : "-"),
             "4"=>$reg->telefono,
             "5"=>$reg->email
               );
@@ -52,7 +52,7 @@ switch ($_GET["op"]) {
              "sEcho"=>1,//info para datatables
              "iTotalRecords"=>count($data),//enviamos el total de registros al datatable
              "iTotalDisplayRecords"=>count($data),//enviamos el total de registros a visualizar
-             "aaData"=>$data); 
+             "aaData"=>$data);
 		echo json_encode($results);
 		break;
 

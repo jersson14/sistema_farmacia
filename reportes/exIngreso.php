@@ -67,13 +67,13 @@ class PDFCompra extends FPDF
     $this->Rect(10, 10, 190, 36, 'F');
 
     $this->SetFillColor(255, 255, 255);
-    $this->Rect(12, 12, 34, 20, 'F');
+    $this->Rect(12, 11, 50, 33, 'F');
     if (!empty($this->logo) && file_exists($this->logo)) {
-      $this->Image($this->logo, 13, 13, 32, 18);
+      $this->Image($this->logo, 13, 12, 48, 31);
     }
 
-    $leftX = 48;
-    $leftW = 80;
+    $leftX = 65;
+    $leftW = 65;
     $this->SetTextColor(255, 255, 255);
 
     $nombreEmpresa = $this->u($this->empresa["nombre"]);

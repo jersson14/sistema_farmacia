@@ -445,7 +445,7 @@ function init(){
    	}
    	if (e.key === "F10") {
    		e.preventDefault();
-   		if ($("#btnGuardar").is(":visible")) {
+   		if (!cajaCerrada && $("#btnGuardar").is(":visible")) {
    			$("#formulario").trigger("submit");
    		}
    	}
@@ -679,6 +679,10 @@ function limpiar(){
 function mostrarform(flag){
 	limpiar();
 	if(flag){
+		if (cajaCerrada) {
+			notifyVenta("warning", "Debes abrir la caja antes de registrar ventas.");
+			return;
+		}
 		$("#listadoregistros").hide();
 		$("#formularioregistros").show();
 		$("#btnagregar").hide();
@@ -1055,9 +1059,32 @@ function anular(idventa){
 var impuesto=18;
 var cont=0;
 var detalles=0;
+var cajaCerrada = false;
 
 $("#btnGuardar").hide();
 $("#tipo_comprobante").change(marcarImpuesto);
+
+// Verificar estado de caja al cargar la pantalla de ventas
+(function verificarEstadoCaja() {
+	$.getJSON("../ajax/caja.php?op=estado", function(r) {
+		if (!r.abierta) {
+			cajaCerrada = true;
+			var $btn = $("#btnagregar");
+			$btn.prop("disabled", true)
+				.attr("title", "Debes abrir la caja antes de vender")
+				.html('<i class="fa fa-lock"></i> Nueva Venta');
+
+			if (!$("#banner-caja-cerrada").length) {
+				$(".content-wrapper").prepend(
+					'<div id="banner-caja-cerrada" style="background:#e74c3c;color:#fff;padding:10px 18px;font-weight:600;font-size:14px;text-align:center;">' +
+					'<i class="fa fa-exclamation-triangle"></i>&nbsp; La caja está cerrada. ' +
+					'<a href="caja.php" style="color:#fff;text-decoration:underline;margin-left:8px;">Abrir caja</a>' +
+					'</div>'
+				);
+			}
+		}
+	});
+})();
 
 function marcarImpuesto(){
 	aplicarSerieImpuesto();
@@ -1065,16 +1092,15 @@ function marcarImpuesto(){
 
 function aplicarSerieImpuesto(){
 	var tipo = $("#tipo_comprobante").val();
+	var igv = (empresaDefaults.impuesto_default || 18).toFixed(2);
 	if (tipo==='Factura') {
 		$("#serie_comprobante").val(empresaDefaults.serie_factura || "F001");
-		$("#impuesto").val((empresaDefaults.impuesto_default || impuesto).toFixed(2));
 	} else if (tipo==='Ticket') {
 		$("#serie_comprobante").val(empresaDefaults.serie_ticket || "T001");
-		$("#impuesto").val("0");
 	} else {
 		$("#serie_comprobante").val(empresaDefaults.serie_boleta || "B001");
-		$("#impuesto").val("0");
 	}
+	$("#impuesto").val(igv);
 	cargarCorrelativoComprobante();
 }
 

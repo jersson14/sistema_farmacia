@@ -440,16 +440,15 @@ function marcarImpuesto(){
 
 function aplicarSerieImpuestoIngreso(){
 	var tipo = $("#tipo_comprobante").val();
+	var igv = (empresaDefaultsIngreso.impuesto_default || 18).toFixed(2);
 	if (tipo==='Factura') {
 		$("#serie_comprobante").val(empresaDefaultsIngreso.serie_factura || "F001");
-		$("#impuesto").val((empresaDefaultsIngreso.impuesto_default || impuesto).toFixed(2));
 	} else if (tipo==='Ticket') {
 		$("#serie_comprobante").val(empresaDefaultsIngreso.serie_ticket || "T001");
-		$("#impuesto").val("0");
 	} else {
 		$("#serie_comprobante").val(empresaDefaultsIngreso.serie_boleta || "B001");
-		$("#impuesto").val("0");
 	}
+	$("#impuesto").val(igv);
 	cargarCorrelativoIngreso();
 }
 
