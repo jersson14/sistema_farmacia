@@ -128,6 +128,56 @@ switch ($op) {
         ]);
         break;
 
+    case 'listarTodos':
+        $draw = isset($_GET['draw']) ? (int)$_GET['draw'] : (isset($_GET['sEcho']) ? (int)$_GET['sEcho'] : 1);
+        $sql = "SELECT l.idlote, a.codigo, a.nombre AS articulo,
+                       l.numero_lote,
+                       l.fecha_fabricacion,
+                       l.fecha_vencimiento,
+                       l.cantidad_inicial,
+                       l.cantidad_actual,
+                       DATEDIFF(l.fecha_vencimiento, CURDATE()) AS dias_restantes
+                FROM lote_articulo l
+                INNER JOIN articulo a ON a.idarticulo = l.idarticulo
+                WHERE l.condicion = 1
+                ORDER BY a.nombre ASC, l.fecha_vencimiento ASC";
+        $rs   = ejecutarConsulta($sql);
+        $data = array();
+        while ($reg = $rs->fetch_object()) {
+            $dias = (int)$reg->dias_restantes;
+            $cant = (int)$reg->cantidad_actual;
+            if ($cant <= 0) {
+                $badge = '<span class="label label-default">AGOTADO</span>';
+            } elseif ($dias < 0) {
+                $badge = '<span class="label label-danger">VENCIDO hace '.abs($dias).' d</span>';
+            } elseif ($dias <= 30) {
+                $badge = '<span class="label label-warning">VENCE en '.$dias.' d</span>';
+            } else {
+                $badge = '<span class="label label-success">VIGENTE</span>';
+            }
+            $fVenc = $reg->fecha_vencimiento ? date('d/m/Y', strtotime($reg->fecha_vencimiento)) : '-';
+            $fFab  = $reg->fecha_fabricacion  ? date('d/m/Y', strtotime($reg->fecha_fabricacion))  : '-';
+            $data[] = array(
+                '0' => htmlspecialchars($reg->codigo),
+                '1' => htmlspecialchars($reg->articulo),
+                '2' => htmlspecialchars($reg->numero_lote),
+                '3' => $fFab,
+                '4' => $fVenc,
+                '5' => (int)$reg->cantidad_inicial,
+                '6' => $cant,
+                '7' => $badge,
+                '8' => (int)$reg->idlote
+            );
+        }
+        echo json_encode(array(
+            'draw'                => $draw,
+            'sEcho'               => $draw,
+            'iTotalRecords'       => count($data),
+            'iTotalDisplayRecords'=> count($data),
+            'aaData'              => $data
+        ));
+        break;
+
     default:
         echo json_encode(array('ok'=>false,'message'=>'Operacion no reconocida'));
 }

@@ -120,7 +120,16 @@ function listar(){
 		},
 		"bDestroy":true,
 		"iDisplayLength":10,//paginacion
-		"order":[[0,"desc"]]//ordenar (columna, orden)
+		"order":[[0,"desc"]],//ordenar (columna, orden)
+		"createdRow": function(row, data) {
+			var stock    = parseInt(data[5]) || 0;
+			var stockMin = parseInt(data[6]) || 0;
+			if (stock === 0) {
+				$(row).addClass('stock-agotado');
+			} else if (stock <= stockMin) {
+				$(row).addClass('stock-bajo');
+			}
+		}
 	}).DataTable();
 }
 //funcion para guardaryeditar

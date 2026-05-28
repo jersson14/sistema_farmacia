@@ -77,9 +77,9 @@ img{max-width:100%;display:block}
 }
 .nav-inner{
   max-width:1280px;margin:0 auto;padding:0 5%;
-  height:72px;display:flex;align-items:center;justify-content:space-between;gap:24px;
+  height:96px;display:flex;align-items:center;justify-content:space-between;gap:24px;
 }
-.nav-logo img{height:52px;object-fit:contain}
+.nav-logo img{height:80px;object-fit:contain}
 .nav-links{display:flex;align-items:center;gap:28px;list-style:none}
 .nav-links a{
   font-size:.82rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
@@ -212,7 +212,7 @@ img{max-width:100%;display:block}
   padding:36px 32px 32px;box-shadow:0 24px 72px rgba(0,0,0,.30);
   text-align:center;max-width:360px;width:100%;margin:0 auto;
 }
-.hero-card img{width:100%;max-width:280px;margin:0 auto 16px}
+.hero-card img{width:100%;max-width:340px;margin:0 auto 16px;display:block}
 .hero-card-tag{
   font-size:.72rem;font-weight:700;letter-spacing:.10em;text-transform:uppercase;
   background:var(--grad-blue);-webkit-background-clip:text;-webkit-text-fill-color:transparent;
@@ -460,7 +460,7 @@ section{padding:88px 5%}
 footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
 .foot-in{max-width:1280px;margin:0 auto}
 .foot-top{display:grid;grid-template-columns:2.2fr 1fr 1fr 1.6fr;gap:48px;margin-bottom:48px}
-.foot-brand img{height:60px;margin-bottom:18px}
+.foot-brand img{height:82px;margin-bottom:18px}
 .foot-brand p{font-size:.875rem;line-height:1.75;max-width:290px;color:#475569}
 .foot-social{display:flex;gap:10px;margin-top:20px}
 .foot-social a{

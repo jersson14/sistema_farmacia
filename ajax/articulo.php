@@ -114,11 +114,13 @@ switch ($_GET["op"]) {
             "11"=>$vencCol
               );
 		}
+		$draw = isset($_GET['draw']) ? (int)$_GET['draw'] : (isset($_GET['sEcho']) ? (int)$_GET['sEcho'] : 1);
 		$results=array(
-             "sEcho"=>1,//info para datatables
-             "iTotalRecords"=>count($data),//enviamos el total de registros al datatable
-             "iTotalDisplayRecords"=>count($data),//enviamos el total de registros a visualizar
-             "aaData"=>$data); 
+             "draw"=>$draw,
+             "sEcho"=>$draw,
+             "iTotalRecords"=>count($data),
+             "iTotalDisplayRecords"=>count($data),
+             "aaData"=>$data);
 		echo json_encode($results);
 		break;
 

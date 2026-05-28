@@ -25,6 +25,24 @@ if ($_SESSION['almacen']==1) {
 </div>
 <!--box-header-->
 <!--centro-->
+<style>
+/* Stock agotado: stock = 0 */
+#tbllistado tr.stock-agotado td { background-color: #fde8e8 !important; }
+#tbllistado tr.stock-agotado:hover td { background-color: #fcc9c9 !important; }
+/* Stock bajo: stock <= stock_minimo (pero > 0) */
+#tbllistado tr.stock-bajo td { background-color: #fff8e1 !important; }
+#tbllistado tr.stock-bajo:hover td { background-color: #ffecb3 !important; }
+.leyenda-stock { display:flex; gap:18px; align-items:center; margin-bottom:8px; font-size:12px; }
+.leyenda-stock span { display:inline-flex; align-items:center; gap:5px; }
+.leyenda-dot { width:14px; height:14px; border-radius:3px; display:inline-block; border:1px solid rgba(0,0,0,.12); }
+</style>
+
+<div class="leyenda-stock">
+  <span><i class="fa fa-info-circle text-muted"></i> <strong>Leyenda:</strong></span>
+  <span><span class="leyenda-dot" style="background:#fde8e8"></span> Sin stock (agotado)</span>
+  <span><span class="leyenda-dot" style="background:#fff8e1"></span> Stock bajo (≤ mínimo)</span>
+</div>
+
 <div class="panel-body table-responsive" id="listadoregistros">
   <table id="tbllistado" class="table table-striped table-bordered table-condensed table-hover">
     <thead>

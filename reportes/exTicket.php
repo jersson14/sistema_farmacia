@@ -104,7 +104,7 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title><?php echo esc($reg->tipo_comprobante . ' ' . $reg->serie_comprobante . '-' . $reg->num_comprobante); ?></title>
-  <link rel="stylesheet" href="../public/css/ticket.css?v=20260526c">
+  <link rel="stylesheet" href="../public/css/ticket.css?v=20260528a">
 </head>
 <body>
 
@@ -121,10 +121,6 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
     <div class="brand-icon-fallback">+</div>
     <?php endif; ?>
 
-    <div class="brand-name"><?php echo esc($empresa); ?></div>
-    <?php if ($tagline && $tagline !== $empresa): ?>
-    <div class="brand-tagline"><?php echo esc($tagline); ?></div>
-    <?php endif; ?>
     <?php if ($ruc): ?>
     <div class="brand-ruc">RUC <?php echo esc($ruc); ?></div>
     <?php endif; ?>
@@ -211,7 +207,7 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
           <td class="desc">
             <?php echo esc($d->articulo); ?>
             <?php if (!empty($d->unidad) && $d->unidad !== 'und' && $d->unidad !== 'UND'): ?>
-            <small style="color:#777"> (<?php echo esc($d->unidad); ?>)</small>
+            <span style="font-size:12px;color:#777"> (<?php echo esc($d->unidad); ?>)</span>
             <?php endif; ?>
             <?php if (!empty($d->principio_activo)): ?>
             <span class="item-dci"><?php echo esc($d->principio_activo); ?></span>
@@ -316,7 +312,7 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
 
     <!-- Mensaje legal -->
     <hr class="sep-dash" style="margin-top:8px">
-    <div style="font-size:8px;color:#888;line-height:1.5;text-align:center;margin-top:3px">
+    <div style="font-size:12px;color:#888;line-height:1.5;text-align:center;margin-top:3px">
       <?php if ($reg->tipo_comprobante === 'Boleta'): ?>
       Este documento no acredita cr&eacute;dito fiscal.
       <?php elseif ($reg->tipo_comprobante === 'Factura'): ?>

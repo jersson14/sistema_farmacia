@@ -599,6 +599,7 @@ if ($_SESSION['almacen']==1) {
             <li><a href="articulo.php"><i class="bi bi-capsule-pill"></i> Artículos</a></li>
             <li><a href="categoria.php"><i class="bi bi-tags"></i> Categorías</a></li>
             <li><a href="unidad.php"><i class="bi bi-rulers"></i> Unidades</a></li>
+            <li><a href="lotes.php"><i class="bi bi-layers"></i> Lotes por Producto</a></li>
             <li><a href="vencimientos.php"><i class="bi bi-calendar-x"></i> Vencimientos</a></li>
           </ul>
         </li>';
