@@ -288,6 +288,80 @@ public function anular($idingreso){
 	return ejecutarConsulta($sql);
 }
 
+public function agregarDetalle($idingreso, $idusuario, $idarticulo, $cantidad, $precio_compra, $precio_venta, $numero_lote=array(), $fecha_vencimiento=array(), $fecha_fabricacion=array()){
+	global $conexion;
+	$idingreso = (int)$idingreso;
+	if ($idingreso <= 0) {
+		return array("ok"=>false, "message"=>"ID de ingreso inválido");
+	}
+	$fila = ejecutarConsultaSimpleFila("SELECT idingreso, estado FROM ingreso WHERE idingreso='$idingreso' LIMIT 1");
+	if (!$fila) {
+		return array("ok"=>false, "message"=>"El ingreso no existe");
+	}
+	if ($fila["estado"] !== "Aceptado") {
+		return array("ok"=>false, "message"=>"Solo se pueden ampliar ingresos en estado Aceptado");
+	}
+	if (!is_array($idarticulo) || count($idarticulo) === 0) {
+		return array("ok"=>false, "message"=>"Debes agregar al menos un artículo");
+	}
+	if (!is_array($cantidad) || count($cantidad) !== count($idarticulo)) {
+		return array("ok"=>false, "message"=>"El detalle de cantidades no es válido");
+	}
+	$detalles = array();
+	for ($i = 0; $i < count($idarticulo); $i++) {
+		$idArt = (int)$idarticulo[$i];
+		$cant  = $this->normalizarCantidad(isset($cantidad[$i]) ? $cantidad[$i] : 0);
+		$pCom  = isset($precio_compra[$i]) ? (float)$precio_compra[$i] : 0;
+		$pVen  = isset($precio_venta[$i])  ? (float)$precio_venta[$i]  : 0;
+		if ($idArt <= 0 || $cant <= 0 || $pCom < 0 || $pVen < 0) {
+			return array("ok"=>false, "message"=>"Datos inválidos en el artículo #".($i+1));
+		}
+		$nLote = isset($numero_lote[$i])       ? trim((string)$numero_lote[$i])       : '';
+		$fVenc = isset($fecha_vencimiento[$i]) ? trim((string)$fecha_vencimiento[$i]) : '';
+		$fFab  = isset($fecha_fabricacion[$i]) ? trim((string)$fecha_fabricacion[$i]) : '';
+		if ($fVenc !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fVenc)) { $fVenc = ''; }
+		if ($fFab  !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fFab))  { $fFab  = ''; }
+		$detalles[] = array('idArt'=>$idArt,'cant'=>$cant,'pCom'=>$pCom,'pVen'=>$pVen,'nLote'=>$nLote,'fVenc'=>$fVenc,'fFab'=>$fFab);
+	}
+	$conexion->autocommit(false);
+	try {
+		$totalAgregado = 0;
+		foreach ($detalles as $d) {
+			$nLoteEsc = limpiarCadena($d['nLote']);
+			$fVencSQL = $d['fVenc'] !== '' ? "'".$d['fVenc']."'" : 'NULL';
+			$sqlDet = "INSERT INTO detalle_ingreso
+				(idingreso,idarticulo,cantidad,precio_compra,precio_venta,numero_lote,fecha_vencimiento)
+				VALUES('$idingreso','{$d['idArt']}','{$d['cant']}','{$d['pCom']}','{$d['pVen']}','$nLoteEsc',$fVencSQL)";
+			$iddet = ejecutarConsulta_retornarID($sqlDet);
+			if (!$iddet) {
+				$conexion->rollback(); $conexion->autocommit(true);
+				return array("ok"=>false, "message"=>"No se pudo registrar el detalle");
+			}
+			if ($d['pVen'] > 0) {
+				ejecutarConsulta("UPDATE articulo SET precio_venta='{$d['pVen']}' WHERE idarticulo='{$d['idArt']}'");
+			}
+			if ($d['nLote'] !== '' && $d['fVenc'] !== '') {
+				$fFabSQL = $d['fFab'] !== '' ? "'".$d['fFab']."'" : 'NULL';
+				$sqlLote = "INSERT INTO lote_articulo
+					(idarticulo,numero_lote,fecha_vencimiento,fecha_fabricacion,cantidad_inicial,cantidad_actual,idingreso,condicion)
+					VALUES('{$d['idArt']}','$nLoteEsc','{$d['fVenc']}',$fFabSQL,'{$d['cant']}','{$d['cant']}','$idingreso',1)";
+				$idlote = ejecutarConsulta_retornarID($sqlLote);
+				if ($idlote) {
+					ejecutarConsulta("UPDATE detalle_ingreso SET idlote='$idlote' WHERE iddetalle_ingreso='$iddet'");
+				}
+			}
+			$totalAgregado += $d['cant'] * $d['pCom'];
+		}
+		ejecutarConsulta("UPDATE ingreso SET total_compra = total_compra + '$totalAgregado' WHERE idingreso='$idingreso'");
+		$conexion->commit(); $conexion->autocommit(true);
+	} catch (Throwable $e) {
+		$conexion->rollback(); $conexion->autocommit(true);
+		return array("ok"=>false, "message"=>"Error al agregar artículos: ".$e->getMessage());
+	}
+	$n = count($detalles);
+	return array("ok"=>true, "message"=>"Se agregaron $n artículo(s) al ingreso correctamente.", "count"=>$n);
+}
+
 
 //metodo para mostrar registros
 public function mostrar($idingreso){

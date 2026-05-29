@@ -1,6 +1,7 @@
 var tabla;
 var tablaArticulos;
 var recetaModalConfirmada = false;
+var borradorTimerVenta = null;
 
 // POS grid state
 var posProductos = [];         // full product list loaded from server
@@ -356,6 +357,11 @@ function init(){
    	}, 80);
    });
    cargarDefaultsEmpresa();
+   setInterval(guardarBorradorVenta, 30000);
+   $(document).on("input", "#detalles input[name='cantidad[]'], #detalles input[name='precio_venta[]'], #detalles input[name='descuento[]']", function(){
+   	clearTimeout(borradorTimerVenta);
+   	borradorTimerVenta = setTimeout(guardarBorradorVenta, 1500);
+   });
 
    $("#formClienteRapido").on("submit", function(e){
    	guardarClienteRapido(e);
@@ -676,7 +682,7 @@ function limpiar(){
 }
 
 //funcion mostrar formulario
-function mostrarform(flag){
+function mostrarform(flag, esNuevo){
 	limpiar();
 	if(flag){
 		if (cajaCerrada) {
@@ -699,6 +705,9 @@ function mostrarform(flag){
 		renderCarritoVisual();
 		// Focus search input
 		setTimeout(function(){ $("#posSearchInput").focus(); }, 150);
+		if (esNuevo) {
+			restaurarBorradorVenta();
+		}
 	}else{
 		$("#listadoregistros").show();
 		$("#formularioregistros").hide();
@@ -939,6 +948,7 @@ function guardarReceta(idventa, callback){
 }
 
 function procesarExitoVenta(r){
+	limpiarBorradorVenta();
 	notifyVenta("success", r.message || "Datos registrados correctamente");
 	if (r.alertas && r.alertas.length > 0) {
 		var texto = "Alerta de stock bajo: " + r.alertas.map(function(a){
@@ -1167,6 +1177,7 @@ function agregarDetalle(idarticulo,articulo,precio_venta,unidad,stockDisponible,
 				renderCarritoVisual();
 				$('#myModal').modal('hide');
 				notifyVenta("info", "El articulo ya estaba agregado. Se incremento la cantidad.");
+				guardarBorradorVenta();
 				return;
 			}
 		}
@@ -1189,6 +1200,7 @@ function agregarDetalle(idarticulo,articulo,precio_venta,unidad,stockDisponible,
 		renderCarritoVisual();
 		$('#myModal').modal('hide');
 		notifyVenta("success", "Articulo agregado a la venta.");
+		guardarBorradorVenta();
 	}else{
 		notifyVenta("warning", "No se pudo agregar el articulo. Revisa la informacion del producto.");
 	}
@@ -1312,6 +1324,7 @@ function eliminarDetalle(indice){
 	detalles=detalles-1;
 	actualizarContadorItems();
 	renderCarritoVisual();
+	guardarBorradorVenta();
 }
 
 function actualizarContadorItems(){
@@ -1482,4 +1495,133 @@ function guardarPerfilPaciente(){
 		.catch(function(){
 			$btn.prop("disabled", false).html('<i class="fa fa-save"></i> Guardar perfil');
 		});
+}
+
+// ── Borrador automático de venta (localStorage) ───────────────────
+var BORRADOR_KEY_VEN = 'farmacia_borrador_venta';
+
+function guardarBorradorVenta() {
+	if (!$("#formularioregistros").is(":visible")) return;
+	if ($("#idventa").val()) return;
+	var filas = document.querySelectorAll('#detalles .filas');
+	if (filas.length === 0) return;
+	var items = [];
+	for (var i = 0; i < filas.length; i++) {
+		var fila = filas[i];
+		var tds = fila.querySelectorAll('td');
+		var nombre = $(tds[1]).clone().find('input').remove().end().text().trim();
+		var cantInp   = fila.querySelector('input[name="cantidad[]"]');
+		var precioInp = fila.querySelector('input[name="precio_venta[]"]');
+		var descInp   = fila.querySelector('input[name="descuento[]"]');
+		var stockInp  = fila.querySelector('input[name="stock_disponible[]"]');
+		var idArtInp  = fila.querySelector('input[name="idarticulo[]"]');
+		items.push({
+			idarticulo:  idArtInp  ? idArtInp.value  : '',
+			nombre:      nombre,
+			unidad:      tds[2]    ? tds[2].textContent.trim() : '',
+			cantidad:    cantInp   ? cantInp.value   : '1',
+			precio_venta:precioInp ? precioInp.value : '0',
+			descuento:   descInp   ? descInp.value   : '0',
+			stock:       stockInp  ? stockInp.value  : '0',
+			tipoVenta:   fila.getAttribute('data-tipo-venta') || 'OTC'
+		});
+	}
+	try {
+		localStorage.setItem(BORRADOR_KEY_VEN, JSON.stringify({
+			ts:               Date.now(),
+			idcliente:        $("#idcliente").val(),
+			cliente_nombre:   $("#idcliente option:selected").text(),
+			tipo_comprobante: $("#tipo_comprobante").val(),
+			metodo_pago:      $("#metodo_pago").val(),
+			items:            items
+		}));
+	} catch(e) {}
+}
+
+function limpiarBorradorVenta() {
+	try { localStorage.removeItem(BORRADOR_KEY_VEN); } catch(e) {}
+}
+
+function restaurarBorradorVenta() {
+	var raw;
+	try { raw = localStorage.getItem(BORRADOR_KEY_VEN); } catch(e) { return; }
+	if (!raw) return;
+	var b;
+	try { b = JSON.parse(raw); } catch(e) { return; }
+	if (!b || !b.items || b.items.length === 0) return;
+	var hace = '';
+	if (b.ts) {
+		var mins = Math.round((Date.now() - b.ts) / 60000);
+		hace = mins < 60 ? ('hace ' + mins + ' min') : ('hace ' + Math.floor(mins/60) + ' h');
+	}
+	window._borradorVenta = b;
+	$('<div id="bannerBorradorVenta" class="alert alert-warning" style="font-size:13px;font-weight:600;margin:8px 0;">' +
+		'<i class="fa fa-clock-o"></i> Tienes un carrito guardado ' + hace + ' con ' +
+		b.items.length + ' producto(s).' +
+		' &nbsp;<button type="button" class="btn btn-xs btn-success" onclick="restaurarBorradorVentaConfirmar()">Restaurar carrito</button>' +
+		' &nbsp;<button type="button" class="btn btn-xs btn-default" onclick="descartarBorradorVenta()">Descartar</button>' +
+	'</div>').prependTo("#formularioregistros");
+}
+
+function restaurarBorradorVentaConfirmar() {
+	var b = window._borradorVenta;
+	if (!b) return;
+	$(".filas").remove();
+	detalles = 0; cont = 0;
+	for (var i = 0; i < b.items.length; i++) {
+		var it = b.items[i];
+		var pv  = parseFloat(it.precio_venta || 0);
+		var desc = parseFloat(it.descuento || 0);
+		var cant = parseFloat(it.cantidad || 1);
+		var stk  = normalizarEnteroNoNegativo(it.stock || 0);
+		var tv   = (it.tipoVenta || 'OTC').toUpperCase();
+		var sub  = (cant * pv - desc).toFixed(2);
+		var fila = '<tr class="filas" id="fila' + cont + '" data-tipo-venta="' + tv + '">' +
+			'<td><button type="button" class="btn btn-danger" onclick="eliminarDetalle(' + cont + ')">X</button></td>' +
+			'<td><input type="hidden" name="idarticulo[]" value="' + it.idarticulo + '"><input type="hidden" name="stock_disponible[]" value="' + stk + '">' + $('<span>').text(it.nombre).html() + '</td>' +
+			'<td>' + $('<span>').text(it.unidad || 'und').html() + '</td>' +
+			'<td><input type="number" step="0.5" min="0.5" max="' + stk + '" name="cantidad[]" value="' + cant + '" oninput="modificarSubtotales()"></td>' +
+			'<td><input type="number" step="0.01" min="0.01" name="precio_venta[]" value="' + pv.toFixed(2) + '" oninput="modificarSubtotales()"></td>' +
+			'<td><input type="number" step="0.01" min="0.00" name="descuento[]" value="' + desc.toFixed(2) + '" oninput="modificarSubtotales()"></td>' +
+			'<td><span id="subtotal' + cont + '" name="subtotal">' + sub + '</span></td>' +
+			'<td><button type="button" onclick="modificarSubtotales()" class="btn btn-info"><i class="fa fa-refresh"></i></button></td>' +
+			'</tr>';
+		cont++; detalles++;
+		$('#detalles').append(fila);
+	}
+	if (b.idcliente) {
+		var encontrado = false;
+		$("#idcliente option").each(function(){
+			if (String($(this).val()) === String(b.idcliente)) { encontrado = true; return false; }
+		});
+		if (encontrado) {
+			$("#idcliente").val(b.idcliente);
+			try { $("#idcliente").selectpicker("refresh"); } catch(e) {}
+		}
+	}
+	if (b.tipo_comprobante) {
+		$("#tipo_comprobante").val(b.tipo_comprobante);
+		try { $("#tipo_comprobante").selectpicker("refresh"); } catch(e) {}
+		$(".pos-doc-btn").removeClass("active");
+		$('.pos-doc-btn[data-tipo="' + b.tipo_comprobante + '"]').addClass("active");
+	}
+	if (b.metodo_pago) {
+		$("#metodo_pago").val(b.metodo_pago);
+		$(".pos-metodo-btn").removeClass("active");
+		$('.pos-metodo-btn[data-metodo="' + b.metodo_pago + '"]').addClass("active");
+		try { $("#metodo_pago").selectpicker("refresh"); } catch(e) {}
+		sincronizarMontoPago();
+	}
+	modificarSubtotales();
+	actualizarContadorItems();
+	renderCarritoVisual();
+	$("#bannerBorradorVenta").remove();
+	notifyVenta("success", "Carrito restaurado: " + b.items.length + " producto(s).");
+}
+
+function descartarBorradorVenta() {
+	limpiarBorradorVenta();
+	window._borradorVenta = null;
+	$("#bannerBorradorVenta").remove();
+	notifyVenta("info", "Carrito descartado.");
 }

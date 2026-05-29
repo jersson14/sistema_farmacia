@@ -39,7 +39,7 @@ if ($_SESSION['ventas']==1) {
             <div class="box-header with-border">
               <h1 class="box-title">
                 Ventas
-                <button class="btn btn-success" onclick="mostrarform(true)" id="btnagregar">
+                <button class="btn btn-success" onclick="mostrarform(true, true)" id="btnagregar">
                   <i class="fa fa-plus-circle"></i> Nueva Venta
                 </button>
               </h1>
@@ -492,7 +492,7 @@ if ($_SESSION['ventas']==1) {
 }
 require 'footer.php';
  ?>
- <script src="scripts/venta.js?v=20260527d"></script>
+ <script src="scripts/venta.js?v=20260529a"></script>
  <?php
 }
 ob_end_flush();

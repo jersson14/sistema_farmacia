@@ -106,6 +106,26 @@ switch ($_GET["op"]) {
 	}
 		break;
 
+	case 'agregarDetalle':
+		$idingreso_amp = isset($_POST["idingreso"]) ? (int)$_POST["idingreso"] : 0;
+		if ($idingreso_amp <= 0) {
+			echo json_encode(array("ok"=>false, "message"=>"ID de ingreso inválido"));
+			break;
+		}
+		$idarticulo_amp      = isset($_POST["idarticulo"])       ? $_POST["idarticulo"]       : array();
+		$cantidad_amp        = isset($_POST["cantidad"])         ? $_POST["cantidad"]         : array();
+		$precio_compra_amp   = isset($_POST["precio_compra"])    ? $_POST["precio_compra"]    : array();
+		$precio_venta_amp    = isset($_POST["precio_venta"])     ? $_POST["precio_venta"]     : array();
+		$numero_lote_amp     = isset($_POST["numero_lote"])      ? $_POST["numero_lote"]      : array();
+		$fvenc_amp           = isset($_POST["fecha_vencimiento"])? $_POST["fecha_vencimiento"]: array();
+		$ffab_amp            = isset($_POST["fecha_fabricacion"]) ? $_POST["fecha_fabricacion"]: array();
+		$rspta_amp = $ingreso->agregarDetalle($idingreso_amp, $idusuario,
+			$idarticulo_amp, $cantidad_amp, $precio_compra_amp, $precio_venta_amp,
+			$numero_lote_amp, $fvenc_amp, $ffab_amp
+		);
+		echo json_encode($rspta_amp);
+		break;
+
 	case 'siguienteCorrelativo':
 		$tipo = isset($_GET["tipo_comprobante"]) ? limpiarCadena($_GET["tipo_comprobante"]) : "Boleta";
 		$serie = isset($_GET["serie_comprobante"]) ? limpiarCadena($_GET["serie_comprobante"]) : "";
@@ -183,7 +203,12 @@ switch ($_GET["op"]) {
 		while ($reg=$rspta->fetch_object()) {
 			$url='../reportes/exIngreso.php?id=';
 			$data[]=array(
-            "0"=>(($reg->estado=='Aceptado')?'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idingreso.')"><i class="fa fa-eye"></i></button>'.' '.'<button class="btn btn-danger btn-xs" onclick="anular('.$reg->idingreso.')"><i class="fa fa-close"></i></button>':'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idingreso.')"><i class="fa fa-eye"></i></button>').'<a target="_blank" href="'.$url.$reg->idingreso.'"> <button class="btn btn-info btn-xs"><i class="fa fa-file"></i></button></a>',
+            "0"=>(($reg->estado=='Aceptado')
+				?'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idingreso.')" title="Ver detalle"><i class="fa fa-eye"></i></button> '
+				 .'<button class="btn btn-success btn-xs" onclick="abrirAmpliarIngreso('.$reg->idingreso.')" title="Agregar artículos a esta compra"><i class="fa fa-plus"></i></button> '
+				 .'<button class="btn btn-danger btn-xs" onclick="anular('.$reg->idingreso.')"><i class="fa fa-close"></i></button>'
+				:'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idingreso.')" title="Ver detalle"><i class="fa fa-eye"></i></button>')
+				.'<a target="_blank" href="'.$url.$reg->idingreso.'"> <button class="btn btn-info btn-xs"><i class="fa fa-file"></i></button></a>',
             "1"=>$reg->fecha,
             "2"=>$reg->proveedor,
             "3"=>$reg->usuario,

@@ -11,6 +11,8 @@ var empresaDefaultsIngreso = {
 var correlativoRequestIdIngreso = 0;
 var proveedoresCargados = false;
 var numeroComprobanteManualIngreso = false;
+var modoAmpliar = false;
+var borradorTimerIngreso = null;
 
 function notifyIngreso(type, message){
 	if (typeof appNotify === "function") {
@@ -100,6 +102,11 @@ function init(){
    	}, 80);
    });
    cargarDefaultsEmpresaIngreso();
+   setInterval(guardarBorradorIngreso, 30000);
+   $(document).on("input change", "#detalles input", function(){
+   	clearTimeout(borradorTimerIngreso);
+   	borradorTimerIngreso = setTimeout(guardarBorradorIngreso, 1500);
+   });
    $("#formProveedorRapido").on("submit", function(e){
    	guardarProveedorRapido(e);
    });
@@ -241,7 +248,7 @@ function limpiar(){
 }
 
 //funcion mostrar formulario
-function mostrarform(flag){
+function mostrarform(flag, esNuevo){
 	limpiar();
 	if(flag){
 		$("#listadoregistros").hide();
@@ -253,7 +260,14 @@ function mostrarform(flag){
 		detalles=0;
 		$("#btnAgregarArt").show();
 
+		if (esNuevo) {
+			restaurarBorradorIngreso();
+		}
 	}else{
+		modoAmpliar = false;
+		$("#bannerAmpliar, #panelItemsExistentes").remove();
+		$("#serie_comprobante, #num_comprobante, #fecha_hora").prop("readonly", false);
+		$("#btnGuardar").html('<i class="fa fa-save"></i>  Guardar');
 		$("#listadoregistros").show();
 		$("#formularioregistros").hide();
 		$("#btnagregar").show();
@@ -262,6 +276,12 @@ function mostrarform(flag){
 
 //cancelar form
 function cancelarform(){
+	if (modoAmpliar) {
+		modoAmpliar = false;
+		$("#bannerAmpliar, #panelItemsExistentes").remove();
+		$("#serie_comprobante, #num_comprobante, #fecha_hora").prop("readonly", false);
+		$("#btnGuardar").html('<i class="fa fa-save"></i>  Guardar');
+	}
 	limpiar();
 	mostrarform(false);
 }
@@ -341,7 +361,11 @@ function listarArticulos(){
 
 //funcion para guardaryeditar
 function guardaryeditar(e){
-     e.preventDefault();//no se activara la accion predeterminada
+     e.preventDefault();
+     if (modoAmpliar) {
+     	guardarAmpliacion();
+     	return;
+     }
      var proveedorSeleccionado = ($("#idproveedor").val() || "").toString().trim();
      if (!proveedorSeleccionado) {
      	notifyIngreso("warning", "Selecciona un proveedor antes de guardar.");
@@ -366,6 +390,7 @@ function guardaryeditar(e){
      		if (r && typeof r.ok !== "undefined") {
      			if (r.ok) {
      				notifyIngreso("success", r.message || "Datos registrados correctamente");
+     				limpiarBorradorIngreso();
      				mostrarform(false);
      				listar();
      			} else {
@@ -376,6 +401,7 @@ function guardaryeditar(e){
      			notifyIngreso("error", "No se recibio respuesta del servidor.");
      		} else {
      			notifyIngreso("success", datos);
+     			limpiarBorradorIngreso();
      			mostrarform(false);
      			listar();
      		}
@@ -501,6 +527,7 @@ function agregarDetalle(idarticulo,articulo,unidad,precio_compra_ref){
 				modificarSubtotales();
 				$('#myModal').modal('hide');
 				notifyIngreso("info", "El artículo ya estaba agregado. Se incrementó la cantidad.");
+				guardarBorradorIngreso();
 				return;
 			}
 		}
@@ -525,6 +552,7 @@ function agregarDetalle(idarticulo,articulo,unidad,precio_compra_ref){
 		actualizarContadorItems();
 		$('#myModal').modal('hide');
 		notifyIngreso("success", "Artículo agregado a la compra.");
+		guardarBorradorIngreso();
 
 	}else{
 		notifyIngreso("warning", "No se pudo agregar el artículo. Revisa la información del producto.");
@@ -579,6 +607,7 @@ function eliminarDetalle(indice){
 	calcularTotales();
 	detalles=detalles-1;
 	actualizarContadorItems();
+	guardarBorradorIngreso();
 }
 
 function actualizarContadorItems(){
@@ -593,6 +622,199 @@ function estilizarBuscadorCatalogo(){
 		$filtro.find("label").addClass("catalog-search-label");
 		$filtro.find("input").addClass("catalog-search-input").attr("placeholder","Buscar por nombre o código");
 	}
+}
+
+// ── Utilidad HTML escape ──────────────────────────────────────────
+function escHtml(s) {
+	return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Borrador automático (localStorage) ───────────────────────────
+var BORRADOR_KEY_ING = 'farmacia_borrador_ingreso';
+
+function guardarBorradorIngreso() {
+	if (!$("#formularioregistros").is(":visible")) return;
+	if (modoAmpliar) return;
+	if ($("#idingreso").val()) return;
+	var items = [];
+	$("#detalles .filas").each(function() {
+		var $f = $(this);
+		var nombre = $f.find('td').eq(1).clone().find('input').remove().end().text().trim();
+		items.push({
+			idarticulo:        $f.find('input[name="idarticulo[]"]').val(),
+			nombre:            nombre,
+			unidad:            $f.find('td').eq(2).text().trim(),
+			cantidad:          $f.find('input[name="cantidad[]"]').val(),
+			precio_compra:     $f.find('input[name="precio_compra[]"]').val(),
+			precio_venta:      $f.find('input[name="precio_venta[]"]').val(),
+			numero_lote:       $f.find('input[name="numero_lote[]"]').val(),
+			fecha_vencimiento: $f.find('input[name="fecha_vencimiento[]"]').val()
+		});
+	});
+	if (items.length === 0) return;
+	try {
+		localStorage.setItem(BORRADOR_KEY_ING, JSON.stringify({
+			ts: Date.now(),
+			idproveedor:      $("#idproveedor").val(),
+			proveedor_nombre: $("#idproveedor option:selected").text(),
+			tipo_comprobante: $("#tipo_comprobante").val(),
+			items: items
+		}));
+	} catch(e) {}
+}
+
+function limpiarBorradorIngreso() {
+	try { localStorage.removeItem(BORRADOR_KEY_ING); } catch(e) {}
+}
+
+function restaurarBorradorIngreso() {
+	var raw;
+	try { raw = localStorage.getItem(BORRADOR_KEY_ING); } catch(e) { return; }
+	if (!raw) return;
+	var b;
+	try { b = JSON.parse(raw); } catch(e) { return; }
+	if (!b || !b.items || b.items.length === 0) return;
+	var hace = '';
+	if (b.ts) {
+		var mins = Math.round((Date.now() - b.ts) / 60000);
+		hace = mins < 60 ? ('hace ' + mins + ' min') : ('hace ' + Math.floor(mins/60) + ' h');
+	}
+	window._borradorIngreso = b;
+	$('<div id="bannerBorradorIngreso" class="alert alert-warning" style="font-size:13px;font-weight:600;">' +
+		'<i class="fa fa-clock-o"></i> Tienes un borrador guardado ' + hace + ' con ' +
+		b.items.length + ' artículo(s) (Proveedor: ' + escHtml(b.proveedor_nombre || '?') + ').' +
+		' &nbsp;<button type="button" class="btn btn-xs btn-success" onclick="restaurarBorradorIngresoConfirmar()">Restaurar borrador</button>' +
+		' &nbsp;<button type="button" class="btn btn-xs btn-default" onclick="descartarBorradorIngreso()">Descartar</button>' +
+	'</div>').prependTo("#formularioregistros form");
+}
+
+function restaurarBorradorIngresoConfirmar() {
+	var b = window._borradorIngreso;
+	if (!b) return;
+	$(".filas").remove();
+	detalles = 0; cont = 0;
+	if (b.idproveedor) {
+		$("#idproveedor").val(b.idproveedor);
+		try { $("#idproveedor").selectpicker("refresh"); } catch(e) {}
+	}
+	if (b.tipo_comprobante) {
+		$("#tipo_comprobante").val(b.tipo_comprobante);
+		try { $("#tipo_comprobante").selectpicker("refresh"); } catch(e) {}
+		aplicarSerieImpuestoIngreso();
+	}
+	for (var i = 0; i < b.items.length; i++) {
+		var it = b.items[i];
+		var pcv = parseFloat(it.precio_compra || 0);
+		var sub = (parseFloat(it.cantidad || 1) * pcv).toFixed(2);
+		var fila = '<tr class="filas" id="fila' + cont + '">' +
+			'<td><button type="button" class="btn btn-danger" onclick="eliminarDetalle(' + cont + ')">X</button></td>' +
+			'<td><input type="hidden" name="idarticulo[]" value="' + escHtml(it.idarticulo) + '">' + escHtml(it.nombre) + '</td>' +
+			'<td>' + escHtml(it.unidad) + '</td>' +
+			'<td><input type="number" step="1" min="1" name="cantidad[]" value="' + parseFloat(it.cantidad || 1) + '" oninput="modificarSubtotales()"></td>' +
+			'<td><input type="number" step="0.01" min="0.01" name="precio_compra[]" value="' + pcv.toFixed(2) + '" oninput="modificarSubtotales()"></td>' +
+			'<td><input type="number" step="0.01" min="0.01" name="precio_venta[]" value="' + parseFloat(it.precio_venta || 0).toFixed(2) + '"></td>' +
+			'<td><input type="text" name="numero_lote[]" maxlength="50" placeholder="N° Lote" style="width:90px" value="' + escHtml(it.numero_lote || '') + '"></td>' +
+			'<td><input type="date" name="fecha_vencimiento[]" style="width:130px" value="' + escHtml(it.fecha_vencimiento || '') + '"></td>' +
+			'<td><span id="subtotal' + cont + '" name="subtotal">' + sub + '</span></td>' +
+			'<td><button type="button" onclick="modificarSubtotales()" class="btn btn-info"><i class="fa fa-refresh"></i></button></td>' +
+			'</tr>';
+		cont++; detalles++;
+		$('#detalles').append(fila);
+	}
+	modificarSubtotales();
+	actualizarContadorItems();
+	$("#bannerBorradorIngreso").remove();
+	notifyIngreso("success", "Borrador restaurado: " + b.items.length + " artículo(s).");
+}
+
+function descartarBorradorIngreso() {
+	limpiarBorradorIngreso();
+	window._borradorIngreso = null;
+	$("#bannerBorradorIngreso").remove();
+	notifyIngreso("info", "Borrador descartado.");
+}
+
+// ── Ampliar ingreso existente ─────────────────────────────────────
+function abrirAmpliarIngreso(idingreso) {
+	modoAmpliar = true;
+	numeroComprobanteManualIngreso = true;
+	mostrarform(true);
+	$.post("../ajax/ingreso.php?op=mostrar", { idingreso: idingreso }, function(data) {
+		var d;
+		try { d = JSON.parse(data); } catch(e) {
+			notifyIngreso("error", "No se pudo cargar el ingreso.");
+			modoAmpliar = false; mostrarform(false); return;
+		}
+		$("#idingreso").val(d.idingreso);
+		$("#idproveedor").val(d.idproveedor);
+		try { $("#idproveedor").selectpicker("refresh"); } catch(e) {}
+		$("#tipo_comprobante").val(d.tipo_comprobante);
+		try { $("#tipo_comprobante").selectpicker("refresh"); } catch(e) {}
+		$("#serie_comprobante").val(d.serie_comprobante).prop("readonly", true);
+		$("#num_comprobante").val(d.num_comprobante).prop("readonly", true);
+		$("#fecha_hora").val(normalizarFechaHoraInput(d.fecha)).prop("readonly", true);
+		$("#impuesto").val(d.impuesto);
+
+		$('<div id="bannerAmpliar" class="alert alert-success" style="font-weight:600;margin-bottom:10px;">' +
+			'<i class="fa fa-plus-circle"></i>&nbsp; MODO AMPLIAR COMPRA &nbsp;|&nbsp; ' +
+			'Proveedor: <strong>' + escHtml(d.proveedor) + '</strong> &nbsp;|&nbsp; ' +
+			'Comprobante: <strong>' + escHtml(d.tipo_comprobante) + ' ' + escHtml(d.serie_comprobante) + '-' + escHtml(d.num_comprobante) + '</strong>' +
+		'</div>').prependTo("#formularioregistros form");
+
+		$("#btnGuardar").html('<i class="fa fa-plus-circle"></i> Agregar artículos al ingreso').hide();
+		$("#btnAgregarArt").show();
+
+		$.get("../ajax/ingreso.php?op=listarDetalle&id=" + idingreso, function(html) {
+			$('<div id="panelItemsExistentes" style="clear:both;margin-bottom:12px;">' +
+				'<div class="panel panel-default" style="margin-bottom:0;">' +
+				'<div class="panel-heading" style="background:#dff0d8;padding:8px 12px;cursor:pointer;" onclick="$(\'#itemsExistentesBody\').toggle();">' +
+				'<i class="fa fa-list-ul"></i> <strong>Artículos ya registrados en esta compra</strong> <small class="text-muted">(click para ver/ocultar)</small>' +
+				'</div>' +
+				'<div id="itemsExistentesBody" style="display:none;overflow-x:auto;">' +
+				'<table class="table table-condensed table-bordered" style="margin:0;">' + html + '</table>' +
+				'</div></div></div>'
+			).insertBefore($("#detalles").closest(".form-group"));
+		});
+	});
+}
+
+function guardarAmpliacion() {
+	var idingreso = $("#idingreso").val();
+	if (!idingreso || !parseInt(idingreso, 10)) {
+		notifyIngreso("error", "ID de ingreso inválido."); return;
+	}
+	if (document.getElementsByName("idarticulo[]").length === 0) {
+		notifyIngreso("warning", "Agrega al menos un artículo nuevo para guardar."); return;
+	}
+	$("#btnGuardar").prop("disabled", true);
+	var formData = new FormData($("#formulario")[0]);
+	$.ajax({
+		url: "../ajax/ingreso.php?op=agregarDetalle",
+		type: "POST",
+		data: formData,
+		contentType: false,
+		processData: false,
+		success: function(resp) {
+			var r = {};
+			try { r = JSON.parse(resp); } catch(e) {}
+			if (r.ok) {
+				notifyIngreso("success", r.message || "Artículos agregados correctamente.");
+				modoAmpliar = false;
+				$("#bannerAmpliar, #panelItemsExistentes").remove();
+				$("#serie_comprobante, #num_comprobante, #fecha_hora").prop("readonly", false);
+				mostrarform(false);
+				listar();
+				cargarResumenPagosIngreso();
+			} else {
+				notifyIngreso("error", r.message || "No se pudo agregar los artículos.");
+			}
+			$("#btnGuardar").prop("disabled", false).html('<i class="fa fa-save"></i>  Guardar');
+		},
+		error: function() {
+			notifyIngreso("error", "Error de conexión al guardar.");
+			$("#btnGuardar").prop("disabled", false).html('<i class="fa fa-save"></i>  Guardar');
+		}
+	});
 }
 
 init();
