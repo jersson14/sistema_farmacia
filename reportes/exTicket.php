@@ -104,7 +104,7 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title><?php echo esc($reg->tipo_comprobante . ' ' . $reg->serie_comprobante . '-' . $reg->num_comprobante); ?></title>
-  <link rel="stylesheet" href="../public/css/ticket.css?v=20260528a">
+  <link rel="stylesheet" href="../public/css/ticket.css?v=20260529b">
 </head>
 <body>
 
