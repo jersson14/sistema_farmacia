@@ -982,6 +982,18 @@ function guardarFilaDetalle(iddetalle) {
 		notifyIngreso("warning", "La cantidad debe ser mayor que cero.");
 		return;
 	}
+	if (!fecha_vencimiento) {
+		notifyIngreso("warning", "La fecha de vencimiento es obligatoria.");
+		$fila.find('input[name="det_fecha_vencimiento"]').css("border", "2px solid #d9534f").focus();
+		return;
+	}
+	var hoy = new Date(); hoy.setHours(0,0,0,0);
+	var fv = new Date(fecha_vencimiento + 'T00:00:00');
+	if (isNaN(fv.getTime()) || fv < hoy) {
+		notifyIngreso("warning", "La fecha de vencimiento debe ser válida y no estar vencida.");
+		$fila.find('input[name="det_fecha_vencimiento"]').css("border", "2px solid #d9534f").focus();
+		return;
+	}
 	var $btn = $fila.find('button');
 	$btn.prop("disabled", true);
 

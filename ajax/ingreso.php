@@ -196,6 +196,15 @@ switch ($_GET["op"]) {
 		$precio_venta_upd   = isset($_POST['precio_venta'])     ? (float)$_POST['precio_venta']           : 0;
 		$numero_lote_upd    = isset($_POST['numero_lote'])      ? limpiarCadena($_POST['numero_lote'])    : '';
 		$fecha_venc_upd     = isset($_POST['fecha_vencimiento'])? limpiarCadena($_POST['fecha_vencimiento']): '';
+		if ($fecha_venc_upd === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha_venc_upd)) {
+			echo json_encode(array("ok"=>false, "message"=>"La fecha de vencimiento es obligatoria y debe tener formato válido."));
+			break;
+		}
+		$fechaObj = DateTime::createFromFormat('Y-m-d', $fecha_venc_upd);
+		if (!$fechaObj || $fechaObj < new DateTime('today')) {
+			echo json_encode(array("ok"=>false, "message"=>"La fecha de vencimiento no puede ser una fecha pasada."));
+			break;
+		}
 		$rspta_upd = $ingreso->actualizarDetalle($iddetalle_upd, $cantidad_upd, $precio_compra_upd, $precio_venta_upd, $numero_lote_upd, $fecha_venc_upd);
 		echo json_encode($rspta_upd);
 		break;
