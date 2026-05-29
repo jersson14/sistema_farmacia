@@ -12,6 +12,7 @@ var correlativoRequestIdIngreso = 0;
 var proveedoresCargados = false;
 var numeroComprobanteManualIngreso = false;
 var modoAmpliar = false;
+var modoAmpliarData = { idingreso: 0, proveedor: '', comprobante: '' };
 var borradorTimerIngreso = null;
 
 function notifyIngreso(type, message){
@@ -371,6 +372,20 @@ function guardaryeditar(e){
      	notifyIngreso("warning", "Selecciona un proveedor antes de guardar.");
      	return;
      }
+     // Validar fecha_vencimiento obligatoria en todos los artículos
+     var fvFaltantes = [];
+     $("#detalles .filas").each(function(){
+     	var $fv = $(this).find('input[name="fecha_vencimiento[]"]');
+     	if ($fv.length && !$.trim($fv.val())) {
+     		$fv.css("border", "2px solid #d9534f");
+     		var nombre = $(this).find('td').eq(1).clone().find('input').remove().end().text().trim();
+     		fvFaltantes.push(nombre || '?');
+     	}
+     });
+     if (fvFaltantes.length > 0) {
+     	notifyIngreso("warning", "Falta fecha de vencimiento en: " + fvFaltantes.join(', '));
+     	return;
+     }
      var formData=new FormData($("#formulario")[0]);
 
      $.ajax({
@@ -533,6 +548,8 @@ function agregarDetalle(idarticulo,articulo,unidad,precio_compra_ref){
 		}
 
 		var subtotal=cantidad*precio_compra;
+		var fvStyle = 'style="width:130px;border:2px solid #d9534f;" title="Fecha de vencimiento obligatoria" oninput="this.style.border=this.value?\'1px solid #ccc\':\'2px solid #d9534f\'"';
+		var fvLabel = '<span style="color:#d9534f;font-size:10px;display:block;">* obligatorio</span>';
 		var fila='<tr class="filas" id="fila'+cont+'">'+
         '<td><button type="button" class="btn btn-danger" onclick="eliminarDetalle('+cont+')">X</button></td>'+
         '<td><input type="hidden" name="idarticulo[]" value="'+idarticulo+'">'+articulo+'</td>'+
@@ -541,7 +558,7 @@ function agregarDetalle(idarticulo,articulo,unidad,precio_compra_ref){
         '<td><input type="number" step="0.01" min="0.01" name="precio_compra[]" id="precio_compra[]" value="'+precio_compra.toFixed(2)+'" oninput="modificarSubtotales()"></td>'+
         '<td><input type="number" step="0.01" min="0.01" name="precio_venta[]" value="'+precio_venta.toFixed(2)+'"></td>'+
         '<td><input type="text" name="numero_lote[]" maxlength="50" placeholder="N° Lote" style="width:90px"></td>'+
-        '<td><input type="date" name="fecha_vencimiento[]" style="width:130px"></td>'+
+        '<td><input type="date" name="fecha_vencimiento[]" '+fvStyle+'>'+fvLabel+'</td>'+
         '<td><span id="subtotal'+cont+'" name="subtotal">'+subtotal.toFixed(2)+'</span></td>'+
         '<td><button type="button" onclick="modificarSubtotales()" class="btn btn-info"><i class="fa fa-refresh"></i></button></td>'+
 		'</tr>';
@@ -634,7 +651,7 @@ var BORRADOR_KEY_ING = 'farmacia_borrador_ingreso';
 
 function guardarBorradorIngreso() {
 	if (!$("#formularioregistros").is(":visible")) return;
-	if (modoAmpliar) return;
+	if (modoAmpliar) { guardarBorradorAmpliar(); return; }
 	if ($("#idingreso").val()) return;
 	var items = [];
 	$("#detalles .filas").each(function() {
@@ -714,7 +731,7 @@ function restaurarBorradorIngresoConfirmar() {
 			'<td><input type="number" step="0.01" min="0.01" name="precio_compra[]" value="' + pcv.toFixed(2) + '" oninput="modificarSubtotales()"></td>' +
 			'<td><input type="number" step="0.01" min="0.01" name="precio_venta[]" value="' + parseFloat(it.precio_venta || 0).toFixed(2) + '"></td>' +
 			'<td><input type="text" name="numero_lote[]" maxlength="50" placeholder="N° Lote" style="width:90px" value="' + escHtml(it.numero_lote || '') + '"></td>' +
-			'<td><input type="date" name="fecha_vencimiento[]" style="width:130px" value="' + escHtml(it.fecha_vencimiento || '') + '"></td>' +
+			'<td><input type="date" name="fecha_vencimiento[]" style="width:130px;border:' + (it.fecha_vencimiento ? '1px solid #ccc' : '2px solid #d9534f') + ';" oninput="this.style.border=this.value?\'1px solid #ccc\':\'2px solid #d9534f\'" value="' + escHtml(it.fecha_vencimiento || '') + '" title="Obligatorio"><span style="color:#d9534f;font-size:10px;display:block;">* obligatorio</span></td>' +
 			'<td><span id="subtotal' + cont + '" name="subtotal">' + sub + '</span></td>' +
 			'<td><button type="button" onclick="modificarSubtotales()" class="btn btn-info"><i class="fa fa-refresh"></i></button></td>' +
 			'</tr>';
@@ -731,6 +748,106 @@ function descartarBorradorIngreso() {
 	limpiarBorradorIngreso();
 	window._borradorIngreso = null;
 	$("#bannerBorradorIngreso").remove();
+	notifyIngreso("info", "Borrador descartado.");
+}
+
+// ── Borrador automático en modo AMPLIAR (localStorage por idingreso) ──
+var BORRADOR_KEY_AMP = 'farmacia_borrador_ampliar_';
+
+function guardarBorradorAmpliar() {
+	var idingreso = modoAmpliarData.idingreso || $("#idingreso").val();
+	if (!idingreso) return;
+	var items = [];
+	$("#detalles .filas").each(function() {
+		var $f = $(this);
+		var nombre = $f.find('td').eq(1).clone().find('input').remove().end().text().trim();
+		items.push({
+			idarticulo:        $f.find('input[name="idarticulo[]"]').val(),
+			nombre:            nombre,
+			unidad:            $f.find('td').eq(2).text().trim(),
+			cantidad:          $f.find('input[name="cantidad[]"]').val(),
+			precio_compra:     $f.find('input[name="precio_compra[]"]').val(),
+			precio_venta:      $f.find('input[name="precio_venta[]"]').val(),
+			numero_lote:       $f.find('input[name="numero_lote[]"]').val(),
+			fecha_vencimiento: $f.find('input[name="fecha_vencimiento[]"]').val()
+		});
+	});
+	if (items.length === 0) {
+		try { localStorage.removeItem(BORRADOR_KEY_AMP + idingreso); } catch(e) {}
+		return;
+	}
+	try {
+		localStorage.setItem(BORRADOR_KEY_AMP + idingreso, JSON.stringify({
+			ts:          Date.now(),
+			idingreso:   idingreso,
+			proveedor:   modoAmpliarData.proveedor,
+			comprobante: modoAmpliarData.comprobante,
+			items:       items
+		}));
+	} catch(e) {}
+}
+
+function limpiarBorradorAmpliar() {
+	var idingreso = modoAmpliarData.idingreso || $("#idingreso").val();
+	if (!idingreso) return;
+	try { localStorage.removeItem(BORRADOR_KEY_AMP + idingreso); } catch(e) {}
+}
+
+function restaurarBorradorAmpliar(idingreso) {
+	var raw;
+	try { raw = localStorage.getItem(BORRADOR_KEY_AMP + idingreso); } catch(e) { return; }
+	if (!raw) return;
+	var b;
+	try { b = JSON.parse(raw); } catch(e) { return; }
+	if (!b || !b.items || b.items.length === 0) return;
+	var hace = '';
+	if (b.ts) {
+		var mins = Math.round((Date.now() - b.ts) / 60000);
+		hace = mins < 60 ? ('hace ' + mins + ' min') : ('hace ' + Math.floor(mins / 60) + ' h');
+	}
+	window._borradorAmpliar = b;
+	$('<div id="bannerBorradorAmpliar" class="alert alert-warning" style="font-size:13px;font-weight:600;margin-top:8px;">' +
+		'<i class="fa fa-clock-o"></i>&nbsp; Borrador guardado ' + hace + ' — ' +
+		b.items.length + ' artículo(s) pendiente(s) de agregar a esta compra.' +
+		'&nbsp;&nbsp;<button type="button" class="btn btn-xs btn-success" onclick="restaurarBorradorAmpliarConfirmar()"><i class="fa fa-undo"></i> Restaurar borrador</button>' +
+		'&nbsp;<button type="button" class="btn btn-xs btn-default" onclick="descartarBorradorAmpliar()">Descartar</button>' +
+	'</div>').insertAfter("#bannerAmpliar");
+}
+
+function restaurarBorradorAmpliarConfirmar() {
+	var b = window._borradorAmpliar;
+	if (!b) return;
+	$(".filas").remove();
+	detalles = 0; cont = 0;
+	for (var i = 0; i < b.items.length; i++) {
+		var it = b.items[i];
+		var pcv = parseFloat(it.precio_compra || 0);
+		var sub = (parseFloat(it.cantidad || 1) * pcv).toFixed(2);
+		var fila = '<tr class="filas" id="fila' + cont + '">' +
+			'<td><button type="button" class="btn btn-danger" onclick="eliminarDetalle(' + cont + ')">X</button></td>' +
+			'<td><input type="hidden" name="idarticulo[]" value="' + escHtml(it.idarticulo) + '">' + escHtml(it.nombre) + '</td>' +
+			'<td>' + escHtml(it.unidad) + '</td>' +
+			'<td><input type="number" step="1" min="1" name="cantidad[]" value="' + parseFloat(it.cantidad || 1) + '" oninput="modificarSubtotales()"></td>' +
+			'<td><input type="number" step="0.01" min="0.01" name="precio_compra[]" value="' + pcv.toFixed(2) + '" oninput="modificarSubtotales()"></td>' +
+			'<td><input type="number" step="0.01" min="0.01" name="precio_venta[]" value="' + parseFloat(it.precio_venta || 0).toFixed(2) + '"></td>' +
+			'<td><input type="text" name="numero_lote[]" maxlength="50" placeholder="N° Lote" style="width:90px" value="' + escHtml(it.numero_lote || '') + '"></td>' +
+			'<td><input type="date" name="fecha_vencimiento[]" style="width:130px;border:2px solid #d9534f;" title="Obligatorio" value="' + escHtml(it.fecha_vencimiento || '') + '"><span style="color:#d9534f;font-size:10px;display:block;">* obligatorio</span></td>' +
+			'<td><span id="subtotal' + cont + '" name="subtotal">' + sub + '</span></td>' +
+			'<td><button type="button" onclick="modificarSubtotales()" class="btn btn-info"><i class="fa fa-refresh"></i></button></td>' +
+			'</tr>';
+		cont++; detalles++;
+		$('#detalles').append(fila);
+	}
+	modificarSubtotales();
+	actualizarContadorItems();
+	$("#bannerBorradorAmpliar").remove();
+	notifyIngreso("success", "Borrador restaurado: " + b.items.length + " artículo(s).");
+}
+
+function descartarBorradorAmpliar() {
+	limpiarBorradorAmpliar();
+	window._borradorAmpliar = null;
+	$("#bannerBorradorAmpliar").remove();
 	notifyIngreso("info", "Borrador descartado.");
 }
 
@@ -755,6 +872,12 @@ function abrirAmpliarIngreso(idingreso) {
 		$("#fecha_hora").val(normalizarFechaHoraInput(d.fecha)).prop("readonly", true);
 		$("#impuesto").val(d.impuesto);
 
+		modoAmpliarData = {
+			idingreso:   d.idingreso,
+			proveedor:   d.proveedor || '',
+			comprobante: (d.tipo_comprobante||'') + ' ' + (d.serie_comprobante||'') + '-' + (d.num_comprobante||'')
+		};
+
 		$('<div id="bannerAmpliar" class="alert alert-success" style="font-weight:600;margin-bottom:10px;">' +
 			'<i class="fa fa-plus-circle"></i>&nbsp; MODO AMPLIAR COMPRA &nbsp;|&nbsp; ' +
 			'Proveedor: <strong>' + escHtml(d.proveedor) + '</strong> &nbsp;|&nbsp; ' +
@@ -763,6 +886,9 @@ function abrirAmpliarIngreso(idingreso) {
 
 		$("#btnGuardar").html('<i class="fa fa-plus-circle"></i> Agregar artículos al ingreso').hide();
 		$("#btnAgregarArt").show();
+
+		// Verificar si hay borrador guardado para este ingreso
+		restaurarBorradorAmpliar(d.idingreso);
 
 		$.get("../ajax/ingreso.php?op=listarDetalle&id=" + idingreso, function(html) {
 			$('<div id="panelItemsExistentes" style="clear:both;margin-bottom:12px;">' +
@@ -786,6 +912,23 @@ function guardarAmpliacion() {
 	if (document.getElementsByName("idarticulo[]").length === 0) {
 		notifyIngreso("warning", "Agrega al menos un artículo nuevo para guardar."); return;
 	}
+	// Validar que todos los artículos nuevos tengan fecha de vencimiento
+	var faltanFechas = false;
+	$("#detalles .filas").each(function(){
+		var $fv = $(this).find('input[name="fecha_vencimiento[]"]');
+		if ($fv.length) {
+			if (!$.trim($fv.val())) {
+				$fv.css("border", "2px solid #d9534f");
+				faltanFechas = true;
+			} else {
+				$fv.css("border", "");
+			}
+		}
+	});
+	if (faltanFechas) {
+		notifyIngreso("warning", "La fecha de vencimiento es obligatoria para todos los artículos.");
+		return;
+	}
 	$("#btnGuardar").prop("disabled", true);
 	var formData = new FormData($("#formulario")[0]);
 	$.ajax({
@@ -799,8 +942,10 @@ function guardarAmpliacion() {
 			try { r = JSON.parse(resp); } catch(e) {}
 			if (r.ok) {
 				notifyIngreso("success", r.message || "Artículos agregados correctamente.");
+				limpiarBorradorAmpliar();
 				modoAmpliar = false;
-				$("#bannerAmpliar, #panelItemsExistentes").remove();
+				modoAmpliarData = { idingreso: 0, proveedor: '', comprobante: '' };
+				$("#bannerAmpliar, #panelItemsExistentes, #bannerBorradorAmpliar").remove();
 				$("#serie_comprobante, #num_comprobante, #fecha_hora").prop("readonly", false);
 				mostrarform(false);
 				listar();
@@ -814,6 +959,55 @@ function guardarAmpliacion() {
 			notifyIngreso("error", "Error de conexión al guardar.");
 			$("#btnGuardar").prop("disabled", false).html('<i class="fa fa-save"></i>  Guardar');
 		}
+	});
+}
+
+// ── Edición interactiva de filas ya guardadas ──────────────────────
+function recalcFilaDetalle(input) {
+	var $fila = $(input).closest('tr');
+	var cant = parseFloat($fila.find('input[name="det_cantidad"]').val() || 0);
+	var pcom = parseFloat($fila.find('input[name="det_precio_compra"]').val() || 0);
+	$fila.find('.det-subtotal').text((cant * pcom).toFixed(2));
+}
+
+function guardarFilaDetalle(iddetalle) {
+	var $fila = $('[data-iddetalle="' + iddetalle + '"]');
+	var cantidad          = $fila.find('input[name="det_cantidad"]').val();
+	var precio_compra     = $fila.find('input[name="det_precio_compra"]').val();
+	var precio_venta      = $fila.find('input[name="det_precio_venta"]').val();
+	var numero_lote       = $fila.find('input[name="det_numero_lote"]').val();
+	var fecha_vencimiento = $fila.find('input[name="det_fecha_vencimiento"]').val();
+
+	if (!cantidad || parseFloat(cantidad) <= 0) {
+		notifyIngreso("warning", "La cantidad debe ser mayor que cero.");
+		return;
+	}
+	var $btn = $fila.find('button');
+	$btn.prop("disabled", true);
+
+	$.post("../ajax/ingreso.php?op=actualizarDetalle", {
+		iddetalle:        iddetalle,
+		cantidad:         cantidad,
+		precio_compra:    precio_compra,
+		precio_venta:     precio_venta,
+		numero_lote:      numero_lote,
+		fecha_vencimiento: fecha_vencimiento
+	}, function(resp) {
+		var r = {};
+		try { r = JSON.parse(resp); } catch(e) {}
+		if (r.ok) {
+			notifyIngreso("success", r.message || "Detalle actualizado.");
+			if (typeof r.nuevo_total !== "undefined") {
+				var sym = window.appCurrencySymbol || "S/";
+				$("#det-total-view").text(sym + " " + parseFloat(r.nuevo_total).toFixed(2));
+			}
+		} else {
+			notifyIngreso("error", r.message || "No se pudo actualizar.");
+		}
+		$btn.prop("disabled", false);
+	}).fail(function(){
+		notifyIngreso("error", "Error de conexión al guardar.");
+		$btn.prop("disabled", false);
 	});
 }
 

@@ -145,13 +145,11 @@ switch ($_GET["op"]) {
 		break;
 
 	case 'listarDetalle':
-		//recibimos el idingreso
-		$id=$_GET['id'];
-
-		$rspta=$ingreso->listarDetalle($id);
-		$total=0;
-		echo ' <thead style="background-color:#A9D0F5">
-        <th>Opciones</th>
+		$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+		$rspta = $ingreso->listarDetalle($id);
+		$total = 0;
+		echo '<thead style="background-color:#A9D0F5">
+        <th></th>
         <th>Articulo</th>
         <th>Unidad</th>
         <th>Cantidad</th>
@@ -160,38 +158,46 @@ switch ($_GET["op"]) {
         <th>N&deg; Lote</th>
         <th>Vencimiento</th>
         <th>Subtotal</th>
-        <th>Actualizar</th>
+        <th>Guardar</th>
        </thead>';
-		while ($reg=$rspta->fetch_object()) {
-			$subtotal = (float)$reg->precio_compra * (float)$reg->cantidad;
-			$loteShow = !empty($reg->numero_lote) ? htmlspecialchars($reg->numero_lote) : '&mdash;';
-			$vencShow = !empty($reg->fecha_vencimiento) ? $reg->fecha_vencimiento : '&mdash;';
-			echo '<tr class="filas">
+		while ($reg = $rspta->fetch_object()) {
+			$subtotal  = (float)$reg->precio_compra * (float)$reg->cantidad;
+			$total    += $subtotal;
+			$iddet     = (int)$reg->iddetalle_ingreso;
+			$loteVal   = htmlspecialchars($reg->numero_lote ?? '');
+			$vencVal   = htmlspecialchars($reg->fecha_vencimiento ?? '');
+			$cantVal   = number_format((float)$reg->cantidad, 0, '.', '');
+			$pcomVal   = number_format((float)$reg->precio_compra, 2, '.', '');
+			$pvenVal   = number_format((float)$reg->precio_venta,  2, '.', '');
+			echo '<tr class="filas" data-iddetalle="'.$iddet.'">
 			<td></td>
-			<td>'.$reg->nombre.'</td>
-			<td>'.$reg->unidad.'</td>
-			<td>'.number_format((float)$reg->cantidad,0).'</td>
-			<td>'.number_format((float)$reg->precio_compra,2).'</td>
-			<td>'.number_format((float)$reg->precio_venta,2).'</td>
-			<td>'.$loteShow.'</td>
-			<td>'.$vencShow.'</td>
-			<td>'.number_format($subtotal,2).'</td>
-			<td></td>
+			<td>'.htmlspecialchars($reg->nombre).'</td>
+			<td>'.htmlspecialchars($reg->unidad).'</td>
+			<td><input type="number" step="1" min="1" name="det_cantidad" value="'.$cantVal.'" style="width:70px" oninput="recalcFilaDetalle(this)" class="form-control input-sm"></td>
+			<td><input type="number" step="0.01" min="0" name="det_precio_compra" value="'.$pcomVal.'" style="width:90px" oninput="recalcFilaDetalle(this)" class="form-control input-sm"></td>
+			<td><input type="number" step="0.01" min="0" name="det_precio_venta" value="'.$pvenVal.'" style="width:90px" class="form-control input-sm"></td>
+			<td><input type="text" name="det_numero_lote" value="'.$loteVal.'" maxlength="50" style="width:90px" placeholder="N° Lote" class="form-control input-sm"></td>
+			<td><input type="date" name="det_fecha_vencimiento" value="'.$vencVal.'" style="width:130px" class="form-control input-sm"></td>
+			<td><span class="det-subtotal">'.number_format($subtotal, 2).'</span></td>
+			<td><button type="button" class="btn btn-success btn-xs" onclick="guardarFilaDetalle('.$iddet.')"><i class="fa fa-save"></i> Guardar</button></td>
 			</tr>';
-			$total=$total+$subtotal;
 		}
 		echo '<tfoot>
          <th>TOTAL</th>
-         <th></th>
-         <th></th>
-         <th></th>
-         <th></th>
-         <th></th>
-         <th></th>
-         <th></th>
-         <th></th>
-         <th><h4 id="total">'.formatearMoneda($total).'</h4><input type="hidden" name="total_compra" id="total_compra"></th>
+         <th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th>
+         <th><h4 id="det-total-view">'.formatearMoneda($total).'</h4></th>
        </tfoot>';
+		break;
+
+	case 'actualizarDetalle':
+		$iddetalle_upd      = isset($_POST['iddetalle'])        ? (int)$_POST['iddetalle']                : 0;
+		$cantidad_upd       = isset($_POST['cantidad'])         ? $_POST['cantidad']                      : 0;
+		$precio_compra_upd  = isset($_POST['precio_compra'])    ? (float)$_POST['precio_compra']          : 0;
+		$precio_venta_upd   = isset($_POST['precio_venta'])     ? (float)$_POST['precio_venta']           : 0;
+		$numero_lote_upd    = isset($_POST['numero_lote'])      ? limpiarCadena($_POST['numero_lote'])    : '';
+		$fecha_venc_upd     = isset($_POST['fecha_vencimiento'])? limpiarCadena($_POST['fecha_vencimiento']): '';
+		$rspta_upd = $ingreso->actualizarDetalle($iddetalle_upd, $cantidad_upd, $precio_compra_upd, $precio_venta_upd, $numero_lote_upd, $fecha_venc_upd);
+		echo json_encode($rspta_upd);
 		break;
 
     case 'listar':

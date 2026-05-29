@@ -157,12 +157,25 @@ public function insertar($idproveedor,$idusuario,$tipo_comprobante,$serie_compro
 			);
 		}
 
-		$numLoteActual   = isset($numero_lote[$i])      ? trim((string)$numero_lote[$i])      : '';
+		$numLoteActual   = isset($numero_lote[$i])       ? trim((string)$numero_lote[$i])       : '';
 		$fechaVencActual = isset($fecha_vencimiento[$i]) ? trim((string)$fecha_vencimiento[$i]) : '';
 		$fechaFabActual  = isset($fecha_fabricacion[$i]) ? trim((string)$fecha_fabricacion[$i]) : '';
-		// Validar formato de fecha de vencimiento si se proporcionó
-		if ($fechaVencActual !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaVencActual)) {
-			$fechaVencActual = '';
+
+		// Fecha de vencimiento obligatoria
+		$_artNombre = '';
+		if ($fechaVencActual === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaVencActual)) {
+			$_artRow = ejecutarConsultaSimpleFila("SELECT nombre FROM articulo WHERE idarticulo='$idArticuloActual' LIMIT 1");
+			$_artNombre = $_artRow ? $_artRow['nombre'] : 'ítem #'.($i+1);
+			if ($fechaVencActual === '') {
+				return array("ok"=>false, "message"=>"Falta la fecha de vencimiento del producto: $_artNombre");
+			}
+			return array("ok"=>false, "message"=>"Fecha de vencimiento con formato incorrecto en: $_artNombre — usa el selector de fecha");
+		}
+		$_fvp = explode('-', $fechaVencActual);
+		if (!checkdate((int)$_fvp[1], (int)$_fvp[2], (int)$_fvp[0])) {
+			$_artRow = ejecutarConsultaSimpleFila("SELECT nombre FROM articulo WHERE idarticulo='$idArticuloActual' LIMIT 1");
+			$_artNombre = $_artRow ? $_artRow['nombre'] : 'ítem #'.($i+1);
+			return array("ok"=>false, "message"=>"Fecha de vencimiento inválida en: $_artNombre — verifica el día y mes");
 		}
 		if ($fechaFabActual !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaFabActual)) {
 			$fechaFabActual = '';
@@ -319,8 +332,23 @@ public function agregarDetalle($idingreso, $idusuario, $idarticulo, $cantidad, $
 		$nLote = isset($numero_lote[$i])       ? trim((string)$numero_lote[$i])       : '';
 		$fVenc = isset($fecha_vencimiento[$i]) ? trim((string)$fecha_vencimiento[$i]) : '';
 		$fFab  = isset($fecha_fabricacion[$i]) ? trim((string)$fecha_fabricacion[$i]) : '';
-		if ($fVenc !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fVenc)) { $fVenc = ''; }
-		if ($fFab  !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fFab))  { $fFab  = ''; }
+
+		// Fecha de vencimiento obligatoria
+		if ($fVenc === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fVenc)) {
+			$_artRow2 = ejecutarConsultaSimpleFila("SELECT nombre FROM articulo WHERE idarticulo='$idArt' LIMIT 1");
+			$_artNom2 = $_artRow2 ? $_artRow2['nombre'] : 'ítem #'.($i+1);
+			if ($fVenc === '') {
+				return array("ok"=>false, "message"=>"Falta la fecha de vencimiento del producto: $_artNom2");
+			}
+			return array("ok"=>false, "message"=>"Fecha de vencimiento con formato incorrecto en: $_artNom2 — usa el selector de fecha");
+		}
+		$_fvp2 = explode('-', $fVenc);
+		if (!checkdate((int)$_fvp2[1], (int)$_fvp2[2], (int)$_fvp2[0])) {
+			$_artRow2 = ejecutarConsultaSimpleFila("SELECT nombre FROM articulo WHERE idarticulo='$idArt' LIMIT 1");
+			$_artNom2 = $_artRow2 ? $_artRow2['nombre'] : 'ítem #'.($i+1);
+			return array("ok"=>false, "message"=>"Fecha de vencimiento inválida en: $_artNom2 — verifica el día y mes");
+		}
+		if ($fFab !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fFab)) { $fFab = ''; }
 		$detalles[] = array('idArt'=>$idArt,'cant'=>$cant,'pCom'=>$pCom,'pVen'=>$pVen,'nLote'=>$nLote,'fVenc'=>$fVenc,'fFab'=>$fFab);
 	}
 	$conexion->autocommit(false);
@@ -370,12 +398,56 @@ public function mostrar($idingreso){
 }
 
 public function listarDetalle($idingreso){
-	$sql="SELECT di.idingreso,di.idarticulo,a.nombre,IFNULL(u.abreviatura,'und') as unidad,di.cantidad,di.precio_compra,di.precio_venta,di.numero_lote,di.fecha_vencimiento
+	$sql="SELECT di.iddetalle_ingreso,di.idingreso,di.idarticulo,a.nombre,IFNULL(u.abreviatura,'und') as unidad,di.cantidad,di.precio_compra,di.precio_venta,di.numero_lote,di.fecha_vencimiento
 	FROM detalle_ingreso di
 	INNER JOIN articulo a ON di.idarticulo=a.idarticulo
 	LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad
 	WHERE di.idingreso='$idingreso'";
 	return ejecutarConsulta($sql);
+}
+
+public function actualizarDetalle($iddetalle, $cantidad, $precio_compra, $precio_venta, $numero_lote, $fecha_vencimiento){
+	$iddetalle = (int)$iddetalle;
+	if ($iddetalle <= 0) {
+		return array("ok"=>false, "message"=>"ID de detalle inválido");
+	}
+	$rowDet = ejecutarConsultaSimpleFila("SELECT idarticulo, idingreso, cantidad FROM detalle_ingreso WHERE iddetalle_ingreso='$iddetalle' LIMIT 1");
+	if (!$rowDet) {
+		return array("ok"=>false, "message"=>"No se encontró el detalle");
+	}
+	$cantidad        = $this->normalizarCantidad($cantidad);
+	$precio_compra   = max(0, (float)$precio_compra);
+	$precio_venta    = max(0, (float)$precio_venta);
+	$numero_lote     = limpiarCadena(trim((string)$numero_lote));
+	$fecha_vencimiento = trim((string)$fecha_vencimiento);
+	if ($fecha_vencimiento !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha_vencimiento)) {
+		$fecha_vencimiento = '';
+	}
+	if ($cantidad <= 0) {
+		return array("ok"=>false, "message"=>"La cantidad debe ser mayor que cero");
+	}
+	$fvSQL = $fecha_vencimiento !== '' ? "'$fecha_vencimiento'" : 'NULL';
+	$sql = "UPDATE detalle_ingreso SET cantidad='$cantidad', precio_compra='$precio_compra', precio_venta='$precio_venta', numero_lote='$numero_lote', fecha_vencimiento=$fvSQL WHERE iddetalle_ingreso='$iddetalle'";
+	$ok = ejecutarConsulta($sql);
+	if (!$ok) {
+		return array("ok"=>false, "message"=>"No se pudo actualizar el detalle");
+	}
+	// Ajustar stock por diferencia de cantidad
+	$oldCantidad = isset($rowDet['cantidad']) ? (float)$rowDet['cantidad'] : 0;
+	$diferencia = $cantidad - $oldCantidad;
+	if (abs($diferencia) > 0.0001) {
+		ejecutarConsulta("UPDATE articulo SET stock = stock + '$diferencia' WHERE idarticulo='".(int)$rowDet['idarticulo']."'");
+	}
+	// Actualizar precio_venta en artículo si cambió
+	if ($precio_venta > 0) {
+		ejecutarConsulta("UPDATE articulo SET precio_venta='$precio_venta' WHERE idarticulo='".(int)$rowDet['idarticulo']."'");
+	}
+	// Recalcular total del ingreso
+	$idingreso = (int)$rowDet['idingreso'];
+	$totalRow = ejecutarConsultaSimpleFila("SELECT IFNULL(SUM(cantidad*precio_compra),0) AS total FROM detalle_ingreso WHERE idingreso='$idingreso'");
+	$nuevoTotal = $totalRow ? (float)$totalRow['total'] : 0;
+	ejecutarConsulta("UPDATE ingreso SET total_compra='$nuevoTotal' WHERE idingreso='$idingreso'");
+	return array("ok"=>true, "message"=>"Detalle actualizado correctamente", "nuevo_total"=>$nuevoTotal);
 }
 
 //listar registros
