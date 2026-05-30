@@ -893,14 +893,30 @@ function abrirAmpliarIngreso(idingreso) {
 		$.get("../ajax/ingreso.php?op=listarDetalle&id=" + idingreso, function(html) {
 			$('<div id="panelItemsExistentes" style="clear:both;margin-bottom:12px;">' +
 				'<div class="panel panel-default" style="margin-bottom:0;">' +
-				'<div class="panel-heading" style="background:#dff0d8;padding:8px 12px;cursor:pointer;" onclick="$(\'#itemsExistentesBody\').toggle();">' +
+				'<div class="panel-heading" style="background:#dff0d8;padding:8px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+				'<div style="flex:1;cursor:pointer;min-width:0;" onclick="$(\'#itemsExistentesBody\').toggle();">' +
 				'<i class="fa fa-list-ul"></i> <strong>Artículos ya registrados en esta compra</strong> <small class="text-muted">(click para ver/ocultar)</small>' +
 				'</div>' +
+				'<div style="flex-shrink:0;">' +
+				'<div class="input-group input-group-sm" style="width:220px;">' +
+				'<span class="input-group-addon" style="background:#fff;"><i class="fa fa-search text-muted"></i></span>' +
+				'<input type="text" id="buscarItemExistente" class="form-control" placeholder="Buscar artículo..." ' +
+				'oninput="filtrarItemsExistentes(this.value)" onclick="event.stopPropagation();" ' +
+				'style="border-left:0;" />' +
+				'</div></div></div>' +
 				'<div id="itemsExistentesBody" style="display:none;overflow-x:auto;">' +
-				'<table class="table table-condensed table-bordered" style="margin:0;">' + html + '</table>' +
+				'<table id="tablaItemsExistentes" class="table table-condensed table-bordered" style="margin:0;">' + html + '</table>' +
 				'</div></div></div>'
 			).insertBefore($("#detalles").closest(".form-group"));
 		});
+	});
+}
+
+function filtrarItemsExistentes(valor) {
+	var termino = (valor || "").toLowerCase().trim();
+	$("#tablaItemsExistentes tbody tr").each(function() {
+		var nombre = $(this).find("td").eq(1).text().toLowerCase();
+		$(this).toggle(termino === "" || nombre.indexOf(termino) !== -1);
 	});
 }
 

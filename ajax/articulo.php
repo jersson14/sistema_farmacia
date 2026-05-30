@@ -17,7 +17,7 @@ $stock            = isset($_POST["stock"])             ? (int)round((float)limpi
 $stock_minimo     = isset($_POST["stock_minimo"])      ? (int)round((float)limpiarCadena($_POST["stock_minimo"])): 1;
 $precio_venta     = isset($_POST["precio_venta"])      ? max(0, (float)limpiarCadena($_POST["precio_venta"]))  : 0;
 $descripcion      = isset($_POST["descripcion"])       ? limpiarCadena($_POST["descripcion"])       : "";
-$imagen           = isset($_POST["imagen"])            ? limpiarCadena($_POST["imagen"])            : "";
+$imagen           = ""; // se resuelve en guardaryeditar con el archivo subido o imagenactual
 // Campos farmacéuticos
 $principio_activo   = isset($_POST["principio_activo"])   ? limpiarCadena($_POST["principio_activo"])   : "";
 $concentracion      = isset($_POST["concentracion"])      ? limpiarCadena($_POST["concentracion"])      : "";
@@ -41,13 +41,19 @@ switch ($_GET["op"]) {
 		echo "Sin permiso para modificar artículos";
 		break;
 	}
-	if (!file_exists($_FILES['imagen']['tmp_name'])|| !is_uploaded_file($_FILES['imagen']['tmp_name'])) {
-		$imagen=$_POST["imagenactual"];
-	}else{
-		$ext=explode(".", $_FILES["imagen"]["name"]);
-		if ($_FILES['imagen']['type']=="image/jpg" || $_FILES['imagen']['type']=="image/jpeg" || $_FILES['imagen']['type']=="image/png") {
-			$imagen=round(microtime(true)).'.'. end($ext);
-			move_uploaded_file($_FILES["imagen"]["tmp_name"], "../files/articulos/".$imagen);
+	// Siempre partir de la imagen actual; solo sobreescribir si el upload es válido y exitoso
+	$imagen = isset($_POST["imagenactual"]) ? trim($_POST["imagenactual"]) : "";
+	if (isset($_FILES['imagen']['tmp_name']) && is_uploaded_file($_FILES['imagen']['tmp_name'])) {
+		$allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+		$allowedExts  = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+		$ext  = strtolower(pathinfo($_FILES['imagen']['name'], PATHINFO_EXTENSION));
+		$mime = strtolower($_FILES['imagen']['type']);
+		if (in_array($mime, $allowedMimes, true) && in_array($ext, $allowedExts, true)) {
+			$nuevoNombre = round(microtime(true)) . '.' . $ext;
+			$destino = "../files/articulos/" . $nuevoNombre;
+			if (move_uploaded_file($_FILES['imagen']['tmp_name'], $destino)) {
+				$imagen = $nuevoNombre;
+			}
 		}
 	}
 	if (empty($idarticulo)) {
