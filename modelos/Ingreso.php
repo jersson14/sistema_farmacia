@@ -411,7 +411,7 @@ public function actualizarDetalle($iddetalle, $cantidad, $precio_compra, $precio
 	if ($iddetalle <= 0) {
 		return array("ok"=>false, "message"=>"ID de detalle inválido");
 	}
-	$rowDet = ejecutarConsultaSimpleFila("SELECT idarticulo, idingreso, cantidad FROM detalle_ingreso WHERE iddetalle_ingreso='$iddetalle' LIMIT 1");
+	$rowDet = ejecutarConsultaSimpleFila("SELECT idarticulo, idingreso, cantidad, IFNULL(idlote,0) AS idlote FROM detalle_ingreso WHERE iddetalle_ingreso='$iddetalle' LIMIT 1");
 	if (!$rowDet) {
 		return array("ok"=>false, "message"=>"No se encontró el detalle");
 	}
@@ -447,6 +447,20 @@ public function actualizarDetalle($iddetalle, $cantidad, $precio_compra, $precio
 	$totalRow = ejecutarConsultaSimpleFila("SELECT IFNULL(SUM(cantidad*precio_compra),0) AS total FROM detalle_ingreso WHERE idingreso='$idingreso'");
 	$nuevoTotal = $totalRow ? (float)$totalRow['total'] : 0;
 	ejecutarConsulta("UPDATE ingreso SET total_compra='$nuevoTotal' WHERE idingreso='$idingreso'");
+	// Sincronizar lote_articulo con los cambios del detalle
+	$idloteExistente = isset($rowDet['idlote']) ? (int)$rowDet['idlote'] : 0;
+	if ($idloteExistente > 0) {
+		$fvLoteSQL = $fecha_vencimiento !== '' ? "'$fecha_vencimiento'" : 'NULL';
+		ejecutarConsulta("UPDATE lote_articulo SET numero_lote='$numero_lote', fecha_vencimiento=$fvLoteSQL, cantidad_inicial = cantidad_inicial + '$diferencia', cantidad_actual = cantidad_actual + '$diferencia' WHERE idlote='$idloteExistente'");
+	} elseif ($numero_lote !== '' && $fecha_vencimiento !== '') {
+		// No había lote vinculado aún: crear uno y vincularlo al detalle
+		$fvLoteSQL = "'$fecha_vencimiento'";
+		$sqlNuevoLote = "INSERT INTO lote_articulo (idarticulo,numero_lote,fecha_vencimiento,cantidad_inicial,cantidad_actual,idingreso,condicion) VALUES ('".(int)$rowDet['idarticulo']."','$numero_lote',$fvLoteSQL,'$cantidad','$cantidad','".(int)$rowDet['idingreso']."',1)";
+		$idloteNuevo = ejecutarConsulta_retornarID($sqlNuevoLote);
+		if ($idloteNuevo) {
+			ejecutarConsulta("UPDATE detalle_ingreso SET idlote='$idloteNuevo' WHERE iddetalle_ingreso='$iddetalle'");
+		}
+	}
 	return array("ok"=>true, "message"=>"Detalle actualizado correctamente", "nuevo_total"=>$nuevoTotal);
 }
 

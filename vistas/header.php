@@ -91,7 +91,7 @@ if (!function_exists('darkenHexColor')) {
   <link rel="stylesheet" href="../public/css/AdminLTE.min.css">
   <link rel="stylesheet" href="../public/css/_all-skins.min.css">
   <link rel="stylesheet" href="../public/css/custom-theme.css?v=20260527d">
-  <link rel="stylesheet" href="../public/css/pos.css?v=20260528b">
+  <link rel="stylesheet" href="../public/css/pos.css?v=20260530d">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="icon" href="<?php echo htmlspecialchars($brandLogo); ?>" type="image/png">

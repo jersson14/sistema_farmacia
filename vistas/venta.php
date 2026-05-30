@@ -153,11 +153,7 @@ if ($_SESSION['ventas']==1) {
                 <p>Cargando productos...</p>
               </div>
             </div>
-            <div class="pos-grid-footer" id="posGridFooter" style="display:none">
-              <button type="button" class="btn btn-default btn-sm" id="btnVerMasProductos">
-                <i class="fa fa-chevron-down"></i> Ver más productos
-              </button>
-            </div>
+            <div class="pos-grid-footer" id="posGridFooter" style="display:none"></div>
           </div>
 
           <!-- RIGHT: Carrito -->
@@ -492,7 +488,7 @@ if ($_SESSION['ventas']==1) {
 }
 require 'footer.php';
  ?>
- <script src="scripts/venta.js?v=20260529a"></script>
+ <script src="scripts/venta.js?v=20260530a"></script>
  <?php
 }
 ob_end_flush();

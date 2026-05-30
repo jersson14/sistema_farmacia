@@ -1013,6 +1013,16 @@ function guardarFilaDetalle(iddetalle) {
 				var sym = window.appCurrencySymbol || "S/";
 				$("#det-total-view").text(sym + " " + parseFloat(r.nuevo_total).toFixed(2));
 			}
+			// Recargar la tabla de detalles para reflejar los nuevos valores
+			var idingreso = $("#idingreso").val();
+			if (idingreso) {
+				$.post("../ajax/ingreso.php?op=listarDetalle&id=" + idingreso, function(html) {
+					$("#detalles").html(html);
+					actualizarContadorItems();
+				});
+			}
+			// Actualizar silenciosamente el listado principal
+			if (tabla) { tabla.ajax.reload(null, false); }
 		} else {
 			notifyIngreso("error", r.message || "No se pudo actualizar.");
 		}

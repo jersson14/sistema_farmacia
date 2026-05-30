@@ -7,6 +7,8 @@ var borradorTimerVenta = null;
 var posProductos = [];         // full product list loaded from server
 var posCatActiva = '';         // '' = all
 var posSearchTimer = null;
+var posCurrentPage = 1;        // página actual del grid (1-indexed)
+var posPorPagina   = 20;       // productos por página
 var empresaDefaults = {
 	serie_boleta: "B001",
 	serie_factura: "F001",
@@ -130,11 +132,20 @@ function renderGrid() {
 
 	if (lista.length === 0) {
 		$("#posProductGrid").html('<div class="pos-grid-empty"><i class="fa fa-search fa-2x"></i><br>Sin resultados.</div>');
+		renderPaginador(0, 0);
 		return;
 	}
 
+	var totalPaginas = Math.ceil(lista.length / posPorPagina);
+	if (posCurrentPage > totalPaginas) posCurrentPage = totalPaginas;
+	if (posCurrentPage < 1) posCurrentPage = 1;
+
+	var inicio  = (posCurrentPage - 1) * posPorPagina;
+	var fin     = Math.min(inicio + posPorPagina, lista.length);
+	var pagina  = lista.slice(inicio, fin);
+
 	var html = '';
-	lista.forEach(function(p) {
+	pagina.forEach(function(p) {
 		var sinStock = p.stock <= 0;
 		var precio   = (p.precio_venta > 0) ? ((window.appCurrencySymbol || 'S/') + ' ' + p.precio_venta.toFixed(2)) : 'Sin precio';
 		var badgeCls = p.tipo_venta === 'OTC' ? 'badge-otc' : (p.tipo_venta === 'RX' ? 'badge-rx' : 'badge-ctrl');
@@ -156,6 +167,75 @@ function renderGrid() {
 		'</div>';
 	});
 	$("#posProductGrid").html(html);
+	renderPaginador(totalPaginas, lista.length);
+	// Siempre volver al tope al cambiar página
+	var $grid = $("#posProductGrid");
+	if ($grid[0]) $grid[0].scrollTop = 0;
+}
+
+function renderPaginador(totalPaginas, totalItems) {
+	var $footer = $("#posGridFooter");
+	if (totalPaginas <= 1) {
+		$footer.hide();
+		return;
+	}
+	$footer.show();
+
+	var desde = (posCurrentPage - 1) * posPorPagina + 1;
+	var hasta = Math.min(posCurrentPage * posPorPagina, totalItems);
+
+	var html = '<div class="pos-paginador">';
+	html += '<span class="pos-pag-info">' + desde + '-' + hasta + ' de ' + totalItems + '</span>';
+	html += '<div class="pos-pag-btns">';
+
+	// Anterior
+	html += '<button type="button" class="pos-pag-btn" onclick="posIrPagina(' + (posCurrentPage - 1) + ')"' + (posCurrentPage <= 1 ? ' disabled' : '') + '>' +
+	        '<i class="fa fa-chevron-left"></i></button>';
+
+	// Páginas (máx 5 visibles, centradas en la actual)
+	var startPg = Math.max(1, posCurrentPage - 2);
+	var endPg   = Math.min(totalPaginas, posCurrentPage + 2);
+	// Ajustar ventana para mantener siempre 5 botones si hay suficientes
+	if (endPg - startPg < 4) {
+		if (startPg === 1) { endPg = Math.min(totalPaginas, startPg + 4); }
+		else               { startPg = Math.max(1, endPg - 4); }
+	}
+
+	if (startPg > 1) {
+		html += '<button type="button" class="pos-pag-btn" onclick="posIrPagina(1)">1</button>';
+		if (startPg > 2) html += '<span class="pos-pag-dots">&hellip;</span>';
+	}
+	for (var i = startPg; i <= endPg; i++) {
+		html += '<button type="button" class="pos-pag-btn' + (i === posCurrentPage ? ' active' : '') + '" onclick="posIrPagina(' + i + ')">' + i + '</button>';
+	}
+	if (endPg < totalPaginas) {
+		if (endPg < totalPaginas - 1) html += '<span class="pos-pag-dots">&hellip;</span>';
+		html += '<button type="button" class="pos-pag-btn" onclick="posIrPagina(' + totalPaginas + ')">' + totalPaginas + '</button>';
+	}
+
+	// Siguiente
+	html += '<button type="button" class="pos-pag-btn" onclick="posIrPagina(' + (posCurrentPage + 1) + ')"' + (posCurrentPage >= totalPaginas ? ' disabled' : '') + '>' +
+	        '<i class="fa fa-chevron-right"></i></button>';
+
+	html += '</div></div>';
+	$footer.html(html);
+}
+
+function posIrPagina(pag) {
+	var totalPaginas = Math.ceil(
+		posProductos.filter(function(p) {
+			var catId = posCatActiva ? parseInt(posCatActiva) : 0;
+			if (catId && p.idcategoria !== catId) return false;
+			var termino = ($("#posSearchInput").val() || "").toLowerCase().trim();
+			if (termino) {
+				return (p.nombre + ' ' + p.principio_activo + ' ' + p.codigo + ' ' + p.categoria)
+				       .toLowerCase().indexOf(termino) !== -1;
+			}
+			return true;
+		}).length / posPorPagina
+	);
+	posCurrentPage = Math.max(1, Math.min(pag, totalPaginas));
+	renderGrid();
 }
 
 function posCardClick(idarticulo) {
@@ -311,10 +391,10 @@ function init(){
    // POS search bar
    $("#posSearchInput").on("input keyup", function() {
    	clearTimeout(posSearchTimer);
-   	posSearchTimer = setTimeout(renderGrid, 200);
+   	posSearchTimer = setTimeout(function() { posCurrentPage = 1; renderGrid(); }, 200);
    });
    $("#posSearchInput").on("keydown", function(e) {
-   	if (e.key === "Enter") { clearTimeout(posSearchTimer); renderGrid(); }
+   	if (e.key === "Enter") { clearTimeout(posSearchTimer); posCurrentPage = 1; renderGrid(); }
    });
 
    // Category pills (delegated, pills added dynamically)
@@ -322,6 +402,7 @@ function init(){
    	$(".pos-cat-pill").removeClass("active");
    	$(this).addClass("active");
    	posCatActiva = $(this).attr("data-cat") || '';
+   	posCurrentPage = 1;
    	renderGrid();
    });
 

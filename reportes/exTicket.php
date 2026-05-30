@@ -343,33 +343,247 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
 
 </div><!-- /ticket-shell -->
 
-<button class="btn-print" onclick="window.print()">
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-  Imprimir ticket
-</button>
+<!-- ── Panel de impresión QZ Tray ─────────────────────────── -->
+<div id="qz-panel" style="margin-top:16px;font-family:Arial,sans-serif;max-width:320px;">
 
-<div id="print-tip" style="margin-top:14px;font-family:Arial,sans-serif;text-align:left;max-width:302px;background:#fffbe6;border:1px solid #f0c040;border-radius:6px;padding:10px 12px;">
-  <div style="font-size:11px;font-weight:700;color:#333;margin-bottom:6px;">&#128438; C&oacute;mo imprimir en tu ticketera:</div>
-  <ol style="font-size:11px;color:#444;margin:0;padding-left:16px;line-height:1.8;">
-    <li><strong>Destino</strong> &rarr; selecciona <strong>XP365B</strong> (o el nombre de tu impresora t&eacute;rmica)</li>
-    <li>El tama&ntilde;o de papel cambia a <strong>80mm autom&aacute;ticamente</strong></li>
-    <li>Clic en <strong>Imprimir</strong></li>
-  </ol>
-  <div style="font-size:10px;color:#888;margin-top:6px;border-top:1px solid #f0c040;padding-top:5px;">
-    &#9888; Si el preview se ve en hoja A4, es normal &mdash; al seleccionar la ticketera el tama&ntilde;o se ajusta solo.
+  <!-- Estado de conexión -->
+  <div id="qz-status" style="font-size:12px;padding:6px 10px;border-radius:5px;margin-bottom:8px;background:#e8f4fd;color:#1a6fa0;border:1px solid #b8d9f0;">
+    &#9679; Conectando con QZ Tray...
   </div>
+
+  <!-- Selector de impresora (visible al conectar) -->
+  <div id="qz-printer-wrap" style="display:none;margin-bottom:8px;">
+    <label style="font-size:12px;font-weight:700;color:#333;display:block;margin-bottom:3px;">Impresora:</label>
+    <select id="qz-printer-select" style="width:100%;padding:5px 8px;font-size:12px;border:1px solid #ccc;border-radius:4px;"></select>
+    <label style="font-size:12px;color:#555;margin-top:6px;display:flex;align-items:center;gap:5px;cursor:pointer;">
+      <input type="checkbox" id="chk-cajon" checked style="width:14px;height:14px;cursor:pointer;">
+      Abrir cajón de dinero al imprimir
+    </label>
+  </div>
+
+  <!-- Botón imprimir con QZ -->
+  <button id="btn-qz-print" style="display:none;width:100%;padding:10px;background:#1a6fa0;color:#fff;border:0;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:5px;"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+    Imprimir en ticketera
+  </button>
+
+  <!-- Fallback navegador -->
+  <button id="btn-browser-print" class="btn-print" onclick="window.print()" style="display:none;width:100%;margin-top:6px;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+    Imprimir desde navegador
+  </button>
+
+  <div id="qz-msg" style="font-size:11px;color:#888;margin-top:5px;min-height:16px;"></div>
 </div>
 
+<script src="../public/js/qz-tray.js"></script>
 <script>
-window.addEventListener('load', function() {
-  setTimeout(function(){
-    window.print();
-    window.addEventListener('afterprint', function(){
-      var t = document.getElementById('print-tip');
-      if (t) t.style.display = 'none';
+(function(){
+  var QZ_PRINTER_KEY  = 'qz_preferred_printer_farmacia';
+  var QZ_CAJON_KEY    = 'qz_abrir_cajon_farmacia';
+  var connected = false;
+
+  function setStatus(msg, tipo) {
+    var el = document.getElementById('qz-status');
+    if (!el) return;
+    var colores = {
+      ok:      { bg:'#e6f4ea', color:'#1e7e34', border:'#b2dfbb' },
+      error:   { bg:'#fdecea', color:'#b71c1c', border:'#f5c6c6' },
+      warning: { bg:'#fff8e1', color:'#7a5c00', border:'#ffe082' },
+      info:    { bg:'#e8f4fd', color:'#1a6fa0', border:'#b8d9f0' }
+    };
+    var c = colores[tipo] || colores.info;
+    el.style.background = c.bg;
+    el.style.color = c.color;
+    el.style.border = '1px solid ' + c.border;
+    el.textContent = msg;
+  }
+
+  function setMsg(msg) {
+    var el = document.getElementById('qz-msg');
+    if (el) el.textContent = msg;
+  }
+
+  function buildTicketHtml() {
+    var shell = document.querySelector('.ticket-shell');
+    if (!shell) return null;
+    var css = <?php
+      $cssPath = __DIR__ . '/../public/css/ticket.css';
+      echo json_encode(file_exists($cssPath) ? file_get_contents($cssPath) : '');
+    ?>;
+    return '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+           '<style>' + css + '</style>' +
+           '</head><body>' + shell.outerHTML + '</body></html>';
+  }
+
+  function cargarImpresoras() {
+    return qz.printers.find('').then(function(lista) {
+      if (!Array.isArray(lista)) lista = lista ? [lista] : [];
+      var sel = document.getElementById('qz-printer-select');
+      sel.innerHTML = '';
+      lista.forEach(function(p) {
+        var op = document.createElement('option');
+        op.value = p; op.textContent = p;
+        sel.appendChild(op);
+      });
+      // Restaurar impresora preferida guardada
+      var preferida = '';
+      try { preferida = localStorage.getItem(QZ_PRINTER_KEY) || ''; } catch(e) {}
+      if (preferida) {
+        for (var i = 0; i < sel.options.length; i++) {
+          if (sel.options[i].value === preferida) { sel.selectedIndex = i; break; }
+        }
+      }
+      // Restaurar preferencia de cajón — default: ACTIVADO
+      var chk = document.getElementById('chk-cajon');
+      if (chk) {
+        try {
+          var guardado = localStorage.getItem(QZ_CAJON_KEY);
+          // Solo se desactiva si el usuario lo apagó explícitamente ('0')
+          chk.checked = (guardado !== '0');
+        } catch(e) {}
+        chk.addEventListener('change', function() {
+          try { localStorage.setItem(QZ_CAJON_KEY, this.checked ? '1' : '0'); } catch(e) {}
+        });
+      }
+      document.getElementById('qz-printer-wrap').style.display = 'block';
+      document.getElementById('btn-qz-print').style.display = 'block';
+      document.getElementById('btn-browser-print').style.display = 'block';
+      return lista;
     });
-  }, 300);
-});
+  }
+
+  function abrirCajon(printer) {
+    // Comando ESC/POS estándar para abrir cajón (pin 2)
+    // ESC p m t1 t2  →  0x1B 0x70 0x00 0x3C 0x78
+    var rawConfig = qz.configs.create(printer);
+    return qz.print(rawConfig, [{
+      type: 'raw', format: 'plain', flavor: 'plain',
+      data: '\x1B\x70\x00\x3C\x78'
+    }]).catch(function() {
+      // Si pin 2 falla, intentar pin 5
+      return qz.print(rawConfig, [{
+        type: 'raw', format: 'plain', flavor: 'plain',
+        data: '\x1B\x70\x01\x3C\x78'
+      }]);
+    });
+  }
+
+  function imprimirQZ() {
+    var btn = document.getElementById('btn-qz-print');
+    var sel = document.getElementById('qz-printer-select');
+    var printer = sel ? sel.value : '';
+    if (!printer) { setMsg('Selecciona una impresora.'); return; }
+
+    // Guardar impresora preferida
+    try { localStorage.setItem(QZ_PRINTER_KEY, printer); } catch(e) {}
+
+    btn.disabled = true;
+    btn.textContent = 'Imprimiendo...';
+    setMsg('');
+
+    var html = buildTicketHtml();
+    if (!html) { setMsg('Error: no se encontró el contenido del ticket.'); btn.disabled = false; return; }
+
+    var config = qz.configs.create(printer, {
+      colorType: 'blackwhite',
+      copies: 1,
+      size: { width: 80, height: null },
+      units: 'mm',
+      rasterize: false
+    });
+
+    var abrirCajonActivado = false;
+    var chk = document.getElementById('chk-cajon');
+    if (chk) abrirCajonActivado = chk.checked;
+
+    var iconoSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:5px;"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
+
+    qz.print(config, [{ type: 'pixel', format: 'html', flavor: 'plain', data: html }])
+      .then(function() {
+        if (abrirCajonActivado) {
+          return abrirCajon(printer).catch(function() {});
+        }
+      })
+      .then(function() {
+        setMsg(abrirCajonActivado ? '✔ Impreso y cajón abierto.' : '✔ Impreso correctamente.');
+        btn.innerHTML = iconoSvg + ' Imprimir en ticketera';
+        btn.disabled = false;
+      })
+      .catch(function(err) {
+        setMsg('Error al imprimir: ' + (err.message || err));
+        btn.innerHTML = iconoSvg + ' Imprimir en ticketera';
+        btn.disabled = false;
+      });
+  }
+
+  // Modo anónimo — funciona en cualquier equipo con QZ Tray instalado
+  // (requiere que "Block anonymous requests" esté desmarcado en QZ Tray)
+  function setupSeguridad() {
+    qz.security.setCertificatePromise(function(resolve) { resolve(); });
+    qz.security.setSignatureAlgorithm('SHA512');
+    qz.security.setSignaturePromise(function() {
+      return function(resolve) { resolve(); };
+    });
+  }
+
+  function intentarConexion(segura) {
+    return qz.websocket.connect({
+      host: 'localhost',
+      port: { secure: 8181, insecure: 8182 },
+      usingSecure: segura,
+      keepAlive: 60
+    });
+  }
+
+  function alConectar(lista) {
+    if (lista.length > 0) {
+      setTimeout(function() { imprimirQZ(); }, 400);
+    }
+  }
+
+  function conectarQZ() {
+    if (!window.qz) { sinQZ(); return; }
+
+    setupSeguridad();
+
+    // 1er intento: WSS:8181 (funciona desde HTTP y HTTPS — localhost es origen seguro)
+    intentarConexion(true)
+      .then(function() {
+        connected = true;
+        setStatus('&#9679; QZ Tray conectado', 'ok');
+        return cargarImpresoras();
+      })
+      .then(alConectar)
+      .catch(function() {
+        // 2do intento: WS:8182
+        intentarConexion(false)
+          .then(function() {
+            connected = true;
+            setStatus('&#9679; QZ Tray conectado', 'ok');
+            return cargarImpresoras();
+          })
+          .then(alConectar)
+          .catch(function(err) {
+            console.warn('QZ Tray no disponible:', err);
+            sinQZ();
+          });
+      });
+  }
+
+  function sinQZ() {
+    setStatus('&#9679; QZ Tray no disponible — usando navegador', 'warning');
+    document.getElementById('btn-browser-print').style.display = 'block';
+    setMsg('Asegúrate de que QZ Tray esté ejecutándose en la barra de tareas.');
+    setTimeout(function() { window.print(); }, 300);
+  }
+
+  document.getElementById('btn-qz-print').addEventListener('click', imprimirQZ);
+
+  window.addEventListener('load', function() {
+    setTimeout(conectarQZ, 300);
+  });
+})();
 </script>
 </body>
 </html>

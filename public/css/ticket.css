@@ -67,8 +67,8 @@ body {
 }
 
 .brand-logo {
-  max-width: 220px;
-  max-height: 100px;
+  max-width: 240px;
+  max-height: 180px;
   object-fit: contain;
   display: block;
 }
@@ -492,8 +492,8 @@ body {
     padding: 5px 8px 5px !important;
   }
 
-  /* Logo más pequeño para ahorrar papel */
-  .brand-logo { max-height: 55px !important; margin-bottom: 3px !important; }
+  /* Logo en impresión */
+  .brand-logo { max-height: 110px !important; max-width: 240px !important; margin-bottom: 3px !important; }
   .brand-logo-wrap { margin-bottom: 3px !important; }
 
   .brand-ruc  { font-size: 12px !important; margin-top: 2px !important; }
