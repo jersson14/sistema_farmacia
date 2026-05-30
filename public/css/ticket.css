@@ -216,6 +216,9 @@ body {
   font-weight: 700;
   color: #111;
   line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .client-doc {
@@ -447,7 +450,7 @@ body {
     background: #fff !important;
     display: block !important;
     font-family: Arial, Helvetica, sans-serif !important;
-    font-size: 13px !important;
+    font-size: 12px !important;
     font-weight: 700 !important;
     color: #000 !important;
     -webkit-print-color-adjust: exact;
@@ -463,7 +466,7 @@ body {
   .ticket-shell p {
     color: #000 !important;
     font-family: Arial, Helvetica, sans-serif !important;
-    font-size: 13px !important;
+    font-size: 12px !important;
     font-weight: 700 !important;
     font-style: normal !important;
     -webkit-print-color-adjust: exact;
@@ -481,44 +484,55 @@ body {
   .ticket-shell::before,
   .ticket-shell::after { display: none !important; }
 
-  /* Cabecera */
+  /* Cabecera — compacta */
   .ticket-head {
     background: #fff !important;
     color: #000 !important;
     border-bottom: 2px solid #000 !important;
+    padding: 5px 8px 5px !important;
   }
 
-  .brand-ruc  { font-size: 14px !important; }
-  .brand-addr { font-size: 13px !important; }
+  /* Logo más pequeño para ahorrar papel */
+  .brand-logo { max-height: 55px !important; margin-bottom: 3px !important; }
+  .brand-logo-wrap { margin-bottom: 3px !important; }
+
+  .brand-ruc  { font-size: 12px !important; margin-top: 2px !important; }
+  .brand-addr { font-size: 11px !important; margin-top: 1px !important; line-height: 1.3 !important; }
 
   /* Comprobante */
-  .doc-badge  { background: #fff !important; }
-  .doc-tipo   { font-size: 13px !important; color: #000 !important; }
-  .doc-numero { font-size: 20px !important; font-weight: 900 !important; color: #000 !important; }
+  .doc-badge  { background: #fff !important; padding: 4px 8px !important; }
+  .doc-tipo   { font-size: 11px !important; color: #000 !important; }
+  .doc-numero { font-size: 17px !important; font-weight: 900 !important; color: #000 !important; margin-top: 1px !important; }
 
   /* Grilla info */
-  .info-label { font-size: 12px !important; color: #000 !important; }
-  .info-value { font-size: 13px !important; color: #000 !important; }
+  .info-grid  { margin-bottom: 3px !important; }
+  .info-label { font-size: 11px !important; color: #000 !important; }
+  .info-value { font-size: 12px !important; color: #000 !important; }
 
   /* Cliente */
-  .client-block   { background: #fff !important; border-color: #000 !important; }
-  .client-title   { font-size: 12px !important; color: #000 !important; }
-  .client-name    { font-size: 14px !important; color: #000 !important; }
-  .client-doc     { font-size: 13px !important; color: #000 !important; }
+  .client-block   { background: #fff !important; border-color: #000 !important; padding: 3px 5px !important; margin: 3px 0 4px !important; }
+  .client-header  { margin-bottom: 1px !important; }
+  .client-title   { font-size: 11px !important; color: #000 !important; }
+  .client-name    { font-size: 12px !important; color: #000 !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+  .client-doc     { font-size: 11px !important; color: #000 !important; margin-top: 0 !important; }
 
   /* Sección ítems */
-  .items-section-title { font-size: 13px !important; color: #000 !important; }
+  .items-section-title { font-size: 11px !important; color: #000 !important; margin: 2px 0 2px !important; }
 
   /* Tabla */
-  .items-table th  { font-size: 12px !important; color: #000 !important; }
-  .items-table td  { font-size: 13px !important; color: #000 !important; }
+  .items-table th  { font-size: 11px !important; color: #000 !important; padding: 2px 2px !important; }
+  .items-table td  { font-size: 12px !important; color: #000 !important; padding: 2px 2px !important; line-height: 1.3 !important; }
   .items-table .price  { color: #000 !important; font-weight: 700 !important; }
   .items-table .amount { color: #000 !important; font-weight: 900 !important; }
-  .item-dci  { font-size: 12px !important; color: #000 !important; font-style: normal !important; }
-  .item-lote { font-size: 12px !important; color: #000 !important; }
+  .item-dci  { font-size: 11px !important; color: #000 !important; font-style: normal !important; }
+  .item-lote { font-size: 11px !important; color: #000 !important; }
+
+  /* Separadores */
+  .sep-dash { margin: 3px 0 !important; }
 
   /* Totales secundarios */
-  .totals-row      { font-size: 13px !important; color: #000 !important; }
+  .totals-block   { margin-top: 2px !important; padding-top: 2px !important; }
+  .totals-row     { font-size: 12px !important; color: #000 !important; padding: 0 !important; }
   .totals-row span { color: #000 !important; font-weight: 700 !important; }
 
   /* Total principal */
@@ -526,38 +540,44 @@ body {
     background: #fff !important;
     border-top: 2px solid #000 !important;
     border-bottom: 2px solid #000 !important;
+    margin: 4px 0 2px !important;
+    padding: 4px 4px !important;
   }
-  .totals-main-label  { font-size: 14px !important; color: #000 !important; }
-  .totals-main-amount { font-size: 26px !important; font-weight: 900 !important; color: #000 !important; }
+  .totals-main-label  { font-size: 12px !important; color: #000 !important; }
+  .totals-main-amount { font-size: 22px !important; font-weight: 900 !important; color: #000 !important; }
 
   /* Pago */
-  .pago-row  { font-size: 13px !important; color: #000 !important; }
+  .pago-block { padding-top: 2px !important; margin-top: 2px !important; }
+  .pago-row   { font-size: 12px !important; color: #000 !important; padding: 0 !important; }
   .pago-row strong { color: #000 !important; }
 
   /* Vuelto */
-  .cambio-block  { border-color: #000 !important; }
-  .cambio-label  { font-size: 13px !important; color: #000 !important; }
-  .cambio-amount { font-size: 18px !important; font-weight: 900 !important; color: #000 !important; }
+  .cambio-block  { border-color: #000 !important; padding: 3px 5px !important; margin: 3px 0 !important; }
+  .cambio-label  { font-size: 12px !important; color: #000 !important; }
+  .cambio-amount { font-size: 15px !important; font-weight: 900 !important; color: #000 !important; }
 
   /* Seguro */
-  .seguro-block { border-color: #000 !important; font-size: 13px !important; color: #000 !important; }
-  .seguro-title { font-size: 13px !important; color: #000 !important; }
+  .seguro-block { border-color: #000 !important; font-size: 11px !important; color: #000 !important; padding: 3px 5px !important; margin: 3px 0 !important; }
+  .seguro-title { font-size: 11px !important; color: #000 !important; }
 
   /* Mensaje legal */
   .ticket-body > div[style*="font-size:12px"] {
-    font-size: 12px !important;
+    font-size: 11px !important;
     color: #000 !important;
+    margin-top: 2px !important;
   }
 
-  /* Pie */
-  .ticket-foot    { border-top: 1px dashed #000 !important; }
-  .gracias        { font-size: 14px !important; color: #000 !important; }
-  .gracias-sub    { font-size: 13px !important; color: #000 !important; }
-  .foot-contact   { font-size: 13px !important; color: #000 !important; }
-  .foot-legal     { font-size: 12px !important; color: #000 !important; }
+  /* Pie — muy compacto */
+  .ticket-foot    { border-top: 1px dashed #000 !important; padding: 4px 0 2px !important; margin-top: 3px !important; }
+  .gracias        { font-size: 12px !important; color: #000 !important; margin-bottom: 0 !important; }
+  .gracias-sub    { font-size: 11px !important; color: #000 !important; margin-bottom: 1px !important; }
+  .foot-contact   { font-size: 11px !important; color: #000 !important; margin-top: 1px !important; }
+  .foot-legal     { font-size: 11px !important; color: #000 !important; line-height: 1.4 !important; }
 
-  /* Franja */
+  /* Franja decorativa — reducida */
   .foot-bar {
+    height: 3px !important;
+    margin: 3px 0 0 !important;
     background: repeating-linear-gradient(
       90deg,
       #000 0px, #000 6px,

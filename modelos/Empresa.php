@@ -100,7 +100,7 @@ class Empresa
         $direccion_linea1 = $direccion;
         $direccion_linea2 = '';
         if ($direccion !== '') {
-            $lineas = preg_split('/\r\n|\r|\n/', wordwrap($direccion, 58, "\n", false));
+            $lineas = preg_split('/\r\n|\r|\n/', wordwrap($direccion, 44, "\n", false));
             $direccion_linea1 = isset($lineas[0]) ? trim($lineas[0]) : '';
             $direccion_linea2 = isset($lineas[1]) ? trim($lineas[1]) : '';
         }
