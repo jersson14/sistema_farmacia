@@ -762,6 +762,18 @@ function limpiar(){
 
 }
 
+// Calcula la altura exacta del pos-wrapper en píxeles y la aplica.
+// Usa window.innerHeight (no 100vh) para evitar ambigüedad CSS.
+function ajustarAlturaPOS() {
+	var wrapper = document.getElementById('formularioregistros');
+	if (!wrapper) return;
+	var headerH = 80;
+	var statsEl = document.getElementById('resumenPagosVenta');
+	var statsH  = statsEl ? statsEl.getBoundingClientRect().height : 0;
+	var h = Math.max(window.innerHeight - headerH - statsH, 300);
+	wrapper.style.height = h + 'px';
+}
+
 //funcion mostrar formulario
 function mostrarform(flag, esNuevo){
 	limpiar();
@@ -770,8 +782,14 @@ function mostrarform(flag, esNuevo){
 			notifyVenta("warning", "Debes abrir la caja antes de registrar ventas.");
 			return;
 		}
+		$("body").addClass("pos-activo");
+		$("html").css("overflow", "hidden");
+		// scroll al tope antes de mostrar el POS para garantizar posición correcta
+		window.scrollTo(0, 0);
 		$("#listadoregistros").hide();
 		$("#formularioregistros").show();
+		ajustarAlturaPOS();
+		$(window).on('resize.pos', ajustarAlturaPOS);
 		$("#btnagregar").hide();
 		$("#btnGuardar").hide();
 		$("#btnCancelar").show();
@@ -790,8 +808,12 @@ function mostrarform(flag, esNuevo){
 			restaurarBorradorVenta();
 		}
 	}else{
+		$(window).off('resize.pos');
+		$("body").removeClass("pos-activo");
+		$("html").css("overflow", "");
 		$("#listadoregistros").show();
 		$("#formularioregistros").hide();
+		document.getElementById('formularioregistros').style.height = '';
 		$("#btnagregar").show();
 	}
 }

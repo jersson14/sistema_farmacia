@@ -488,7 +488,7 @@ if ($_SESSION['ventas']==1) {
 }
 require 'footer.php';
  ?>
- <script src="scripts/venta.js?v=20260530a"></script>
+ <script src="scripts/venta.js?v=20260531c"></script>
  <?php
 }
 ob_end_flush();

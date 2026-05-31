@@ -1,10 +1,26 @@
 /* POS — Point of Sale styles */
 
+/* ── Modo POS activo ────────────────────────────────────────────
+   1. html/body sin scroll (evita que el layout se desencuadre)
+   2. #mainCW sin padding y sin scroll propio
+   3. JS calcula la altura exacta del pos-wrapper en píxeles
+   ─────────────────────────────────────────────────────────────── */
+body.pos-activo,
+body.pos-activo > .wrapper {
+  overflow: hidden !important;
+}
+
+body.pos-activo #mainCW {
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
 .pos-wrapper {
   display: flex;
   flex-direction: column;
   width: 100%;
   box-sizing: border-box;
+  /* JS sobreescribe este valor con píxeles exactos */
   height: calc(100vh - 80px);
   overflow: hidden;
   background: #f4f7fb;
@@ -151,20 +167,43 @@
   color: #fff;
 }
 
-/* Body */
+/* ══════════════════════════════════════════════════════════════
+   LAYOUT POS — cadena flex completa
+   pos-wrapper (flex-col, altura fija por JS)
+     └─ form  (flex: 1, flex-col) ← necesario para cerrar la cadena
+          ├─ pos-topbar    (flex-shrink:0)
+          ├─ pos-cat-bar   (flex-shrink:0)
+          └─ pos-body      (flex:1 → llena lo que sobra)
+               ├─ pos-productos-panel (flex: 1 1 0px)
+               └─ pos-carrito-panel   (flex: 0 0 420px, nunca cambia)
+   ══════════════════════════════════════════════════════════════ */
+
+/* El <form> es display:block por defecto — lo convertimos en
+   flex-column para que sus hijos reciban la altura correcta     */
+.pos-wrapper > form {
+  flex: 1 1 0px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  width: 100%;
+}
+
 .pos-body {
   display: flex;
-  flex: 1 1 0;
+  flex-direction: row;
+  flex: 1 1 0px;
   overflow: hidden;
   min-height: 0;
   min-width: 0;
   width: 100%;
 }
 
-/* Products panel */
+/* Panel izquierdo: crece para ocupar TODO excepto el carrito */
 .pos-productos-panel {
-  flex: 1 1 0;
+  flex: 1 1 0px;   /* 0px explícito — el contenido nunca afecta el ancho */
   min-width: 0;
+  width: 0;        /* fuerza que el crecimiento parta de cero */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -353,32 +392,28 @@
   line-height: 28px;
 }
 
-/* Cart panel — el panel NO scrollea; solo scrollea el área de ítems */
+/* Panel del carrito — ancho fijo, nunca se encoge */
 .pos-carrito-panel {
   flex: 0 0 420px;
   width: 420px;
+  min-width: 420px;
   max-width: 420px;
-  min-width: 0;
   display: flex;
   flex-direction: column;
   background: #fff;
   overflow: hidden;
   min-height: 0;
+  border-left: 1px solid #e2e8f0;
 }
 
-@media (max-width: 1280px) {
-  .pos-carrito-panel { flex: 0 0 380px; width: 380px; max-width: 380px; }
+@media (max-width: 1280px) and (min-width: 901px) {
+  .pos-carrito-panel { flex: 0 0 380px; width: 380px; min-width: 380px; max-width: 380px; }
 }
-
-@media (max-width: 1100px) {
-  .pos-carrito-panel { flex: 0 0 340px; width: 340px; max-width: 340px; }
+@media (max-width: 1100px) and (min-width: 901px) {
+  .pos-carrito-panel { flex: 0 0 340px; width: 340px; min-width: 340px; max-width: 340px; }
 }
-
-/* Zona de transición desktop-tablet: viewport 901-960px con sidebar (230px)
-   deja solo ~670-730px de contenido. Reducir carrito para que productos no quede
-   aplastado. */
 @media (max-width: 960px) and (min-width: 901px) {
-  .pos-carrito-panel { flex: 0 0 300px; width: 300px; max-width: 300px; }
+  .pos-carrito-panel { flex: 0 0 300px; width: 300px; min-width: 300px; max-width: 300px; }
 }
 
 .pos-carrito-header {
@@ -810,7 +845,7 @@
    Se activa cuando el navegador hace zoom (100vh se achica)
    ════════════════════════════════════════════════════════════ */
 @media (max-height: 650px) {
-  .pos-wrapper { height: calc(100vh - 55px); }
+  body.pos-activo #mainCW { height: calc(100vh - 80px) !important; }
   .pos-topbar { padding: 4px 12px; }
   .pos-cat-bar { padding: 3px 12px; }
   .pos-carrito-header { padding: 5px 8px 3px; }
@@ -829,7 +864,7 @@
 }
 
 @media (max-height: 500px) {
-  .pos-wrapper { height: calc(100vh - 50px); }
+  body.pos-activo #mainCW { height: calc(100vh - 50px) !important; }
   .pos-topbar { padding: 3px 10px; }
   .pos-cat-bar { display: none; }
   .pos-totales { padding: 3px 10px; }
@@ -845,28 +880,31 @@
 /* ════════════════════════════════════════════════════════════
    TABLET (≤ 900px) — layout apilado básico
    ════════════════════════════════════════════════════════════ */
+/* Header baja a 54px en ≤767px (custom-theme.css) */
+@media (max-width: 767px) and (min-width: 600px) {
+  body.pos-activo #mainCW { height: calc(100dvh - 54px) !important; }
+  .pos-wrapper             { height: calc(100dvh - 54px); }
+}
+
 @media (max-width: 900px) and (min-width: 600px) {
-  .pos-wrapper { height: calc(100dvh - 60px); }
-  .pos-body { flex-direction: column; overflow: hidden; }
-  /*
-   * NO usar vh aquí: 55vh + 45vh = 100vh > pos-body (que descuenta
-   * header + topbar + catbar ≈ 170px). Con zoom alto el carrito se
-   * desborda y COBRAR queda oculto bajo el borde inferior.
-   * Solución: tamaño relativo al pos-body real (clamp + flex).
-   */
-  .pos-carrito-panel {
-    flex: 0 0 auto;
-    height: clamp(220px, 55%, 100%);
-    width: 100%;
-    max-width: 100%;
-    border-right: 0;
-    border-top: 1px solid #e2e8f0;
-  }
+  /* Tablet: carrito en la mitad inferior, productos en la superior */
+  .pos-body { position: relative; overflow: hidden; }
+
   .pos-productos-panel {
-    flex: 1 1 0;
-    min-height: 80px;
-    height: auto;
+    position: absolute;
+    left: 0; right: 0; top: 0;
+    bottom: clamp(200px, 45%, 60%);
     border-right: 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .pos-carrito-panel {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    top: auto;
+    width: 100%;
+    height: clamp(200px, 45%, 60%);
+    border-left: 0;
+    border-top: 1px solid #e2e8f0;
   }
 }
 
@@ -876,8 +914,9 @@
 @media (max-width: 599px) {
 
   /* Wrapper: usa dvh para que browsers móviles no trunquen */
+  body.pos-activo #mainCW { height: calc(100dvh - 80px) !important; }
   .pos-wrapper {
-    height: calc(100dvh - 60px);
+    height: calc(100dvh - 80px);
     overflow: hidden;
   }
 

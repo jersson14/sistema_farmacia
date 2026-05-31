@@ -32,16 +32,15 @@ class PedidoOnline
             foreach ($items as $item) {
                 $idarticulo = (int)$item['idarticulo'];
                 $cantidad   = max(1, (int)$item['cantidad']);
-                // Validar que el artículo existe, es OTC y tiene stock
+                // Validar que el artículo existe, está activo y tiene stock
                 $art = ejecutarConsultaSimpleFila(
                     "SELECT a.idarticulo, a.nombre, a.stock,
-                            IFNULL(a.tipo_venta,'OTC') AS tipo_venta,
                             COALESCE(NULLIF(a.precio_venta,0),
                                 (SELECT di.precio_venta FROM detalle_ingreso di WHERE di.idarticulo=a.idarticulo ORDER BY di.iddetalle_ingreso DESC LIMIT 1),
                             0) AS precio_venta
                      FROM articulo a WHERE a.idarticulo='$idarticulo' AND a.condicion=1 LIMIT 1"
                 );
-                if (!$art || $art['tipo_venta'] !== 'OTC') {
+                if (!$art) {
                     $conexion->rollback(); $conexion->autocommit(true); return false;
                 }
                 if ((float)$art['stock'] < $cantidad) {

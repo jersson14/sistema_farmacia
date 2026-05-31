@@ -11,10 +11,10 @@ function cargarContadores() {
         var v90 = r.vence_90  || 0;
 
         var html = '';
-        html += kpiBox((v  > 0 ? 'bg-red'    : 'bg-green'), 'fa-times-circle',    'Vencidos',          v   + ' lote(s)');
-        html += kpiBox((v30> 0 ? 'bg-red'    : 'bg-green'), 'fa-exclamation',     '≤ 30 días',         v30 + ' lote(s)');
-        html += kpiBox((v60> 0 ? 'bg-yellow'  : 'bg-green'), 'fa-clock-o',         '≤ 60 días',         v60 + ' lote(s)');
-        html += kpiBox('bg-aqua',                             'fa-calendar',        '≤ 90 días',         v90 + ' lote(s)');
+        html += kpiBox((v  > 0 ? 'bg-red'    : 'bg-green'), 'fa-times-circle',    'Vencidos',  v   + ' lote(s)');
+        html += kpiBox((v30> 0 ? 'bg-red'    : 'bg-green'), 'fa-exclamation',     '≤ 30 días', v30 + ' lote(s)');
+        html += kpiBox((v60> 0 ? 'bg-yellow'  : 'bg-green'), 'fa-clock-o',        '≤ 60 días', v60 + ' lote(s)');
+        html += kpiBox('bg-aqua',                             'fa-calendar',       '≤ 90 días', v90 + ' lote(s)');
         $("#contadoresVenc").html(html);
     }).fail(function() {
         $("#contadoresVenc").html('<div class="col-xs-12"><div class="alert alert-warning">No se pudo cargar los contadores. Verifica que la migración de lotes haya sido ejecutada.</div></div>');
@@ -32,44 +32,43 @@ function kpiBox(bgClass, icon, label, value) {
 }
 
 function initTblVencidos() {
-    tblVencidos = $('#tblVencidos').dataTable({
-        aProcessing: true,
-        aServerSide: true,
+    if (tblVencidos) {
+        tblVencidos.destroy();
+        tblVencidos = null;
+    }
+    tblVencidos = $('#tblVencidos').DataTable({
+        processing: true,
         dom: 'Bfrtip',
         buttons: window.appDataTableButtons ? window.appDataTableButtons('Lotes Vencidos', true) : ['copy','csv','excel','print'],
         ajax: {
             url: '../ajax/lote.php?op=vencidos',
             type: 'get',
-            dataType: 'json',
+            dataSrc: 'aaData',
             error: function(e) { console.log(e.responseText); }
         },
-        bDestroy: true,
         iDisplayLength: 20,
         order: [[4, 'desc']]
-    }).DataTable();
+    });
 }
 
 function initTblProximos(dias) {
     if (tblProximos) {
         tblProximos.destroy();
-        $('#tblProximos').empty();
         tblProximos = null;
     }
-    tblProximos = $('#tblProximos').dataTable({
-        aProcessing: true,
-        aServerSide: true,
+    tblProximos = $('#tblProximos').DataTable({
+        processing: true,
         dom: 'Bfrtip',
         buttons: window.appDataTableButtons ? window.appDataTableButtons('Proximos a Vencer', true) : ['copy','csv','excel','print'],
         ajax: {
             url: '../ajax/lote.php?op=proximosVencer&dias=' + (dias || 30),
             type: 'get',
-            dataType: 'json',
+            dataSrc: 'aaData',
             error: function(e) { console.log(e.responseText); }
         },
-        bDestroy: true,
         iDisplayLength: 20,
         order: [[4, 'asc']]
-    }).DataTable();
+    });
 }
 
 $(function() {

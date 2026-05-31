@@ -11,11 +11,23 @@ $descripcion=isset($_POST["descripcion"])? limpiarCadena($_POST["descripcion"]):
 switch ($_GET["op"]) {
 	case 'guardaryeditar':
 		if (empty($idunidad)) {
-			$rspta=$unidad->insertar($nombre,$abreviatura,$descripcion);
-			echo $rspta ? "Unidad registrada correctamente" : "No se pudo registrar la unidad";
-		}else{
-			$rspta=$unidad->editar($idunidad,$nombre,$abreviatura,$descripcion);
-			echo $rspta ? "Unidad actualizada correctamente" : "No se pudo actualizar la unidad";
+			if ($unidad->existeAbreviatura($abreviatura)) {
+				echo json_encode(["ok" => false, "message" => "Ya existe una unidad con la abreviatura '$abreviatura'. Usa una abreviatura diferente."]);
+				break;
+			}
+			$rspta = $unidad->insertar($nombre, $abreviatura, $descripcion);
+			echo json_encode($rspta
+				? ["ok" => true,  "message" => "Unidad registrada correctamente"]
+				: ["ok" => false, "message" => "No se pudo registrar la unidad"]);
+		} else {
+			if ($unidad->existeAbreviatura($abreviatura, $idunidad)) {
+				echo json_encode(["ok" => false, "message" => "Ya existe otra unidad con la abreviatura '$abreviatura'. Usa una abreviatura diferente."]);
+				break;
+			}
+			$rspta = $unidad->editar($idunidad, $nombre, $abreviatura, $descripcion);
+			echo json_encode($rspta
+				? ["ok" => true,  "message" => "Unidad actualizada correctamente"]
+				: ["ok" => false, "message" => "No se pudo actualizar la unidad"]);
 		}
 		break;
 

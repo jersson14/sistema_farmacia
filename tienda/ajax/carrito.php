@@ -10,14 +10,13 @@ if (!isset($_SESSION['carrito_tienda'])) {
     $_SESSION['carrito_tienda'] = array();
 }
 
-// Verificar si la columna tipo_venta existe
+// Verificar si la columna precio_venta existe en articulo
 function _tiendaColumnExists($col) {
     global $conexion;
     $r = $conexion->query("SHOW COLUMNS FROM `articulo` LIKE '$col'");
     return $r && $r->num_rows > 0;
 }
-$_tieneTipoVenta    = _tiendaColumnExists('tipo_venta');
-$_tienePrecioVenta  = _tiendaColumnExists('precio_venta');
+$_tienePrecioVenta = _tiendaColumnExists('precio_venta');
 
 try {
 switch ($op) {
@@ -27,14 +26,13 @@ switch ($op) {
         $qty = max(1, (int)($_POST['cantidad'] ?? 1));
         if ($id <= 0) { echo json_encode(array('ok'=>false,'message'=>'Producto invalido')); break; }
 
-        $filtroOtc  = $_tieneTipoVenta   ? "AND tipo_venta='OTC'" : '';
         $precioExpr = $_tienePrecioVenta
             ? "COALESCE(NULLIF(a.precio_venta,0),(SELECT di.precio_venta FROM detalle_ingreso di WHERE di.idarticulo=a.idarticulo ORDER BY di.iddetalle_ingreso DESC LIMIT 1),0)"
             : "IFNULL((SELECT di.precio_venta FROM detalle_ingreso di WHERE di.idarticulo=a.idarticulo ORDER BY di.iddetalle_ingreso DESC LIMIT 1),0)";
         $art = ejecutarConsultaSimpleFila(
             "SELECT idarticulo, nombre, stock, condicion, IFNULL(imagen,'') AS imagen,
                     $precioExpr AS precio_venta
-             FROM articulo a WHERE idarticulo='$id' AND condicion=1 $filtroOtc LIMIT 1"
+             FROM articulo a WHERE idarticulo='$id' AND condicion=1 LIMIT 1"
         );
         if (!$art) { echo json_encode(array('ok'=>false,'message'=>'Producto no disponible en la tienda')); break; }
 

@@ -5,6 +5,13 @@ class Unidad{
 	public function __construct(){
 	}
 
+	public function existeAbreviatura($abreviatura, $excluirId = null){
+		$sql = "SELECT idunidad FROM unidad_medida WHERE abreviatura='$abreviatura'";
+		if ($excluirId) $sql .= " AND idunidad <> '$excluirId'";
+		$q = ejecutarConsulta($sql);
+		return $q && $q->num_rows > 0;
+	}
+
 	public function insertar($nombre, $abreviatura, $descripcion){
 		$sql="INSERT INTO unidad_medida (nombre,abreviatura,descripcion,condicion) VALUES ('$nombre','$abreviatura','$descripcion','1')";
 		return ejecutarConsulta($sql);

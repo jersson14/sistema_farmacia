@@ -65,10 +65,20 @@ function guardaryeditar(e){
 		data: formData,
 		contentType: false,
 		processData: false,
+		dataType: "json",
 		success: function(datos){
-			bootbox.alert(datos);
-			mostrarform(false);
-			tabla.ajax.reload();
+			if (datos.ok) {
+				appNotify(datos.message, "success");
+				mostrarform(false);
+				tabla.ajax.reload();
+			} else {
+				bootbox.alert(datos.message);
+				$("#btnGuardar").prop("disabled", false);
+			}
+		},
+		error: function(){
+			bootbox.alert("Error al conectar con el servidor");
+			$("#btnGuardar").prop("disabled", false);
 		}
 	});
 

@@ -446,12 +446,13 @@ function mostrar(idingreso){
 			$("#btnGuardar").hide();
 			$("#btnCancelar").show();
 			$("#btnAgregarArt").hide();
-		});
-	$.post("../ajax/ingreso.php?op=listarDetalle&id="+idingreso,function(r){
-		$("#detalles").html(r);
-		actualizarContadorItems();
-	});
 
+			// Cargar detalle DESPUÉS de limpiar el formulario para evitar race condition
+			$.post("../ajax/ingreso.php?op=listarDetalle&id="+idingreso, function(r){
+				$("#detalles").html(r);
+				actualizarContadorItems();
+			});
+		});
 }
 
 

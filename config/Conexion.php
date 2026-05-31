@@ -16,11 +16,14 @@ date_default_timezone_set('America/Lima');
 mysqli_query($conexion, "SET time_zone = '-05:00'"  );
 
 if (!function_exists('ejecutarConsulta')) {
-	Function ejecutarConsulta($sql){ 
-global $conexion;
-$query=$conexion->query($sql);
-return $query;
-
+	function ejecutarConsulta($sql){
+		global $conexion;
+		try {
+			$query = $conexion->query($sql);
+			return $query;
+		} catch (mysqli_sql_exception $e) {
+			return false;
+		}
 	}
 
 	function ejecutarConsultaSimpleFila($sql){
