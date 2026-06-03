@@ -429,9 +429,21 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
       // Restaurar impresora preferida guardada
       var preferida = '';
       try { preferida = localStorage.getItem(QZ_PRINTER_KEY) || ''; } catch(e) {}
+      var encontrada = false;
       if (preferida) {
         for (var i = 0; i < sel.options.length; i++) {
-          if (sel.options[i].value === preferida) { sel.selectedIndex = i; break; }
+          if (sel.options[i].value === preferida) { sel.selectedIndex = i; encontrada = true; break; }
+        }
+      }
+      // Si no hay preferencia guardada (o ya no existe), buscar impresora tipo ticketera
+      if (!encontrada) {
+        var palabrasCaja = ['caja','ticket','thermal','termica','térmica','pos','receipt','80mm','58mm','tmt','epson tm','star'];
+        for (var j = 0; j < sel.options.length; j++) {
+          var nombre = sel.options[j].value.toLowerCase();
+          for (var k = 0; k < palabrasCaja.length; k++) {
+            if (nombre.indexOf(palabrasCaja[k]) !== -1) { sel.selectedIndex = j; break; }
+          }
+          if (sel.selectedIndex === j) break;
         }
       }
       // Restaurar preferencia de cajón — default: ACTIVADO
