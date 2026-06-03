@@ -1137,7 +1137,7 @@ function procesarExitoVenta(r){
 		// Abrir gaveta via QZ Tray usando la impresora guardada en localStorage
 		abrirGavetaQZ();
 	}
-	mostrarform(false);
+	mostrarform(true, true);
 	listar();
 }
 

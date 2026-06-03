@@ -50,25 +50,7 @@ $telefono = !empty($cfgEmpresa['telefono'])         ? $cfgEmpresa['telefono']   
 $email    = !empty($cfgEmpresa['email'])            ? $cfgEmpresa['email']           : '';
 $web      = !empty($cfgEmpresa['web'])              ? $cfgEmpresa['web']             : '';
 
-// Logo: buscar en archivos de empresa
-$logo = '';
-if (!empty($cfgEmpresa['logo'])) {
-    $logoFS = realpath(__DIR__ . '/../files/empresa/' . $cfgEmpresa['logo']);
-    if ($logoFS && file_exists($logoFS)) {
-        $logo = '../files/empresa/' . $cfgEmpresa['logo'];
-    }
-}
-// Fallback: buscar logo genérico de la farmacia
-if (!$logo) {
-    $candidatos = [
-        __DIR__ . '/../files/famacia.png'  => '../files/famacia.png',
-        __DIR__ . '/logo.png'              => 'logo.png',
-        __DIR__ . '/logo1.jpeg'            => 'logo1.jpeg',
-    ];
-    foreach ($candidatos as $path => $url) {
-        if (file_exists($path)) { $logo = $url; break; }
-    }
-}
+$logo = '../files/farma2.png';
 
 $total    = (float)$reg->total_venta;
 $impuesto = (float)$reg->impuesto;
@@ -159,7 +141,7 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
       <?php endif; ?>
       <div class="info-col" style="text-align:right">
         <span class="info-label">Atendido por</span>
-        <span class="info-value"><?php echo esc($reg->usuario); ?></span>
+        <span class="info-value"><?php echo esc(explode(' ', trim($reg->usuario))[0]); ?></span>
       </div>
     </div>
 
@@ -178,7 +160,6 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
     </div>
 
     <!-- Detalle de ítems -->
-    <div class="items-section-title">&#9679; Detalle de productos</div>
     <table class="items-table">
       <thead>
         <tr>
@@ -209,9 +190,7 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
             <?php if (!empty($d->unidad) && $d->unidad !== 'und' && $d->unidad !== 'UND'): ?>
             <span style="font-size:12px;color:#777"> (<?php echo esc($d->unidad); ?>)</span>
             <?php endif; ?>
-            <?php if (!empty($d->principio_activo)): ?>
-            <span class="item-dci"><?php echo esc($d->principio_activo); ?></span>
-            <?php endif; ?>
+
             <?php
             $lotePartes = [];
             if (!empty($d->numero_lote))       $lotePartes[] = 'Lote: ' . $d->numero_lote;
@@ -230,10 +209,6 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
 
     <!-- Totales secundarios -->
     <div class="totals-block">
-      <div class="totals-row">
-        <span><?php echo $itemCount; ?> art&iacute;culo<?php echo $itemCount !== 1 ? 's' : ''; ?></span>
-        <span style="color:#888"><?php echo number_format($cantTotal, 0); ?> unidades</span>
-      </div>
       <hr class="sep-dash" style="margin:4px 0">
       <?php if ($impuesto > 0): ?>
       <div class="totals-row">
@@ -265,24 +240,6 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
       <div class="pago-row">
         <span>Forma de pago</span>
         <strong><?php echo esc($metodoPago); ?></strong>
-      </div>
-      <?php endif; ?>
-      <?php if ($montoEfectivo > 0): ?>
-      <div class="pago-row">
-        <span>Efectivo</span>
-        <span><?php echo mon($montoEfectivo, $simbolo); ?></span>
-      </div>
-      <?php endif; ?>
-      <?php if ($montoTarjeta > 0): ?>
-      <div class="pago-row">
-        <span>Tarjeta</span>
-        <span><?php echo mon($montoTarjeta, $simbolo); ?></span>
-      </div>
-      <?php endif; ?>
-      <?php if ($montoDigital > 0): ?>
-      <div class="pago-row">
-        <span>Yape / Plin</span>
-        <span><?php echo mon($montoDigital, $simbolo); ?></span>
       </div>
       <?php endif; ?>
     </div>
@@ -327,8 +284,6 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
       <div class="gracias-sub">Al cuidado de su salud</div>
       <?php if ($web): ?>
       <div class="foot-contact">&#127760; <?php echo esc($web); ?></div>
-      <?php elseif ($email): ?>
-      <div class="foot-contact">&#9993; <?php echo esc($email); ?></div>
       <?php endif; ?>
       <div class="foot-legal">
         Conserve su comprobante de pago.<br>
