@@ -437,13 +437,25 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
       }
       // Si no hay preferencia guardada (o ya no existe), buscar impresora tipo ticketera
       if (!encontrada) {
-        var palabrasCaja = ['caja','ticket','thermal','termica','térmica','pos','receipt','80mm','58mm','tmt','epson tm','star'];
-        for (var j = 0; j < sel.options.length; j++) {
+        var palabrasCaja    = ['caja','ticket','thermal','termica','térmica','pos','receipt','80mm','58mm','tmt','epson tm','star','xprinter','bixolon','citizen','sewoo','hoin','rongta','gprinter'];
+        var palabrasVirtual = ['fax','pdf','xps','onenote','microsoft','send to','imagen','image writer','novapdf','cutepdf','deskpdf','primopdf','snagit','papercut'];
+        // Paso 1: buscar por palabras clave de ticketera
+        outer1: for (var j = 0; j < sel.options.length; j++) {
           var nombre = sel.options[j].value.toLowerCase();
           for (var k = 0; k < palabrasCaja.length; k++) {
-            if (nombre.indexOf(palabrasCaja[k]) !== -1) { sel.selectedIndex = j; break; }
+            if (nombre.indexOf(palabrasCaja[k]) !== -1) { sel.selectedIndex = j; encontrada = true; break outer1; }
           }
-          if (sel.selectedIndex === j) break;
+        }
+        // Paso 2: si no hay ticketera, elegir la primera impresora que NO sea virtual
+        if (!encontrada) {
+          for (var j = 0; j < sel.options.length; j++) {
+            var nombre = sel.options[j].value.toLowerCase();
+            var esVirtual = false;
+            for (var k = 0; k < palabrasVirtual.length; k++) {
+              if (nombre.indexOf(palabrasVirtual[k]) !== -1) { esVirtual = true; break; }
+            }
+            if (!esVirtual) { sel.selectedIndex = j; encontrada = true; break; }
+          }
         }
       }
       // Restaurar preferencia de cajón — default: ACTIVADO
@@ -550,7 +562,15 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
 
   function alConectar(lista) {
     if (lista.length > 0) {
-      setTimeout(function() { imprimirQZ(); }, 400);
+      var sel = document.getElementById('qz-printer-select');
+      var impresora = sel ? sel.value.toLowerCase() : '';
+      var virtuales = ['fax','pdf','xps','onenote','microsoft','send to','imagen','image writer','novapdf','cutepdf','deskpdf','primopdf','snagit','papercut'];
+      var esVirtual = virtuales.some(function(v){ return impresora.indexOf(v) !== -1; });
+      if (!esVirtual) {
+        setTimeout(function() { imprimirQZ(); }, 400);
+      } else {
+        setMsg('Selecciona la impresora de tickets antes de imprimir.');
+      }
     }
   }
 
