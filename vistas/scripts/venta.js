@@ -9,15 +9,22 @@ function abrirGavetaQZ() {
 	try { printer = localStorage.getItem(QZ_PRINTER_KEY) || ''; } catch(e) {}
 	if (!printer) return;
 
-	var ESC_P_PIN2 = '\x1B\x70\x00\x3C\x78';
-	var ESC_P_PIN5 = '\x1B\x70\x01\x3C\x78';
+	// ESC p pin t1 t2 (Epson/compatible) y DLE DC4 (impresoras chinas: XPrinter, HOIN, Rongta)
+	var pin2a  = btoa('\x1B\x70\x00\x3C\x78');  // pin 2 — 60/120 ms
+	var pin2b  = btoa('\x1B\x70\x00\x19\xFA');  // pin 2 — 25/250 ms
+	var pin5   = btoa('\x1B\x70\x01\x3C\x78');  // pin 5
+	var dleDc4 = btoa('\x10\x14\x01\x00\x05');  // DLE DC4 — alternativo para impresoras chinas
+
+	function enviar(b64) {
+		var cfg = qz.configs.create(printer);
+		return qz.print(cfg, [{ type: 'raw', format: 'plain', flavor: 'base64', data: b64 }]);
+	}
 
 	function enviarComando() {
-		var cfg = qz.configs.create(printer);
-		return qz.print(cfg, [{ type: 'raw', format: 'plain', flavor: 'plain', data: ESC_P_PIN2 }])
-			.catch(function() {
-				return qz.print(cfg, [{ type: 'raw', format: 'plain', flavor: 'plain', data: ESC_P_PIN5 }]);
-			});
+		return enviar(pin2a)
+			.catch(function() { return enviar(pin2b); })
+			.catch(function() { return enviar(pin5); })
+			.catch(function() { return enviar(dleDc4); });
 	}
 
 	function setupSeguridad() {

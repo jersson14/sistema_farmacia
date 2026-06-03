@@ -367,6 +367,11 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
     Imprimir en ticketera
   </button>
 
+  <!-- Probar gaveta -->
+  <button id="btn-test-cajon" style="display:none;width:100%;margin-top:6px;padding:8px;background:#5a6268;color:#fff;border:0;border-radius:6px;font-size:12px;cursor:pointer;">
+    &#9654; Probar apertura de gaveta
+  </button>
+
   <!-- Fallback navegador -->
   <button id="btn-browser-print" class="btn-print" onclick="window.print()" style="display:none;width:100%;margin-top:6px;">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
@@ -512,6 +517,7 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
       }
       document.getElementById('qz-printer-wrap').style.display = 'block';
       document.getElementById('btn-qz-print').style.display = 'block';
+      document.getElementById('btn-test-cajon').style.display = 'block';
       document.getElementById('btn-browser-print').style.display = 'block';
       return lista;
     }
@@ -520,13 +526,10 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
   function abrirCajon(printer) {
     var rawConfig = qz.configs.create(printer);
 
-    // btoa() codifica los bytes incluyendo \x00 (null byte) sin truncar
-    // ESC p 0 60 120 → pin 2 (0x1B 0x70 0x00 0x3C 0x78)
-    var pin2a = btoa('\x1B\x70\x00\x3C\x78');
-    // ESC p 0 25 250 → pin 2 timing alternativo (más compatible)
-    var pin2b = btoa('\x1B\x70\x00\x19\xFA');
-    // ESC p 1 60 120 → pin 5
-    var pin5  = btoa('\x1B\x70\x01\x3C\x78');
+    var pin2a  = btoa('\x1B\x70\x00\x3C\x78');  // ESC p pin2 — 60/120 ms
+    var pin2b  = btoa('\x1B\x70\x00\x19\xFA');  // ESC p pin2 — 25/250 ms
+    var pin5   = btoa('\x1B\x70\x01\x3C\x78');  // ESC p pin5
+    var dleDc4 = btoa('\x10\x14\x01\x00\x05');  // DLE DC4 — XPrinter, HOIN, Rongta
 
     function enviar(b64) {
       return qz.print(rawConfig, [{ type: 'raw', format: 'plain', flavor: 'base64', data: b64 }]);
@@ -534,7 +537,8 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
 
     return enviar(pin2a)
       .catch(function() { return enviar(pin2b); })
-      .catch(function() { return enviar(pin5); });
+      .catch(function() { return enviar(pin5); })
+      .catch(function() { return enviar(dleDc4); });
   }
 
   function imprimirQZ() {
@@ -650,6 +654,16 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
   }
 
   document.getElementById('btn-qz-print').addEventListener('click', imprimirQZ);
+
+  document.getElementById('btn-test-cajon').addEventListener('click', function() {
+    var sel = document.getElementById('qz-printer-select');
+    var printer = sel ? sel.value : '';
+    if (!printer) { setMsg('Selecciona una impresora primero.'); return; }
+    setMsg('Enviando comando de gaveta...');
+    abrirCajon(printer)
+      .then(function() { setMsg('✔ Comando enviado. ¿Se abrió la gaveta?'); })
+      .catch(function(e) { setMsg('Error: ' + (e.message || e)); });
+  });
 
   window.addEventListener('load', function() {
     setTimeout(conectarQZ, 300);
