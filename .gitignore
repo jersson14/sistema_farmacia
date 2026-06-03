@@ -6,6 +6,7 @@ files/backups/
 
 # Credenciales y configuración sensible
 config/global.php
+config/qz_private.key
 
 # Logo y archivos del cliente
 files/empresa/

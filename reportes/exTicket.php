@@ -589,13 +589,25 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
       });
   }
 
-  // Modo anónimo — funciona en cualquier equipo con QZ Tray instalado
-  // (requiere que "Block anonymous requests" esté desmarcado en QZ Tray)
   function setupSeguridad() {
-    qz.security.setCertificatePromise(function(resolve) { resolve(); });
+    qz.security.setCertificatePromise(function(resolve, reject) {
+      fetch('../public/qz_cert.pem?v=' + Date.now())
+        .then(function(r) { return r.ok ? r.text() : Promise.reject('Certificado no encontrado. Ejecuta config/setup_qz.php'); })
+        .then(resolve)
+        .catch(reject);
+    });
     qz.security.setSignatureAlgorithm('SHA512');
-    qz.security.setSignaturePromise(function() {
-      return function(resolve) { resolve(); };
+    qz.security.setSignaturePromise(function(toSign) {
+      return function(resolve, reject) {
+        fetch('../ajax/qz_sign.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: toSign
+        })
+          .then(function(r) { return r.ok ? r.text() : Promise.reject('Error al firmar (HTTP ' + r.status + ')'); })
+          .then(resolve)
+          .catch(reject);
+      };
     });
   }
 
