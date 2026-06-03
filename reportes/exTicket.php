@@ -518,19 +518,23 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
   }
 
   function abrirCajon(printer) {
-    // Comando ESC/POS estándar para abrir cajón (pin 2)
-    // ESC p m t1 t2  →  0x1B 0x70 0x00 0x3C 0x78
     var rawConfig = qz.configs.create(printer);
-    return qz.print(rawConfig, [{
-      type: 'raw', format: 'plain', flavor: 'plain',
-      data: '\x1B\x70\x00\x3C\x78'
-    }]).catch(function() {
-      // Si pin 2 falla, intentar pin 5
-      return qz.print(rawConfig, [{
-        type: 'raw', format: 'plain', flavor: 'plain',
-        data: '\x1B\x70\x01\x3C\x78'
-      }]);
-    });
+
+    // btoa() codifica los bytes incluyendo \x00 (null byte) sin truncar
+    // ESC p 0 60 120 → pin 2 (0x1B 0x70 0x00 0x3C 0x78)
+    var pin2a = btoa('\x1B\x70\x00\x3C\x78');
+    // ESC p 0 25 250 → pin 2 timing alternativo (más compatible)
+    var pin2b = btoa('\x1B\x70\x00\x19\xFA');
+    // ESC p 1 60 120 → pin 5
+    var pin5  = btoa('\x1B\x70\x01\x3C\x78');
+
+    function enviar(b64) {
+      return qz.print(rawConfig, [{ type: 'raw', format: 'plain', flavor: 'base64', data: b64 }]);
+    }
+
+    return enviar(pin2a)
+      .catch(function() { return enviar(pin2b); })
+      .catch(function() { return enviar(pin5); });
   }
 
   function imprimirQZ() {
