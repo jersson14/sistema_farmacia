@@ -417,8 +417,30 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
   }
 
   function cargarImpresoras() {
-    return qz.printers.find('').then(function(lista) {
-      if (!Array.isArray(lista)) lista = lista ? [lista] : [];
+    var virtuales = ['fax','pdf','xps','onenote','microsoft','send to','imagen','image writer','novapdf','cutepdf','deskpdf','primopdf','snagit','papercut'];
+
+    function esVirtual(nombre) {
+      var n = nombre.toLowerCase();
+      return virtuales.some(function(v){ return n.indexOf(v) !== -1; });
+    }
+
+    function seleccionarEn(sel, nombre) {
+      for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === nombre) { sel.selectedIndex = i; return true; }
+      }
+      return false;
+    }
+
+    var listaPromise   = qz.printers.find('');
+    var defaultPromise = qz.printers.getDefault().catch(function(){ return ''; });
+
+    return Promise.all([listaPromise, defaultPromise]).then(function(res) {
+      var lista     = Array.isArray(res[0]) ? res[0] : (res[0] ? [res[0]] : []);
+      var winDefault = (typeof res[1] === 'string') ? res[1] : '';
+
+      // Excluir impresoras virtuales del listado
+      lista = lista.filter(function(p){ return !esVirtual(p); });
+
       var sel = document.getElementById('qz-printer-select');
       sel.innerHTML = '';
       lista.forEach(function(p) {
@@ -426,44 +448,36 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
         op.value = p; op.textContent = p;
         sel.appendChild(op);
       });
-      // Restaurar impresora preferida guardada
+
+      // Prioridad 1: preferencia guardada por el usuario en este navegador
       var preferida = '';
       try { preferida = localStorage.getItem(QZ_PRINTER_KEY) || ''; } catch(e) {}
-      var encontrada = false;
-      if (preferida) {
-        for (var i = 0; i < sel.options.length; i++) {
-          if (sel.options[i].value === preferida) { sel.selectedIndex = i; encontrada = true; break; }
-        }
+      var encontrada = preferida ? seleccionarEn(sel, preferida) : false;
+
+      // Prioridad 2: impresora predeterminada de Windows
+      if (!encontrada && winDefault && !esVirtual(winDefault)) {
+        encontrada = seleccionarEn(sel, winDefault);
       }
-      // Si no hay preferencia guardada (o ya no existe), buscar impresora tipo ticketera
+
+      // Prioridad 3: primera impresora con nombre de ticketera
       if (!encontrada) {
-        var palabrasCaja    = ['caja','ticket','thermal','termica','térmica','pos','receipt','80mm','58mm','tmt','epson tm','star','xprinter','bixolon','citizen','sewoo','hoin','rongta','gprinter'];
-        var palabrasVirtual = ['fax','pdf','xps','onenote','microsoft','send to','imagen','image writer','novapdf','cutepdf','deskpdf','primopdf','snagit','papercut'];
-        // Paso 1: buscar por palabras clave de ticketera
+        var palabrasCaja = ['caja','ticket','thermal','termica','térmica','pos','receipt','80mm','58mm','tmt','epson tm','star','xprinter','bixolon','citizen','sewoo','hoin','rongta','gprinter'];
         outer1: for (var j = 0; j < sel.options.length; j++) {
-          var nombre = sel.options[j].value.toLowerCase();
+          var n = sel.options[j].value.toLowerCase();
           for (var k = 0; k < palabrasCaja.length; k++) {
-            if (nombre.indexOf(palabrasCaja[k]) !== -1) { sel.selectedIndex = j; encontrada = true; break outer1; }
-          }
-        }
-        // Paso 2: si no hay ticketera, elegir la primera impresora que NO sea virtual
-        if (!encontrada) {
-          for (var j = 0; j < sel.options.length; j++) {
-            var nombre = sel.options[j].value.toLowerCase();
-            var esVirtual = false;
-            for (var k = 0; k < palabrasVirtual.length; k++) {
-              if (nombre.indexOf(palabrasVirtual[k]) !== -1) { esVirtual = true; break; }
-            }
-            if (!esVirtual) { sel.selectedIndex = j; encontrada = true; break; }
+            if (n.indexOf(palabrasCaja[k]) !== -1) { sel.selectedIndex = j; encontrada = true; break outer1; }
           }
         }
       }
+
+      // Prioridad 4: primera impresora disponible (ya filtradas las virtuales)
+      if (!encontrada && sel.options.length > 0) { sel.selectedIndex = 0; }
+
       // Restaurar preferencia de cajón — default: ACTIVADO
       var chk = document.getElementById('chk-cajon');
       if (chk) {
         try {
           var guardado = localStorage.getItem(QZ_CAJON_KEY);
-          // Solo se desactiva si el usuario lo apagó explícitamente ('0')
           chk.checked = (guardado !== '0');
         } catch(e) {}
         chk.addEventListener('change', function() {
@@ -561,16 +575,11 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
   }
 
   function alConectar(lista) {
-    if (lista.length > 0) {
-      var sel = document.getElementById('qz-printer-select');
-      var impresora = sel ? sel.value.toLowerCase() : '';
-      var virtuales = ['fax','pdf','xps','onenote','microsoft','send to','imagen','image writer','novapdf','cutepdf','deskpdf','primopdf','snagit','papercut'];
-      var esVirtual = virtuales.some(function(v){ return impresora.indexOf(v) !== -1; });
-      if (!esVirtual) {
-        setTimeout(function() { imprimirQZ(); }, 400);
-      } else {
-        setMsg('Selecciona la impresora de tickets antes de imprimir.');
-      }
+    var sel = document.getElementById('qz-printer-select');
+    if (sel && sel.options.length > 0 && sel.value) {
+      setTimeout(function() { imprimirQZ(); }, 400);
+    } else {
+      setMsg('No se encontró ninguna impresora física. Conecta tu ticketera e intenta de nuevo.');
     }
   }
 
