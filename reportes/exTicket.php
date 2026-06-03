@@ -530,7 +530,7 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
   function intentarConexion(segura) {
     return qz.websocket.connect({
       host: 'localhost',
-      port: { secure: 8181, insecure: 8182 },
+      port: { secure: [8181], insecure: [8182] },
       usingSecure: segura,
       keepAlive: 60
     });
