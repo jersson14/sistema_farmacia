@@ -488,7 +488,8 @@ if ($_SESSION['ventas']==1) {
 }
 require 'footer.php';
  ?>
- <script src="scripts/venta.js?v=20260531c"></script>
+ <script src="../public/js/qz-tray.js"></script>
+ <script src="scripts/venta.js?v=20260603a"></script>
  <?php
 }
 ob_end_flush();

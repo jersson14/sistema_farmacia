@@ -1,5 +1,45 @@
 var tabla;
 var tablaArticulos;
+
+var QZ_PRINTER_KEY = 'qz_preferred_printer_farmacia';
+
+function abrirGavetaQZ() {
+	if (!window.qz) return;
+	var printer = '';
+	try { printer = localStorage.getItem(QZ_PRINTER_KEY) || ''; } catch(e) {}
+	if (!printer) return;
+
+	var ESC_P_PIN2 = '\x1B\x70\x00\x3C\x78';
+	var ESC_P_PIN5 = '\x1B\x70\x01\x3C\x78';
+
+	function enviarComando() {
+		var cfg = qz.configs.create(printer);
+		return qz.print(cfg, [{ type: 'raw', format: 'plain', flavor: 'plain', data: ESC_P_PIN2 }])
+			.catch(function() {
+				return qz.print(cfg, [{ type: 'raw', format: 'plain', flavor: 'plain', data: ESC_P_PIN5 }]);
+			});
+	}
+
+	function setupSeguridad() {
+		qz.security.setCertificatePromise(function(resolve) { resolve(); });
+		qz.security.setSignatureAlgorithm('SHA512');
+		qz.security.setSignaturePromise(function() { return function(resolve) { resolve(); }; });
+	}
+
+	if (qz.websocket.isActive()) {
+		enviarComando().catch(function() {});
+		return;
+	}
+
+	setupSeguridad();
+	qz.websocket.connect({ host: 'localhost', port: { secure: [8181], insecure: [8182] }, usingSecure: true, keepAlive: 30 })
+		.then(enviarComando)
+		.catch(function() {
+			qz.websocket.connect({ host: 'localhost', port: { secure: [8181], insecure: [8182] }, usingSecure: false, keepAlive: 30 })
+				.then(enviarComando)
+				.catch(function() {});
+		});
+}
 var recetaModalConfirmada = false;
 var borradorTimerVenta = null;
 
@@ -1071,15 +1111,8 @@ function procesarExitoVenta(r){
 			// El navegador bloqueó el popup — mostrar botón manual
 			notifyVenta("info", 'Ticket listo. <a href="' + urlComp + '" target="_blank" style="color:#fff;text-decoration:underline">Abrir ticket</a>');
 		}
-		// Abrir gaveta de dinero via comando ESC/POS
-		$.get("../ajax/abrirGaveta.php", function(resp) {
-			try {
-				var res = (typeof resp === 'string') ? JSON.parse(resp) : resp;
-				if (!res.ok && res.msg && res.msg.indexOf('no configurada') === -1) {
-					notifyVenta("warning", "Gaveta: " + res.msg);
-				}
-			} catch(e) {}
-		});
+		// Abrir gaveta via QZ Tray usando la impresora guardada en localStorage
+		abrirGavetaQZ();
 	}
 	mostrarform(false);
 	listar();
