@@ -438,10 +438,35 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
       var lista     = Array.isArray(res[0]) ? res[0] : (res[0] ? [res[0]] : []);
       var winDefault = (typeof res[1] === 'string') ? res[1] : '';
 
-      // Excluir impresoras virtuales del listado; si el resultado queda vacío, mostrar todas
+      // Excluir impresoras virtuales del listado
       var listaFiltrada = lista.filter(function(p){ return !esVirtual(p); });
-      if (listaFiltrada.length > 0) lista = listaFiltrada;
+      // Si no queda ninguna impresora física, intentar buscar directamente por nombre conocido
+      if (listaFiltrada.length === 0) {
+        return qz.printers.find('CAJA').then(function(found) {
+          var nombre = Array.isArray(found) ? found[0] : found;
+          if (nombre) {
+            lista = [nombre];
+          } else {
+            setStatus('&#9679; QZ Tray conectado — sin impresoras físicas detectadas', 'warning');
+            setMsg('No se encontró ninguna impresora física. Verifica que la ticketera esté encendida y configurada en Windows.');
+            document.getElementById('qz-printer-wrap').style.display = 'none';
+            document.getElementById('btn-qz-print').style.display = 'none';
+            return [];
+          }
+          return poblarSelector(lista, winDefault);
+        }).catch(function() {
+          setStatus('&#9679; QZ Tray conectado — sin impresoras físicas detectadas', 'warning');
+          setMsg('No se encontró ninguna impresora física. Verifica que la ticketera esté encendida y configurada en Windows.');
+          document.getElementById('qz-printer-wrap').style.display = 'none';
+          document.getElementById('btn-qz-print').style.display = 'none';
+          return [];
+        });
+      }
+      lista = listaFiltrada;
+      return poblarSelector(lista, winDefault);
+    });
 
+    function poblarSelector(lista, winDefault) {
       var sel = document.getElementById('qz-printer-select');
       sel.innerHTML = '';
       lista.forEach(function(p) {
@@ -471,7 +496,7 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
         }
       }
 
-      // Prioridad 4: primera impresora disponible (ya filtradas las virtuales)
+      // Prioridad 4: primera impresora disponible
       if (!encontrada && sel.options.length > 0) { sel.selectedIndex = 0; }
 
       // Restaurar preferencia de cajón — default: ACTIVADO
@@ -489,7 +514,7 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
       document.getElementById('btn-qz-print').style.display = 'block';
       document.getElementById('btn-browser-print').style.display = 'block';
       return lista;
-    });
+    }
   }
 
   function abrirCajon(printer) {
