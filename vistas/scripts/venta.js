@@ -28,9 +28,25 @@ function abrirGavetaQZ() {
 	}
 
 	function setupSeguridad() {
-		qz.security.setCertificatePromise(function(resolve) { resolve(); });
+		qz.security.setCertificatePromise(function(resolve, reject) {
+			fetch('../public/qz_cert.pem')
+				.then(function(r) { return r.text(); })
+				.then(resolve)
+				.catch(reject);
+		});
 		qz.security.setSignatureAlgorithm('SHA512');
-		qz.security.setSignaturePromise(function() { return function(resolve) { resolve(); }; });
+		qz.security.setSignaturePromise(function(toSign) {
+			return function(resolve, reject) {
+				$.ajax({
+					url: '../ajax/qz_sign.php',
+					type: 'POST',
+					data: toSign,
+					contentType: 'text/plain',
+					success: resolve,
+					error: function(xhr) { reject(new Error(xhr.statusText || 'Error al firmar')); }
+				});
+			};
+		});
 	}
 
 	if (qz.websocket.isActive()) {
