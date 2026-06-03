@@ -438,8 +438,9 @@ function mon($v, $sym){ return $sym . ' ' . number_format((float)$v, 2); }
       var lista     = Array.isArray(res[0]) ? res[0] : (res[0] ? [res[0]] : []);
       var winDefault = (typeof res[1] === 'string') ? res[1] : '';
 
-      // Excluir impresoras virtuales del listado
-      lista = lista.filter(function(p){ return !esVirtual(p); });
+      // Excluir impresoras virtuales del listado; si el resultado queda vacío, mostrar todas
+      var listaFiltrada = lista.filter(function(p){ return !esVirtual(p); });
+      if (listaFiltrada.length > 0) lista = listaFiltrada;
 
       var sel = document.getElementById('qz-printer-select');
       sel.innerHTML = '';
