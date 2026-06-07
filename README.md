@@ -1,28 +1,29 @@
-# Sistema de Gestión para Farmacia
+# ITVentas — Sistema de Gestión para Farmacia
 
-Sistema de punto de venta, inventario, compras y reportes diseñado para **farmacias independientes o cadenas pequeñas** en Perú. Basado en el motor ITVentas, adaptado al dominio farmacéutico con soporte para lotes, vencimientos, recetas médicas, control especial y regulación DIGEMID.
+Sistema de punto de venta, inventario, compras y reportes diseñado para **farmacias independientes o cadenas pequeñas** en Perú. Basado en una arquitectura MVC artesanal en PHP, adaptado al dominio farmacéutico con trazabilidad de lotes, control de vencimientos (FEFO), recetas médicas y registro de medicamentos de control especial.
+
+![PHP](https://img.shields.io/badge/PHP-8.x-777BB4?logo=php&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-5.7%2B-4479A1?logo=mysql&logoColor=white)
+![Bootstrap](https://img.shields.io/badge/Bootstrap-3-7952B3?logo=bootstrap&logoColor=white)
+![AdminLTE](https://img.shields.io/badge/AdminLTE-2.x-3C8DBC)
+![FPDF](https://img.shields.io/badge/FPDF-1.81-orange)
+![XAMPP](https://img.shields.io/badge/XAMPP-Windows-FB7A24?logo=xampp&logoColor=white)
 
 ---
 
 ## Tecnologías
 
-### Backend
-- PHP 8.x (probado con PHP 8.2)
-- MySQL / MariaDB
-- `mysqli` nativo — sin ORM, sin Composer
-- Arquitectura MVC artesanal
-
-### Frontend
-- AdminLTE + Bootstrap 3
-- jQuery
-- DataTables + Buttons (Excel / CSV / PDF)
-- Chart.js (dashboard)
-- Bootbox · Bootstrap Select
-
-### Reportes y periféricos
-- FPDF 1.81 (`fpdf181/`) — reportes PDF
-- Ticket HTML imprimible (`reportes/exTicket.php`)
-- Impresora térmica + gaveta de dinero (via nombre compartido en Windows)
+| Capa | Herramienta |
+|---|---|
+| Backend | PHP 8.x — sin framework, sin ORM, sin Composer |
+| Base de datos | MySQL / MariaDB (`mysqli` nativo) |
+| Frontend | AdminLTE + Bootstrap 3 + jQuery |
+| Gráficos | Chart.js |
+| Tablas | DataTables + Buttons (Excel / CSV) |
+| Reportes PDF | FPDF 1.81 |
+| Tickets | HTML imprimible (thermal printer) |
+| Periféricos | Impresora térmica + gaveta de dinero vía nombre compartido Windows |
+| Entorno | XAMPP (Windows) |
 
 ---
 
@@ -111,33 +112,38 @@ farmacia/
 - Los triggers se documentan en el mismo archivo de migración
 - Los registros no se eliminan físicamente: campo `condicion` (1 = activo, 0 = inactivo)
 
-### Migraciones disponibles (en orden)
+### Migraciones disponibles (en orden de aplicación)
 
-```
-20260321_unidades_medida.sql
-20260321_fase_comercial.sql
-20260525_metodo_pago_venta.sql
-20260525_atributos_medicamento.sql
-20260525_lotes_vencimientos.sql
-20260525_receta_medica.sql
-20260525_control_especial.sql
-20260525_tienda_online.sql
-20260525_categorias_atc.sql
-20260525_temperatura_ingreso.sql
-20260525_seguro_venta.sql
-20260525_cantidad_decimal.sql
-20260525_paciente_perfil.sql
-20260525_permisos_granulares.sql
-20260525_permisos_base_completo.sql
-20260526_insert_unidades_medida.sql
-20260526_insert_categorias_y_articulos.sql
-20260526_insert_proveedores_peru.sql
-20260526_add_precio_venta_articulo.sql
-20260526_add_tipo_entrega_pedido.sql
-20260526_add_metodo_pago_ingreso.sql
-20260527_consumidor_final.sql
-20260527_printer_config.sql
-```
+Todos los archivos están en `migrations/`. Aplíquelos en este orden sobre la BD importada:
+
+| # | Archivo | Descripción |
+|---|---|---|
+| 01 | `20260321_unidades_medida.sql` | Tabla de unidades de medida |
+| 02 | `20260321_fase_comercial.sql` | Fase comercial de artículos |
+| 03 | `20260525_metodo_pago_venta.sql` | Método de pago por venta |
+| 04 | `20260525_atributos_medicamento.sql` | DCI, laboratorio, forma farmacéutica, condición de venta |
+| 05 | `20260525_lotes_vencimientos.sql` | Control de lotes y fechas de vencimiento (FEFO) |
+| 06 | `20260525_receta_medica.sql` | Registro de recetas médicas |
+| 07 | `20260525_control_especial.sql` | Libro de control de psicotrópicos y narcóticos |
+| 08 | `20260525_tienda_online.sql` | Módulo de pedidos online |
+| 09 | `20260525_categorias_atc.sql` | Clasificación ATC de medicamentos |
+| 10 | `20260525_temperatura_ingreso.sql` | Condición de temperatura en recepciones |
+| 11 | `20260525_seguro_venta.sql` | Ventas con seguro médico |
+| 12 | `20260525_cantidad_decimal.sql` | Soporte de cantidades decimales |
+| 13 | `20260525_paciente_perfil.sql` | Perfil clínico del paciente |
+| 14 | `20260525_permisos_granulares.sql` | Sistema de permisos granulares por módulo |
+| 15 | `20260525_permisos_base_completo.sql` | Permisos base del sistema |
+| 16 | `20260526_insert_unidades_medida.sql` | Datos semilla — unidades de medida |
+| 17 | `20260526_insert_categorias_y_articulos.sql` | Datos semilla — categorías y artículos de farmacia |
+| 18 | `20260526_insert_proveedores_peru.sql` | Datos semilla — proveedores del mercado peruano |
+| 19 | `20260526_add_precio_venta_articulo.sql` | Campo precio de venta en artículo |
+| 20 | `20260526_add_tipo_entrega_pedido.sql` | Tipo de entrega en pedidos |
+| 21 | `20260526_add_metodo_pago_ingreso.sql` | Método de pago en ingresos |
+| 22 | `20260527_consumidor_final.sql` | Cliente por defecto "Consumidor Final" |
+| 23 | `20260527_printer_config.sql` | Configuración de impresora de tickets |
+| 24 | `20260531_fix_tipo_venta_null.sql` | Corrección de nulos en tipo de venta |
+
+> Todas las migraciones usan `IF NOT EXISTS` y son idempotentes — se pueden aplicar más de una vez sin error.
 
 ---
 
@@ -151,29 +157,26 @@ farmacia/
 
 ## Instalación local (XAMPP)
 
-1. Copiar el proyecto a `C:\xampp\htdocs\farmacia\`
-2. Crear la base de datos (ver nombre en `config/global.php`)
-3. Importar el dump SQL principal
-4. Aplicar migraciones pendientes en el orden indicado arriba
-5. Levantar Apache + MySQL desde el panel XAMPP
-6. Abrir `http://localhost/farmacia/`
+```bash
+# 1. Copiar la carpeta del proyecto a:
+#    C:\xampp\htdocs\farmacia\
 
----
+# 2. Crear la base de datos en phpMyAdmin e importar el dump SQL principal
 
-## Configuración de conexión
+# 3. Aplicar las migraciones en el orden listado arriba
 
-Editar `config/global.php`:
+# 4. Copiar el archivo de configuración de ejemplo
+cp config/global.example.php config/global.php
+#    Editar config/global.php con tus propias credenciales locales (no se versiona)
 
-```php
-define("DB_HOST",     "localhost");
-define("DB_NAME",     "farmacia_db");      // nombre de tu BD
-define("DB_USERNAME", "usuario");
-define("DB_PASSWORD", "clave_segura");
-define("DB_ENCODE",   "utf8");
-define("PRO_NOMBRE",  "Farmacia XYZ");
+# 5. Levantar Apache + MySQL desde el panel XAMPP
+
+# 6. Abrir en el navegador
+#    http://localhost/farmacia/
 ```
 
-Crear `config/global.example.php` con valores en blanco como referencia para el repo.
+> `config/global.php` está en `.gitignore` — nunca se sube al repositorio.  
+> Usa `config/global.example.php` como plantilla de referencia.
 
 ---
 
