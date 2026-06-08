@@ -301,7 +301,7 @@ public function anular($idingreso){
 	return ejecutarConsulta($sql);
 }
 
-public function agregarDetalle($idingreso, $idusuario, $idarticulo, $cantidad, $precio_compra, $precio_venta, $numero_lote=array(), $fecha_vencimiento=array(), $fecha_fabricacion=array()){
+public function agregarDetalle($idingreso, $idusuario, $idarticulo, $cantidad, $precio_compra, $precio_venta, $numero_lote=array(), $fecha_vencimiento=array(), $fecha_fabricacion=array(), $idproveedor_new=null, $tipo_comprobante_new=null, $serie_comprobante_new=null, $num_comprobante_new=null, $fecha_hora_new=null){
 	global $conexion;
 	$idingreso = (int)$idingreso;
 	if ($idingreso <= 0) {
@@ -381,6 +381,26 @@ public function agregarDetalle($idingreso, $idusuario, $idarticulo, $cantidad, $
 			$totalAgregado += $d['cant'] * $d['pCom'];
 		}
 		ejecutarConsulta("UPDATE ingreso SET total_compra = total_compra + '$totalAgregado' WHERE idingreso='$idingreso'");
+		$updateCab = array();
+		if ($idproveedor_new !== null && (int)$idproveedor_new > 0) {
+			$updateCab[] = "idproveedor='" . (int)$idproveedor_new . "'";
+		}
+		if ($tipo_comprobante_new !== null && $tipo_comprobante_new !== '') {
+			$updateCab[] = "tipo_comprobante='" . limpiarCadena($tipo_comprobante_new) . "'";
+		}
+		if ($serie_comprobante_new !== null && $serie_comprobante_new !== '') {
+			$updateCab[] = "serie_comprobante='" . limpiarCadena($serie_comprobante_new) . "'";
+		}
+		if ($num_comprobante_new !== null && $num_comprobante_new !== '') {
+			$updateCab[] = "num_comprobante='" . limpiarCadena($num_comprobante_new) . "'";
+		}
+		if ($fecha_hora_new !== null && $fecha_hora_new !== '') {
+			$fhNorm = $this->normalizarFechaHora($fecha_hora_new);
+			if ($fhNorm) { $updateCab[] = "fecha_hora='" . limpiarCadena($fhNorm) . "'"; }
+		}
+		if (!empty($updateCab)) {
+			ejecutarConsulta("UPDATE ingreso SET " . implode(",", $updateCab) . " WHERE idingreso='$idingreso'");
+		}
 		$conexion->commit(); $conexion->autocommit(true);
 	} catch (Throwable $e) {
 		$conexion->rollback(); $conexion->autocommit(true);

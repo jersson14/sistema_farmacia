@@ -868,9 +868,9 @@ function abrirAmpliarIngreso(idingreso) {
 		try { $("#idproveedor").selectpicker("refresh"); } catch(e) {}
 		$("#tipo_comprobante").val(d.tipo_comprobante);
 		try { $("#tipo_comprobante").selectpicker("refresh"); } catch(e) {}
-		$("#serie_comprobante").val(d.serie_comprobante).prop("readonly", true);
-		$("#num_comprobante").val(d.num_comprobante).prop("readonly", true);
-		$("#fecha_hora").val(normalizarFechaHoraInput(d.fecha)).prop("readonly", true);
+		$("#serie_comprobante").val(d.serie_comprobante);
+		$("#num_comprobante").val(d.num_comprobante);
+		$("#fecha_hora").val(normalizarFechaHoraInput(d.fecha));
 		$("#impuesto").val(d.impuesto);
 
 		modoAmpliarData = {

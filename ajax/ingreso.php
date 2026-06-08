@@ -119,9 +119,15 @@ switch ($_GET["op"]) {
 		$numero_lote_amp     = isset($_POST["numero_lote"])      ? $_POST["numero_lote"]      : array();
 		$fvenc_amp           = isset($_POST["fecha_vencimiento"])? $_POST["fecha_vencimiento"]: array();
 		$ffab_amp            = isset($_POST["fecha_fabricacion"]) ? $_POST["fecha_fabricacion"]: array();
+		$idproveedor_amp        = isset($_POST["idproveedor"])        ? limpiarCadena($_POST["idproveedor"])        : null;
+		$tipo_comprobante_amp   = isset($_POST["tipo_comprobante"])   ? limpiarCadena($_POST["tipo_comprobante"])   : null;
+		$serie_comprobante_amp  = isset($_POST["serie_comprobante"])  ? limpiarCadena($_POST["serie_comprobante"])  : null;
+		$num_comprobante_amp    = isset($_POST["num_comprobante"])    ? limpiarCadena($_POST["num_comprobante"])    : null;
+		$fecha_hora_amp         = isset($_POST["fecha_hora"])         ? limpiarCadena($_POST["fecha_hora"])         : null;
 		$rspta_amp = $ingreso->agregarDetalle($idingreso_amp, $idusuario,
 			$idarticulo_amp, $cantidad_amp, $precio_compra_amp, $precio_venta_amp,
-			$numero_lote_amp, $fvenc_amp, $ffab_amp
+			$numero_lote_amp, $fvenc_amp, $ffab_amp,
+			$idproveedor_amp, $tipo_comprobante_amp, $serie_comprobante_amp, $num_comprobante_amp, $fecha_hora_amp
 		);
 		echo json_encode($rspta_amp);
 		break;
