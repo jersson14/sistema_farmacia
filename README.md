@@ -389,9 +389,85 @@ Usar siempre `obtenerSimboloMoneda()` y `formatearMoneda()` para mostrar precios
 
 ---
 
-## Arquitectura de despliegue
+## Arquitectura
 
-El sistema opera en modo **local primario** — la venta, caja, gaveta y ticketera corren en XAMPP dentro de la farmacia sin depender de internet. Opcionalmente se puede sincronizar con un hosting para que el dueño vea reportes y dashboard en tiempo real desde cualquier dispositivo (ver `ARQUITECTURA_HIBRIDA.md`).
+### Arquitectura de la aplicación (MVC artesanal)
+
+```mermaid
+flowchart TB
+    subgraph CLIENTE["💻 Cliente — Navegador"]
+        UI["Vistas AdminLTE / Bootstrap 3<br/>jQuery + DataTables + Chart.js"]
+    end
+
+    subgraph SERVIDOR["🖥️ Servidor — XAMPP (Apache + PHP 8.x)"]
+        direction TB
+        AJAX["Capa AJAX — ajax/*.php<br/>Controladores · switch($_GET['op'])<br/>Sesión + permisos + limpiarCadena()"]
+        MODELOS["Capa de Modelos — modelos/*.php<br/>Lógica de negocio · transacciones MySQL"]
+        REPORTES["Capa de Reportes — reportes/*.php<br/>FPDF 1.81 · PDF_MC_Table"]
+        CONFIG["config/Conexion.php<br/>ejecutarConsulta() · formatearMoneda()"]
+    end
+
+    subgraph DATOS["🗄️ Base de datos"]
+        MYSQL[("MySQL / MariaDB<br/>mi_tienda")]
+    end
+
+    subgraph PERIFERICOS["🖨️ Periféricos de punto de venta"]
+        TICKETERA["Impresora térmica"]
+        GAVETA["Gaveta de dinero"]
+    end
+
+    UI -- "fetch / $.ajax (JSON)" --> AJAX
+    AJAX --> MODELOS
+    MODELOS --> CONFIG
+    REPORTES --> CONFIG
+    CONFIG --> MYSQL
+    AJAX -- "PDF / ticket HTML" --> REPORTES
+    UI -- "imprimir vía nombre compartido" --> TICKETERA
+    TICKETERA --> GAVETA
+
+    classDef cliente fill:#3C8DBC,color:#fff,stroke:#2c699a
+    classDef servidor fill:#f4f6f9,color:#1f2d3d,stroke:#777BB4
+    classDef datos fill:#4479A1,color:#fff,stroke:#2c5d80
+    classDef peri fill:#FB7A24,color:#fff,stroke:#c9601a
+    class UI cliente
+    class AJAX,MODELOS,REPORTES,CONFIG servidor
+    class MYSQL datos
+    class TICKETERA,GAVETA peri
+```
+
+**Flujo de una petición:** la vista hace una llamada AJAX a `ajax/entidad.php?op=...` → el controlador valida sesión/permiso y sanitiza el input con `limpiarCadena()` → delega en el modelo correspondiente (`modelos/Entidad.php`) → el modelo ejecuta SQL vía `ejecutarConsulta()` (con transacción si toca varias tablas) → la respuesta vuelve como JSON estándar `{ "ok": true|false, ... }`. Los reportes PDF y tickets se generan en una capa separada (`reportes/`) que lee directo de la BD, sin pasar por sesión.
+
+### Arquitectura de despliegue
+
+El sistema opera en modo **local primario** — la venta, caja, gaveta y ticketera corren en XAMPP dentro de la farmacia sin depender de internet. Opcionalmente se puede sincronizar con un hosting para que el dueño vea reportes y dashboard en tiempo real desde cualquier dispositivo.
+
+```mermaid
+flowchart LR
+    subgraph FARMACIA["🏪 Farmacia — red local"]
+        POS["PC de venta<br/>XAMPP local"]
+        TICK["Ticketera + gaveta"]
+        POS --- TICK
+    end
+
+    subgraph NUBE["☁️ Hosting (opcional)"]
+        WEB["App web — reportes y dashboard"]
+        DBCLOUD[("MySQL en la nube")]
+        WEB --> DBCLOUD
+    end
+
+    DUENO["📱 Dueño / Supervisor<br/>cualquier dispositivo"]
+
+    POS -- "venta, caja, stock (offline-first)" --> POS
+    POS -. "sincronización periódica" .-> DBCLOUD
+    DUENO -- "consulta KPIs y reportes" --> WEB
+
+    classDef local fill:#3C8DBC,color:#fff,stroke:#2c699a
+    classDef cloud fill:#605ca8,color:#fff,stroke:#4a4791
+    class POS,TICK local
+    class WEB,DBCLOUD cloud
+```
+
+> Detalle completo de las opciones de sincronización en `ARQUITECTURA_HIBRIDA.md`.
 
 ---
 
