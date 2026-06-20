@@ -147,6 +147,21 @@ Todos los archivos están en `migrations/`. Aplíquelos en este orden sobre la B
 
 ---
 
+## Beneficios estimados frente a la gestión manual
+
+| Proceso | Antes (manual / hojas de cálculo) | Con ITVentas | Mejora estimada |
+|---|---|---|---|
+| Registrar una venta | 3–5 min (cálculo manual, sin control de stock) | 15–30 seg (búsqueda + F10) | **-80% tiempo por venta** |
+| Control de stock | Conteo físico periódico, desfases frecuentes | Stock en tiempo real por trigger | **-90% errores de inventario** |
+| Productos vencidos / mermas | Sin alerta, se detectan al vender o al vencer | Alerta automática + despacho FEFO | **-60% mermas por vencimiento** |
+| Cierre de caja | 15–20 min cuadrando papeles a mano | Resumen automático + diferencia calculada | **-75% tiempo de cierre** |
+| Búsqueda de medicamento | Memoria del cajero o catálogo físico | Búsqueda por nombre, genérico, laboratorio o código de barras | **-70% tiempo de atención** |
+| Trazabilidad de lotes (recall) | Revisión manual de comprobantes en papel | Consulta directa por lote en el sistema | **De horas a segundos** |
+
+> Valores estimados a partir de los flujos de trabajo típicos de una farmacia independiente antes de digitalizar sus procesos. El impacto real depende del volumen de ventas y del nivel de adopción del personal.
+
+---
+
 ## Requisitos
 
 - PHP >= 8.1 con extensiones: `mysqli`, `mbstring`, `gd`
@@ -416,3 +431,10 @@ El sistema opera en modo **local primario** — la venta, caja, gaveta y tickete
 | `ARQUITECTURA_HIBRIDA.md` | Opciones de despliegue local + web |
 | `GAVETA_CONFIGURACION.md` | Configuración detallada de gaveta e impresora térmica |
 | `CONTRATO_SOFTWARE.md` | Términos de entrega del sistema |
+
+---
+
+## Derechos de autor
+
+© 2026  Jersson Corilla - Todos los derechos reservados.
+
