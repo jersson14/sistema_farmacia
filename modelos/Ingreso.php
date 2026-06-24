@@ -484,6 +484,38 @@ public function actualizarDetalle($iddetalle, $cantidad, $precio_compra, $precio
 	return array("ok"=>true, "message"=>"Detalle actualizado correctamente", "nuevo_total"=>$nuevoTotal);
 }
 
+public function eliminarDetalle($iddetalle){
+	$iddetalle = (int)$iddetalle;
+	if ($iddetalle <= 0) {
+		return array("ok"=>false, "message"=>"ID de detalle inválido");
+	}
+	$rowDet = ejecutarConsultaSimpleFila("SELECT idarticulo, idingreso, cantidad, IFNULL(idlote,0) AS idlote FROM detalle_ingreso WHERE iddetalle_ingreso='$iddetalle' LIMIT 1");
+	if (!$rowDet) {
+		return array("ok"=>false, "message"=>"No se encontró el artículo en esta compra");
+	}
+	$idlote = (int)$rowDet['idlote'];
+	if ($idlote > 0) {
+		$ventasLote = ejecutarConsultaSimpleFila("SELECT COUNT(*) AS total FROM detalle_venta WHERE idlote='$idlote'");
+		if ($ventasLote && (int)$ventasLote['total'] > 0) {
+			return array("ok"=>false, "message"=>"No se puede eliminar: este lote ya tiene ventas registradas");
+		}
+	}
+	$ok = ejecutarConsulta("DELETE FROM detalle_ingreso WHERE iddetalle_ingreso='$iddetalle'");
+	if (!$ok) {
+		return array("ok"=>false, "message"=>"No se pudo eliminar el artículo de la compra");
+	}
+	if ($idlote > 0) {
+		ejecutarConsulta("DELETE FROM lote_articulo WHERE idlote='$idlote'");
+	}
+	$cantidad = (float)$rowDet['cantidad'];
+	ejecutarConsulta("UPDATE articulo SET stock = stock - '$cantidad' WHERE idarticulo='".(int)$rowDet['idarticulo']."'");
+	$idingreso = (int)$rowDet['idingreso'];
+	$totalRow = ejecutarConsultaSimpleFila("SELECT IFNULL(SUM(cantidad*precio_compra),0) AS total FROM detalle_ingreso WHERE idingreso='$idingreso'");
+	$nuevoTotal = $totalRow ? (float)$totalRow['total'] : 0;
+	ejecutarConsulta("UPDATE ingreso SET total_compra='$nuevoTotal' WHERE idingreso='$idingreso'");
+	return array("ok"=>true, "message"=>"Artículo eliminado de la compra correctamente", "nuevo_total"=>$nuevoTotal);
+}
+
 //listar registros
 public function listar(){
 	$sql="SELECT i.idingreso,DATE_FORMAT(i.fecha_hora,'%d/%m/%Y %H:%i') as fecha,i.idproveedor,p.nombre as proveedor,u.idusuario,u.nombre as usuario, i.tipo_comprobante,i.serie_comprobante,i.num_comprobante,i.total_compra,i.impuesto,i.estado FROM ingreso i INNER JOIN persona p ON i.idproveedor=p.idpersona INNER JOIN usuario u ON i.idusuario=u.idusuario ORDER BY i.idingreso DESC";

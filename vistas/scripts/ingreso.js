@@ -1050,4 +1050,38 @@ function guardarFilaDetalle(iddetalle) {
 	});
 }
 
+function eliminarFilaDetalle(iddetalle) {
+	if (!confirm("¿Eliminar este artículo de la compra? Esta acción no se puede deshacer.")) {
+		return;
+	}
+	var $fila = $('[data-iddetalle="' + iddetalle + '"]');
+	var $btn = $fila.find('.btn-danger');
+	$btn.prop("disabled", true);
+
+	$.post("../ajax/ingreso.php?op=eliminarDetalle", { iddetalle: iddetalle }, function(resp) {
+		var r = {};
+		try { r = JSON.parse(resp); } catch(e) {}
+		if (r.ok) {
+			notifyIngreso("success", r.message || "Artículo eliminado de la compra.");
+			if (typeof r.nuevo_total !== "undefined") {
+				var sym = window.appCurrencySymbol || "S/";
+				$("#det-total-view").text(sym + " " + parseFloat(r.nuevo_total).toFixed(2));
+			}
+			var idingreso = $("#idingreso").val();
+			if (idingreso) {
+				$.get("../ajax/ingreso.php?op=listarDetalle&id=" + idingreso, function(html) {
+					$("#tablaItemsExistentes").html(html);
+				});
+			}
+			if (tabla) { tabla.ajax.reload(null, false); }
+		} else {
+			notifyIngreso("error", r.message || "No se pudo eliminar el artículo.");
+			$btn.prop("disabled", false);
+		}
+	}).fail(function(){
+		notifyIngreso("error", "Error de conexión al eliminar.");
+		$btn.prop("disabled", false);
+	});
+}
+
 init();

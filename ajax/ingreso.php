@@ -165,6 +165,7 @@ switch ($_GET["op"]) {
         <th>Vencimiento</th>
         <th>Subtotal</th>
         <th>Guardar</th>
+        <th>Eliminar</th>
        </thead>';
 		while ($reg = $rspta->fetch_object()) {
 			$subtotal  = (float)$reg->precio_compra * (float)$reg->cantidad;
@@ -186,12 +187,14 @@ switch ($_GET["op"]) {
 			<td><input type="date" name="det_fecha_vencimiento" value="'.$vencVal.'" style="width:130px" class="form-control input-sm"></td>
 			<td><span class="det-subtotal">'.number_format($subtotal, 2).'</span></td>
 			<td><button type="button" class="btn btn-success btn-xs" onclick="guardarFilaDetalle('.$iddet.')"><i class="fa fa-save"></i> Guardar</button></td>
+			<td><button type="button" class="btn btn-danger btn-xs" onclick="eliminarFilaDetalle('.$iddet.')"><i class="fa fa-trash"></i> Eliminar</button></td>
 			</tr>';
 		}
 		echo '<tfoot>
          <th>TOTAL</th>
          <th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th>
          <th><h4 id="det-total-view">'.formatearMoneda($total).'</h4></th>
+         <th></th>
        </tfoot>';
 		break;
 
@@ -213,6 +216,12 @@ switch ($_GET["op"]) {
 		}
 		$rspta_upd = $ingreso->actualizarDetalle($iddetalle_upd, $cantidad_upd, $precio_compra_upd, $precio_venta_upd, $numero_lote_upd, $fecha_venc_upd);
 		echo json_encode($rspta_upd);
+		break;
+
+	case 'eliminarDetalle':
+		$iddetalle_del = isset($_POST['iddetalle']) ? (int)$_POST['iddetalle'] : 0;
+		$rspta_del = $ingreso->eliminarDetalle($iddetalle_del);
+		echo json_encode($rspta_del);
 		break;
 
     case 'listar':
