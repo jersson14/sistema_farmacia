@@ -292,7 +292,7 @@ if ($_SESSION['compras']==1) {
 
 require 'footer.php';
  ?>
- <script src="scripts/ingreso.js?v=20260529d"></script>
+ <script src="scripts/ingreso.js?v=20260624a"></script>
  <?php 
 }
 
