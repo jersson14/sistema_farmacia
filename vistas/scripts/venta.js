@@ -520,21 +520,17 @@ function init(){
    	numeroComprobanteManual = true;
    });
 
-   // Receta médica Rx
+   // Receta médica Rx (registro opcional: no bloquea la venta)
    $("#btnConfirmarReceta").on("click", function(){
    	var nombreMedico = $.trim($("#rx_nombre_medico").val());
    	var colegiatura  = $.trim($("#rx_colegiatura").val());
-   	if (!nombreMedico) {
-   		notifyVenta("warning", "El nombre del médico es obligatorio para medicamentos Rx.");
-   		$("#rx_nombre_medico").focus();
-   		return;
-   	}
-   	if (!colegiatura) {
-   		notifyVenta("warning", "El número de colegiatura es obligatorio para medicamentos Rx.");
-   		$("#rx_colegiatura").focus();
-   		return;
-   	}
-   	recetaModalConfirmada = true;
+   	// Solo se guarda la receta si el cajero ingresó al menos el nombre del médico o la colegiatura.
+   	recetaModalConfirmada = !!(nombreMedico || colegiatura);
+   	$('#modalReceta').modal('hide');
+   	ejecutarGuardarVenta();
+   });
+   $("#btnVenderSinReceta").on("click", function(){
+   	recetaModalConfirmada = false;
    	$('#modalReceta').modal('hide');
    	ejecutarGuardarVenta();
    });
@@ -979,11 +975,8 @@ function guardaryeditar(e){
      sincronizarMontoPago();
      if (!validarMontoPago()) return;
 
-     if (tieneArticulosRx()) {
-     	abrirModalReceta();
-     } else {
-     	ejecutarGuardarVenta();
-     }
+     // La receta médica es opcional y no bloquea la emisión de la boleta.
+     ejecutarGuardarVenta();
 }
 
 function tieneArticulosControlEspecial(){

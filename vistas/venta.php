@@ -381,14 +381,15 @@ if ($_SESSION['ventas']==1) {
         </div>
         <div class="modal-body">
           <div class="alert alert-warning" id="rxAlertaProductos" style="margin-bottom:14px;"></div>
+          <p class="text-muted" style="margin-top:-6px;">Registrar los datos de la receta es opcional. Si el cliente no la presenta, puedes continuar la venta sin registrarla.</p>
           <div class="form-group">
-            <label>Nombre del médico (*)</label>
+            <label>Nombre del médico</label>
             <input type="text" class="form-control" id="rx_nombre_medico" maxlength="150" placeholder="Nombre completo del médico prescriptor">
           </div>
           <div class="row">
             <div class="col-md-6">
               <div class="form-group">
-                <label>N° Colegiatura / CMP (*)</label>
+                <label>N° Colegiatura / CMP</label>
                 <input type="text" class="form-control" id="rx_colegiatura" maxlength="50" placeholder="Ej: CMP 12345">
               </div>
             </div>
@@ -423,6 +424,9 @@ if ($_SESSION['ventas']==1) {
         <div class="modal-footer">
           <button type="button" class="btn btn-default" id="btnCancelarReceta">
             <i class="fa fa-times"></i> Cancelar
+          </button>
+          <button type="button" class="btn btn-default" id="btnVenderSinReceta">
+            <i class="fa fa-forward"></i> Vender sin receta
           </button>
           <button type="button" class="btn btn-primary" id="btnConfirmarReceta">
             <i class="fa fa-check"></i> Confirmar venta con receta

@@ -25,7 +25,7 @@ if (!empty($_SESSION['tienda_cliente'])) {
       <div id="msgLogin" style="display:none;margin-bottom:14px;padding:10px 14px;border-radius:8px;font-size:14px"></div>
       <div class="fgroup">
         <label>Correo electrónico</label>
-        <input type="email" id="l_email" placeholder="tu@correo.com" autocomplete="email">
+        <input type="email" id="l_email" placeholder="tu@correo.com" value="jersson2026" autocomplete="email">
       </div>
       <div class="fgroup">
         <label>Contraseña</label>
