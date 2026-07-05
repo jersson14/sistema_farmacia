@@ -229,10 +229,16 @@ var metodoPagoSel  = 'CONTRAENTREGA';
 var tipoCompSel    = 'Boleta';
 var tipoEntregaSel = 'ENVIO';
 
+function marcarRadio(name, valor){
+  var input = document.querySelector('input[name="' + name + '"][value="' + valor + '"]');
+  if (input) input.checked = true;
+}
+
 function selEntrega(t){
   tipoEntregaSel = t;
   document.getElementById('cardEnvio').classList.toggle('selected',  t === 'ENVIO');
   document.getElementById('cardRecojo').classList.toggle('selected', t === 'RECOJO');
+  marcarRadio('tipo_entrega', t);
   document.getElementById('seccionDireccion').style.display = (t === 'RECOJO') ? 'none' : 'block';
   actualizarTotales();
 }
@@ -241,6 +247,7 @@ function selPago(m){
   metodoPagoSel = m;
   document.getElementById('cardYape').classList.toggle('selected',   m === 'YAPE');
   document.getElementById('cardContra').classList.toggle('selected', m === 'CONTRAENTREGA');
+  marcarRadio('metodo_pago', m);
   document.getElementById('datosYape').style.display = (m === 'YAPE') ? 'block' : 'none';
 }
 
@@ -248,6 +255,7 @@ function selComp(t){
   tipoCompSel = t;
   document.getElementById('cardBoleta').classList.toggle('selected',  t === 'Boleta');
   document.getElementById('cardFactura').classList.toggle('selected', t === 'Factura');
+  marcarRadio('tipo_comp', t);
   document.getElementById('datosFactura').style.display = (t === 'Factura') ? 'block' : 'none';
 }
 
