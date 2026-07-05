@@ -205,18 +205,25 @@ function tarjetaProducto(p){
     ? '<div class="pdci">' + esc(p.principio_activo) + (p.concentracion ? ' ' + esc(p.concentracion) : '') + '</div>'
     : '';
   var lab = p.laboratorio ? '<div class="plab">' + esc(p.laboratorio) + '</div>' : '';
-  var precio = parseFloat(p.precio_venta) || 0;
+  var precio    = parseFloat(p.precio_venta) || 0;
+  var enOferta  = !!p.en_oferta && parseFloat(p.descuento_porcentaje) > 0;
+  var precioHtml = precio > 0 ? 'S/ ' + precio.toFixed(2) : '<small>Sin precio</small>';
+  if (enOferta && precio > 0) {
+    precioHtml = '<span class="precio-tachado">S/ ' + parseFloat(p.precio_original || 0).toFixed(2) + '</span>S/ ' + precio.toFixed(2);
+  }
 
   return '<div class="product-card" onclick="verProducto(' + p.idarticulo + ')">'
     + '<div class="img-wrap">'
     +   imgHtml(p.imagen, p.nombre)
     +   '<span class="badge-otc">OTC</span>'
+    +   (enOferta ? '<span class="badge-oferta">-' + parseFloat(p.descuento_porcentaje).toFixed(0) + '%</span>' : '')
     + '</div>'
     + '<div class="card-body">'
     +   '<div class="pcat">' + esc(p.categoria) + '</div>'
     +   '<div class="pname">' + esc(p.nombre) + '</div>'
     +   dci + lab
-    +   '<div class="pprice">' + (precio > 0 ? 'S/ ' + precio.toFixed(2) : '<small>Sin precio</small>') + '</div>'
+    +   (enOferta ? '<span class="tag-oferta">🔥 ¡En oferta!</span>' : '')
+    +   '<div class="pprice">' + precioHtml + '</div>'
     +   (sinStock
         ? '<button class="btn-agregar" disabled onclick="event.stopPropagation()"><i class="bi bi-x-circle"></i> Sin stock</button>'
         : '<button class="btn-agregar" onclick="event.stopPropagation(); agregarAlCarrito(' + p.idarticulo + ',\'' + esc(p.nombre).replace(/\'/g,"\\'") + '\', this)"><i class="bi bi-cart-plus"></i> Agregar</button>')
@@ -275,6 +282,7 @@ function verProducto(id){
       if (!d.ok){ contenido.innerHTML = '<div class="pm-body"><p style="color:#ef4444">Producto no encontrado.</p></div>'; return; }
       var p = d.producto;
       var precio = parseFloat(p.precio_venta) || 0;
+      var enOferta = !!p.en_oferta && parseFloat(p.descuento_porcentaje) > 0;
       var sinStock = (parseInt(p.stock) || 0) <= 0;
 
       var imgSec = '<div class="pm-img">';
@@ -307,12 +315,18 @@ function verProducto(id){
         ? '<button class="btn-primary-lg" disabled style="opacity:.5;cursor:not-allowed"><i class="bi bi-x-circle"></i> Sin stock</button>'
         : '<button class="btn-primary-lg" id="btnModalAgregar" onclick="agregarDesdeModal(' + p.idarticulo + ',\'' + esc(p.nombre).replace(/\'/g,"\\'") + '\')"><i class="bi bi-cart-plus-fill"></i> Agregar al carrito</button>';
 
+      var precioModalHtml = precio > 0
+        ? (enOferta ? '<span class="precio-tachado">S/ ' + parseFloat(p.precio_original || 0).toFixed(2) + '</span>' : '')
+          + 'S/ ' + precio.toFixed(2) + ' <small>/ unidad</small>'
+        : '<small style="font-size:16px">Consultar precio</small>';
+
       contenido.innerHTML = imgSec
         + '<div class="pm-body">'
         + '<div class="pm-cat">' + esc(p.categoria) + '</div>'
         + '<div class="pm-name">' + esc(p.nombre) + '</div>'
         + (meta ? '<div class="pm-meta">' + meta + '</div>' : '')
-        + '<div class="pm-price">' + (precio > 0 ? 'S/ ' + precio.toFixed(2) + ' <small>/ unidad</small>' : '<small style="font-size:16px">Consultar precio</small>') + '</div>'
+        + (enOferta ? '<div class="pm-badge-oferta">🏷️ Oferta -' + parseFloat(p.descuento_porcentaje).toFixed(0) + '%</div>' : '')
+        + '<div class="pm-price">' + precioModalHtml + '</div>'
         + descSec
         + '<hr class="pm-divider">'
         + stockTxt

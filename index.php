@@ -427,6 +427,26 @@ section{padding:88px 5%}
 .nf-tx strong{display:block;font-weight:700;font-size:.9rem;margin-bottom:2px}
 .nf-tx span{font-size:.82rem;color:var(--gray-500)}
 
+/* ═══ MISIÓN Y VISIÓN ═══════════════════════════════════════ */
+.mision-vision{background:var(--gray-50)}
+.mv-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px}
+.mv-card{
+  background:#fff;border-radius:var(--r-xl);padding:40px 36px;
+  box-shadow:var(--shadow);border-top:4px solid var(--blue);
+  transition:transform .3s ease,box-shadow .3s ease;
+}
+.mv-card:hover{transform:translateY(-6px);box-shadow:var(--shadow-lg)}
+.mv-card.red{border-top-color:var(--red)}
+.mv-ico{
+  width:58px;height:58px;border-radius:16px;
+  background:var(--grad-blue);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:26px;margin-bottom:22px;box-shadow:var(--shadow-blue);
+}
+.mv-card.red .mv-ico{background:var(--grad-red);box-shadow:0 8px 28px rgba(220,38,38,.35)}
+.mv-card h3{font-family:'Sora',sans-serif;font-weight:800;font-size:1.35rem;margin-bottom:14px}
+.mv-card p{font-size:.95rem;color:var(--gray-500);line-height:1.85}
+
 /* ═══ CONTACTO ════════════════════════════════════════════ */
 .contacto{background:var(--gray-50)}
 .cnt-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px}
@@ -520,6 +540,7 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
   .prod-grid{grid-template-columns:repeat(2,1fr)}
   .nos-grid{grid-template-columns:1fr}
   .nos-img-wrap{max-width:500px;margin:0 auto}
+  .mv-grid{grid-template-columns:1fr}
   .cnt-grid{grid-template-columns:1fr}
   .strip-in{grid-template-columns:1fr}
   .strip-item{border-right:none;border-bottom:1px solid rgba(255,255,255,.15)}
@@ -888,6 +909,37 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── MISIÓN Y VISIÓN ────────────────────────────────────── -->
+<section id="mision-vision" class="mision-vision">
+  <div class="sec-in">
+    <div class="sec-hd rev">
+      <div class="sec-tag"><i class="bi bi-flag-fill"></i> Nuestro Compromiso</div>
+      <h2>Misión y <em>Visión</em></h2>
+      <p>Los principios que guían cada atención y cada medicamento que entregamos.</p>
+    </div>
+    <div class="mv-grid">
+      <div class="mv-card rev-l">
+        <div class="mv-ico"><i class="bi bi-bullseye"></i></div>
+        <h3>Misión</h3>
+        <p>
+          Brindar acceso a medicamentos de calidad y asesoría farmacéutica confiable a la
+          comunidad de Patibamba Baja y sus alrededores, con atención cercana, profesionales
+          titulados y precios justos, cuidando la salud de cada familia como si fuera la nuestra.
+        </p>
+      </div>
+      <div class="mv-card red rev-r">
+        <div class="mv-ico"><i class="bi bi-binoculars-fill"></i></div>
+        <h3>Visión</h3>
+        <p>
+          Ser la botica de referencia de la región por su calidad de servicio, innovación
+          digital y compromiso con la salud pública, expandiendo nuestra plataforma online
+          para acercar medicamentos certificados a más comunidades cada año.
+        </p>
       </div>
     </div>
   </div>

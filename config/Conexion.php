@@ -112,6 +112,23 @@ function formatearMoneda($monto, $codigo = null, $decimales = 2){
 	return $simbolo . ' ' . number_format((float)$monto, (int)$decimales, '.', ',');
 }
 
+// Precio base de un articulo: precio_venta propio, o el ultimo precio_venta de compra si no tiene
+function sqlPrecioBaseExpr($alias = 'a'){
+	return "COALESCE(NULLIF($alias.precio_venta,0),(SELECT di.precio_venta FROM detalle_ingreso di WHERE di.idarticulo=$alias.idarticulo ORDER BY di.iddetalle_ingreso DESC LIMIT 1),0)";
+}
+
+// Condicion booleana SQL: la oferta del articulo esta vigente ahora mismo
+function sqlOfertaVigenteExpr($alias = 'a'){
+	return "($alias.en_oferta=1 AND $alias.descuento_porcentaje>0 AND ($alias.oferta_fecha_inicio IS NULL OR NOW()>=$alias.oferta_fecha_inicio) AND ($alias.oferta_fecha_fin IS NULL OR NOW()<=$alias.oferta_fecha_fin))";
+}
+
+// Precio final a cobrar: con descuento si la oferta esta vigente, si no el precio base
+function sqlPrecioFinalExpr($alias = 'a'){
+	$base    = sqlPrecioBaseExpr($alias);
+	$vigente = sqlOfertaVigenteExpr($alias);
+	return "IF($vigente, ROUND($base * (1 - $alias.descuento_porcentaje/100), 2), $base)";
+}
+
 }
 
  ?>

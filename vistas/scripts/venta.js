@@ -210,7 +210,13 @@ function renderGrid() {
 	var html = '';
 	pagina.forEach(function(p) {
 		var sinStock = p.stock <= 0;
-		var precio   = (p.precio_venta > 0) ? ((window.appCurrencySymbol || 'S/') + ' ' + p.precio_venta.toFixed(2)) : 'Sin precio';
+		var simbolo  = window.appCurrencySymbol || 'S/';
+		var enOferta = !!p.en_oferta && parseFloat(p.descuento_porcentaje) > 0;
+		var precio   = (p.precio_venta > 0) ? (simbolo + ' ' + p.precio_venta.toFixed(2)) : 'Sin precio';
+		var precioHtml = precio;
+		if (enOferta && p.precio_venta > 0) {
+			precioHtml = '<span class="pos-card-precio-tachado">' + simbolo + ' ' + parseFloat(p.precio_venta_original || 0).toFixed(2) + '</span> ' + precio;
+		}
 		var badgeCls = p.tipo_venta === 'OTC' ? 'badge-otc' : (p.tipo_venta === 'RX' ? 'badge-rx' : 'badge-ctrl');
 		var badgeTxt = p.tipo_venta === 'CONTROL_ESPECIAL' ? 'CTRL' : p.tipo_venta;
 		var imgSrc   = p.imagen ? '../files/articulos/' + p.imagen : '../public/img/default-50x50.gif';
@@ -220,11 +226,12 @@ function renderGrid() {
 		var onclick  = sinStock ? '' : 'onclick="posCardClick(' + p.idarticulo + ')"';
 
 		html += '<div class="' + cardCls + '" data-id="' + p.idarticulo + '" ' + onclick + '>' +
+			(enOferta ? '<span class="pos-card-oferta-ribbon">-' + parseFloat(p.descuento_porcentaje).toFixed(0) + '%</span>' : '') +
 			'<img class="pos-card-img" src="' + imgSrc + '" onerror="this.src=\'../public/img/default-50x50.gif\'" alt="">' +
 			'<div class="pos-card-nombre">' + $('<span>').text(p.nombre).html() + '</div>' +
 			(generico ? '<div class="pos-card-generico">' + $('<span>').text(generico).html() + '</div>' : '') +
 			'<div class="pos-card-footer">' +
-				'<span class="pos-card-precio">' + precio + '</span>' +
+				'<span class="pos-card-precio">' + precioHtml + '</span>' +
 				'<span class="pos-card-badge ' + badgeCls + '">' + badgeTxt + '</span>' +
 			'</div>' +
 		'</div>';

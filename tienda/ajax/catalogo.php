@@ -12,6 +12,7 @@ function _catColExists($col) {
 }
 $tieneColumnasTienda = _catColExists('tipo_venta');
 $tieneColumnasRx     = _catColExists('principio_activo');
+$tieneColumnasOferta = _catColExists('en_oferta');
 
 ob_end_clean(); // descartar cualquier salida accidental hasta aquí
 header('Content-Type: application/json; charset=utf-8');
@@ -54,14 +55,19 @@ switch ($op) {
             ? ", IFNULL(a.principio_activo,'') AS principio_activo, IFNULL(a.concentracion,'') AS concentracion, IFNULL(a.laboratorio,'') AS laboratorio"
             : '';
 
+        $precioBase = "COALESCE(NULLIF(a.precio_venta,0),(SELECT di.precio_venta FROM detalle_ingreso di WHERE di.idarticulo=a.idarticulo ORDER BY di.iddetalle_ingreso DESC LIMIT 1),0)";
+        if ($tieneColumnasOferta) {
+            $ofertaSelect = ", " . sqlPrecioFinalExpr('a') . " AS precio_final, $precioBase AS precio_original, " . sqlOfertaVigenteExpr('a') . " AS en_oferta, a.descuento_porcentaje";
+        } else {
+            $ofertaSelect = ", $precioBase AS precio_final, $precioBase AS precio_original, 0 AS en_oferta, 0 AS descuento_porcentaje";
+        }
+
         $sql = "SELECT a.idarticulo, a.nombre, a.codigo,
-                       COALESCE(NULLIF(a.precio_venta,0),
-                           (SELECT di.precio_venta FROM detalle_ingreso di WHERE di.idarticulo=a.idarticulo ORDER BY di.iddetalle_ingreso DESC LIMIT 1),
-                       0) AS precio_venta,
                        IFNULL(a.stock, 0) AS stock,
                        IFNULL(a.imagen,'') AS imagen,
                        IFNULL(c.nombre,'General') AS categoria
                        $extraSelect
+                       $ofertaSelect
                 FROM articulo a
                 LEFT JOIN categoria c ON a.idcategoria = c.idcategoria
                 $filtro
@@ -80,7 +86,10 @@ switch ($op) {
                 'idarticulo'       => (int)$r['idarticulo'],
                 'nombre'           => $r['nombre'],
                 'codigo'           => $r['codigo'],
-                'precio_venta'     => (float)$r['precio_venta'],
+                'precio_venta'     => (float)$r['precio_final'],
+                'precio_original'  => (float)$r['precio_original'],
+                'en_oferta'        => !empty($r['en_oferta']) ? 1 : 0,
+                'descuento_porcentaje' => (float)$r['descuento_porcentaje'],
                 'stock'            => (int)round((float)$r['stock']),
                 'principio_activo' => isset($r['principio_activo']) ? $r['principio_activo'] : '',
                 'concentracion'    => isset($r['concentracion'])    ? $r['concentracion']    : '',
@@ -134,16 +143,21 @@ switch ($op) {
             : '';
         $filtroTienda = '';
 
+        $precioBaseP = "COALESCE(NULLIF(a.precio_venta,0),(SELECT di.precio_venta FROM detalle_ingreso di WHERE di.idarticulo=a.idarticulo ORDER BY di.iddetalle_ingreso DESC LIMIT 1),0)";
+        if ($tieneColumnasOferta) {
+            $ofertaSelectP = ", " . sqlPrecioFinalExpr('a') . " AS precio_final, $precioBaseP AS precio_original, " . sqlOfertaVigenteExpr('a') . " AS en_oferta, a.descuento_porcentaje";
+        } else {
+            $ofertaSelectP = ", $precioBaseP AS precio_final, $precioBaseP AS precio_original, 0 AS en_oferta, 0 AS descuento_porcentaje";
+        }
+
         $r = ejecutarConsultaSimpleFila(
             "SELECT a.idarticulo, a.nombre, a.codigo,
-                    COALESCE(NULLIF(a.precio_venta,0),
-                        (SELECT di.precio_venta FROM detalle_ingreso di WHERE di.idarticulo=a.idarticulo ORDER BY di.iddetalle_ingreso DESC LIMIT 1),
-                    0) AS precio_venta,
                     IFNULL(a.stock,0) AS stock,
                     IFNULL(a.descripcion,'') AS descripcion,
                     IFNULL(a.imagen,'') AS imagen,
                     IFNULL(c.nombre,'General') AS categoria
                     $extraSelect
+                    $ofertaSelectP
              FROM articulo a
              LEFT JOIN categoria c ON a.idcategoria = c.idcategoria
              WHERE a.idarticulo='$id' AND a.condicion=1 $filtroTienda LIMIT 1"
@@ -152,7 +166,10 @@ switch ($op) {
             echo json_encode(array('ok'=>false,'message'=>'Producto no encontrado'));
             break;
         }
-        $r['precio_venta'] = (float)$r['precio_venta'];
+        $r['precio_venta']    = (float)$r['precio_final'];
+        $r['precio_original'] = (float)$r['precio_original'];
+        $r['en_oferta']       = !empty($r['en_oferta']) ? 1 : 0;
+        $r['descuento_porcentaje'] = (float)$r['descuento_porcentaje'];
         $r['stock']        = (int)round((float)$r['stock']);
         echo json_encode(array('ok' => true, 'producto' => $r));
         break;

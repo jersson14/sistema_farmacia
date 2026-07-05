@@ -27,6 +27,11 @@ $laboratorio        = isset($_POST["laboratorio"])        ? limpiarCadena($_POST
 $registro_sanitario = isset($_POST["registro_sanitario"]) ? limpiarCadena($_POST["registro_sanitario"]) : "";
 $requiere_frio      = isset($_POST["requiere_frio"])      ? 1 : 0;
 $tipo_venta         = isset($_POST["tipo_venta"])         ? limpiarCadena($_POST["tipo_venta"])         : "OTC";
+// Oferta por tiempo limitado
+$en_oferta            = isset($_POST["en_oferta"])            ? 1 : 0;
+$descuento_porcentaje = isset($_POST["descuento_porcentaje"]) ? max(0, min(100, (float)limpiarCadena($_POST["descuento_porcentaje"]))) : 0;
+$oferta_fecha_inicio  = isset($_POST["oferta_fecha_inicio"])  ? str_replace('T', ' ', limpiarCadena($_POST["oferta_fecha_inicio"])) : "";
+$oferta_fecha_fin     = isset($_POST["oferta_fecha_fin"])     ? str_replace('T', ' ', limpiarCadena($_POST["oferta_fecha_fin"])) : "";
 
 if ($stock < 0) {
 	$stock = 0;
@@ -59,12 +64,14 @@ switch ($_GET["op"]) {
 	if (empty($idarticulo)) {
 		$rspta=$articulo->insertar($idcategoria,$idunidad,$codigo,$nombre,$stock,$stock_minimo,$precio_venta,$descripcion,$imagen,
 			$principio_activo,$concentracion,$forma_farmaceutica,$via_administracion,
-			$laboratorio,$registro_sanitario,$requiere_frio,$tipo_venta);
+			$laboratorio,$registro_sanitario,$requiere_frio,$tipo_venta,
+			$en_oferta,$descuento_porcentaje,$oferta_fecha_inicio,$oferta_fecha_fin);
 		echo $rspta ? "Datos registrados correctamente" : "No se pudo registrar los datos";
 	}else{
 		$rspta=$articulo->editar($idarticulo,$idcategoria,$idunidad,$codigo,$nombre,$stock,$stock_minimo,$precio_venta,$descripcion,$imagen,
 			$principio_activo,$concentracion,$forma_farmaceutica,$via_administracion,
-			$laboratorio,$registro_sanitario,$requiere_frio,$tipo_venta);
+			$laboratorio,$registro_sanitario,$requiere_frio,$tipo_venta,
+			$en_oferta,$descuento_porcentaje,$oferta_fecha_inicio,$oferta_fecha_fin);
 		echo $rspta ? "Datos actualizados correctamente" : "No se pudo actualizar los datos";
 	}
 		break;
@@ -105,6 +112,15 @@ switch ($_GET["op"]) {
 			} else {
 				$vencCol = '<span class="label bg-green">' . $reg->prox_vencimiento . '</span>';
 			}
+			if (!$reg->en_oferta || (float)$reg->descuento_porcentaje <= 0) {
+				$ofertaCol = '<span class="text-muted">Sin oferta</span>';
+			} elseif ($reg->oferta_vigente) {
+				$ofertaCol = '<span class="label bg-red"><i class="fa fa-tag"></i> Vigente -' . rtrim(rtrim(number_format((float)$reg->descuento_porcentaje,2),'0'),'.') . '%</span>';
+			} elseif ($reg->oferta_fecha_inicio !== null && strtotime($reg->oferta_fecha_inicio) > time()) {
+				$ofertaCol = '<span class="label bg-orange"><i class="fa fa-clock-o"></i> Programada ' . date('d/m/Y H:i', strtotime($reg->oferta_fecha_inicio)) . '</span>';
+			} else {
+				$ofertaCol = '<span class="label bg-default">Vencida</span>';
+			}
 			$data[]=array(
             "0"=>($reg->condicion)?'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idarticulo.')"><i class="fa fa-pencil"></i></button>'.' '.'<button class="btn btn-danger btn-xs" onclick="desactivar('.$reg->idarticulo.')"><i class="fa fa-close"></i></button>':'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idarticulo.')"><i class="fa fa-pencil"></i></button>'.' '.'<button class="btn btn-primary btn-xs" onclick="activar('.$reg->idarticulo.')"><i class="fa fa-check"></i></button>',
             "1"=>$reg->nombre,
@@ -117,7 +133,8 @@ switch ($_GET["op"]) {
             "8"=>"<img src='../files/articulos/".$reg->imagen."' height='50px' width='50px'>",
             "9"=>$reg->descripcion,
             "10"=>($reg->condicion)?'<span class="label bg-green">Activado</span>':'<span class="label bg-red">Desactivado</span>',
-            "11"=>$vencCol
+            "11"=>$vencCol,
+            "12"=>$ofertaCol
               );
 		}
 		$draw = isset($_GET['draw']) ? (int)$_GET['draw'] : (isset($_GET['sEcho']) ? (int)$_GET['sEcho'] : 1);

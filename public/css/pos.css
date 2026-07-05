@@ -249,6 +249,27 @@ body.pos-activo #mainCW {
   flex-direction: column;
   gap: 4px;
   user-select: none;
+  position: relative;
+}
+
+.pos-card-oferta-ribbon {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 999px;
+  z-index: 1;
+}
+
+.pos-card-precio-tachado {
+  font-size: 10px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-decoration: line-through;
 }
 
 .pos-card:hover {

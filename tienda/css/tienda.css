@@ -586,6 +586,51 @@ body {
   font-weight: 500;
   color: var(--text-secondary);
 }
+
+.tag-oferta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: linear-gradient(90deg, #f59e0b, #ef4444);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  margin-top: 8px;
+  box-shadow: 0 3px 12px rgba(239,68,68,.45);
+  animation: tagOfertaPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes tagOfertaPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 3px 12px rgba(239,68,68,.45); }
+  50%      { transform: scale(1.035); box-shadow: 0 4px 16px rgba(239,68,68,.65); }
+}
+
+.product-card .badge-oferta {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  letter-spacing: .3px;
+  box-shadow: 0 2px 6px rgba(220,38,38,.35);
+}
+
+.precio-tachado {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: line-through;
+  margin-right: 6px;
+}
 .product-card .pstock {
   font-size: 11px;
   color: var(--text-secondary);
@@ -997,7 +1042,7 @@ body {
   text-align: center;
   border: 1px solid #a7f3d0;
 }
-.yape-panel img { max-width: 180px; border-radius: var(--radius); margin: 12px auto; box-shadow: var(--shadow-lg); }
+.yape-panel img { width: 100%; max-width: 320px; border-radius: var(--radius); margin: 12px auto; box-shadow: var(--shadow-lg); display: block; }
 .yape-panel .yape-name { font-weight: 700; font-size: 15px; color: #065f46; margin-bottom: 4px; }
 .yape-panel .yape-num  { font-size: 22px; font-weight: 900; color: #059669; letter-spacing: 1px; }
 
@@ -1197,6 +1242,22 @@ body {
   margin-bottom: 16px;
 }
 .pm-price small { font-size: 16px; font-weight: 500; color: var(--text-secondary); }
+.pm-price .precio-tachado { font-size: 18px; }
+.pm-badge-oferta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(90deg, #f59e0b, #ef4444);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  padding: 5px 14px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  box-shadow: 0 3px 12px rgba(239,68,68,.45);
+}
 .pm-divider { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }
 .pm-desc-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
 .pm-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 20px; }

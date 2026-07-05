@@ -374,6 +374,9 @@ switch ($_GET["op"]) {
 					'stock'          => $stock,
 					'stock_minimo'   => (int)round((float)($reg->stock_minimo ?? 0)),
 					'precio_venta'   => $precio,
+					'precio_venta_original' => isset($reg->precio_venta_original) ? (float)$reg->precio_venta_original : $precio,
+					'en_oferta'      => !empty($reg->en_oferta) ? 1 : 0,
+					'descuento_porcentaje' => isset($reg->descuento_porcentaje) ? (float)$reg->descuento_porcentaje : 0,
 					'tipo_venta'     => !empty($reg->tipo_venta) ? $reg->tipo_venta : 'OTC',
 					'imagen'         => !empty($reg->imagen) ? $reg->imagen : ''
 				);
@@ -410,6 +413,8 @@ switch ($_GET["op"]) {
 				"idarticulo"=>$reg['idarticulo'],
 				"nombre"=>$reg['nombre'],
 				"precio_venta"=>(float)$reg['precio_venta'],
+				"precio_venta_original"=>isset($reg['precio_venta_original']) ? (float)$reg['precio_venta_original'] : (float)$reg['precio_venta'],
+				"en_oferta"=>!empty($reg['en_oferta']) ? 1 : 0,
 				"unidad"=>$reg['abreviatura'],
 				"stock"=>(int)round((float)$reg['stock']),
 				"tipo_venta"=>(!empty($reg['tipo_venta']) ? $reg['tipo_venta'] : 'OTC')

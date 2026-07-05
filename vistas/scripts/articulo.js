@@ -49,6 +49,28 @@ function init(){
       };
       reader.readAsDataURL(file);
    });
+
+   $("#precio_venta, #descuento_porcentaje, #en_oferta").on("input change", actualizarPreviewOferta);
+}
+
+//vista previa en vivo del precio con descuento
+function actualizarPreviewOferta(){
+	var $prev = $("#ofertaPreview");
+	var activa = $("#en_oferta").is(":checked");
+	var precio = parseFloat($("#precio_venta").val()) || 0;
+	var pct    = parseFloat($("#descuento_porcentaje").val()) || 0;
+
+	if (!activa || pct <= 0 || precio <= 0) {
+		$prev.hide();
+		return;
+	}
+
+	pct = Math.min(100, Math.max(0, pct));
+	var simbolo = window.appCurrencySymbol || "S/";
+	var final   = Math.round((precio * (1 - pct / 100)) * 100) / 100;
+
+	$prev.html("Precio de oferta: <strong>" + simbolo + " " + final.toFixed(2) + "</strong> " +
+		"<span style='text-decoration:line-through;color:#999;margin-left:6px'>" + simbolo + " " + precio.toFixed(2) + "</span>").show();
 }
 
 //funcion limpiar
@@ -79,6 +101,12 @@ function limpiar(){
 	$("#requiere_frio").prop("checked", false);
 	$("#tipo_venta").val("OTC");
 	try { $("#tipo_venta").selectpicker("refresh"); } catch(e) {}
+	// Oferta
+	$("#en_oferta").prop("checked", false);
+	$("#descuento_porcentaje").val("0");
+	$("#oferta_fecha_inicio").val("");
+	$("#oferta_fecha_fin").val("");
+	$("#ofertaPreview").hide();
 }
 
 //funcion mostrar formulario
@@ -195,7 +223,19 @@ function mostrar(idarticulo){
 			$("#requiere_frio").prop("checked", data.requiere_frio == 1);
 			$("#tipo_venta").val(data.tipo_venta || "OTC");
 			try { $("#tipo_venta").selectpicker("refresh"); } catch(e) {}
+			// Oferta
+			$("#en_oferta").prop("checked", data.en_oferta == 1);
+			$("#descuento_porcentaje").val(parseFloat(data.descuento_porcentaje || 0));
+			$("#oferta_fecha_inicio").val(mysqlDatetimeALocal(data.oferta_fecha_inicio));
+			$("#oferta_fecha_fin").val(mysqlDatetimeALocal(data.oferta_fecha_fin));
+			actualizarPreviewOferta();
 		})
+}
+
+//convierte 'YYYY-MM-DD HH:MM:SS' (MySQL) a 'YYYY-MM-DDTHH:MM' (input datetime-local)
+function mysqlDatetimeALocal(valor){
+	if (!valor) return "";
+	return String(valor).trim().replace(" ", "T").substring(0, 16);
 }
 
 function normalizarEnteroNoNegativo(valor, fallback){

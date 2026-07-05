@@ -58,6 +58,7 @@ if ($_SESSION['almacen']==1) {
       <th>Descripcion</th>
       <th>Estado</th>
       <th>Próx. Venc.</th>
+      <th>Oferta</th>
     </thead>
     <tbody>
     </tbody>
@@ -74,7 +75,8 @@ if ($_SESSION['almacen']==1) {
       <th>Descripcion</th>
       <th>Estado</th>
       <th>Próx. Venc.</th>
-    </tfoot>   
+      <th>Oferta</th>
+    </tfoot>
   </table>
 </div>
 <div class="panel-body" id="formularioregistros">
@@ -251,6 +253,47 @@ if ($_SESSION['almacen']==1) {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Oferta / Descuento -->
+    <div class="col-lg-12 col-md-12 col-xs-12" style="margin-top:10px;">
+      <div class="box box-warning box-solid">
+        <div class="box-header with-border">
+          <h4 class="box-title"><i class="fa fa-tag"></i> Oferta / Descuento</h4>
+          <div class="box-tools pull-right">
+            <button type="button" class="btn btn-box-tool" data-widget="collapse"><i class="fa fa-minus"></i></button>
+          </div>
+        </div>
+        <div class="box-body">
+          <div class="row">
+            <div class="form-group col-lg-3 col-md-3 col-xs-12">
+              <label>&nbsp;</label><br>
+              <div class="checkbox">
+                <label>
+                  <input type="checkbox" name="en_oferta" id="en_oferta" value="1">
+                  <i class="fa fa-tag text-red"></i> Activar oferta
+                </label>
+              </div>
+            </div>
+            <div class="form-group col-lg-3 col-md-3 col-xs-6">
+              <label>% de descuento</label>
+              <div class="input-group">
+                <input class="form-control" type="number" step="0.01" min="0" max="100" name="descuento_porcentaje" id="descuento_porcentaje" placeholder="0.00" value="0">
+                <span class="input-group-addon">%</span>
+              </div>
+            </div>
+            <div class="form-group col-lg-3 col-md-3 col-xs-6">
+              <label>Desde (opcional)</label>
+              <input class="form-control" type="datetime-local" name="oferta_fecha_inicio" id="oferta_fecha_inicio">
+            </div>
+            <div class="form-group col-lg-3 col-md-3 col-xs-6">
+              <label>Hasta (opcional)</label>
+              <input class="form-control" type="datetime-local" name="oferta_fecha_fin" id="oferta_fecha_fin">
+            </div>
+          </div>
+          <div id="ofertaPreview" class="alert alert-info" style="display:none; margin-bottom:0;"></div>
         </div>
       </div>
     </div>
