@@ -301,6 +301,63 @@ public function anular($idingreso){
 	return ejecutarConsulta($sql);
 }
 
+public function activar($idingreso){
+	$sql="UPDATE ingreso SET estado='Aceptado' WHERE idingreso='$idingreso'";
+	return ejecutarConsulta($sql);
+}
+
+public function eliminarDefinitivo($idingreso){
+	global $conexion;
+	$idingreso = (int)$idingreso;
+	if ($idingreso <= 0) {
+		return array("ok"=>false, "message"=>"ID de compra inválido");
+	}
+	$cab = ejecutarConsultaSimpleFila("SELECT idingreso, estado FROM ingreso WHERE idingreso='$idingreso' LIMIT 1");
+	if (!$cab) {
+		return array("ok"=>false, "message"=>"La compra no existe");
+	}
+	if ($cab["estado"] !== "Anulado") {
+		return array("ok"=>false, "message"=>"Solo se pueden eliminar definitivamente las compras anuladas");
+	}
+
+	$rspta = ejecutarConsulta("SELECT iddetalle_ingreso, idarticulo, cantidad, IFNULL(idlote,0) AS idlote FROM detalle_ingreso WHERE idingreso='$idingreso'");
+	$filas = array();
+	while ($d = $rspta->fetch_object()) {
+		if ((int)$d->idlote > 0) {
+			$ventasLote = ejecutarConsultaSimpleFila("SELECT COUNT(*) AS total FROM detalle_venta WHERE idlote='".(int)$d->idlote."'");
+			if ($ventasLote && (int)$ventasLote["total"] > 0) {
+				return array("ok"=>false, "message"=>"No se puede eliminar: uno de los lotes de esta compra ya tiene ventas registradas");
+			}
+		}
+		$filas[] = $d;
+	}
+
+	$conexion->autocommit(false);
+	try {
+		foreach ($filas as $d) {
+			ejecutarConsulta("UPDATE articulo SET stock = stock - '".(float)$d->cantidad."' WHERE idarticulo='".(int)$d->idarticulo."'");
+			if ((int)$d->idlote > 0) {
+				ejecutarConsulta("DELETE FROM lote_articulo WHERE idlote='".(int)$d->idlote."'");
+			}
+		}
+		ejecutarConsulta("DELETE FROM detalle_ingreso WHERE idingreso='$idingreso'");
+		$ok = ejecutarConsulta("DELETE FROM ingreso WHERE idingreso='$idingreso'");
+		if (!$ok) {
+			$conexion->rollback();
+			$conexion->autocommit(true);
+			return array("ok"=>false, "message"=>"No se pudo eliminar la compra");
+		}
+		$conexion->commit();
+		$conexion->autocommit(true);
+	} catch (Throwable $e) {
+		$conexion->rollback();
+		$conexion->autocommit(true);
+		return array("ok"=>false, "message"=>"No se pudo eliminar la compra: ".$e->getMessage());
+	}
+
+	return array("ok"=>true, "message"=>"Compra eliminada definitivamente");
+}
+
 public function agregarDetalle($idingreso, $idusuario, $idarticulo, $cantidad, $precio_compra, $precio_venta, $numero_lote=array(), $fecha_vencimiento=array(), $fecha_fabricacion=array(), $idproveedor_new=null, $tipo_comprobante_new=null, $serie_comprobante_new=null, $num_comprobante_new=null, $fecha_hora_new=null){
 	global $conexion;
 	$idingreso = (int)$idingreso;

@@ -144,7 +144,17 @@ switch ($_GET["op"]) {
 		$rspta=$ingreso->anular($idingreso);
 		echo $rspta ? "Ingreso anulado correctamente" : "No se pudo anular el ingreso";
 		break;
-	
+
+	case 'activar':
+		$rspta=$ingreso->activar($idingreso);
+		echo $rspta ? "Compra recuperada correctamente" : "No se pudo recuperar la compra";
+		break;
+
+	case 'eliminarDefinitivo':
+		$rspta_eldef = $ingreso->eliminarDefinitivo($idingreso);
+		echo json_encode($rspta_eldef);
+		break;
+
 	case 'mostrar':
 		$rspta=$ingreso->mostrar($idingreso);
 		echo json_encode($rspta);
@@ -236,9 +246,12 @@ switch ($_GET["op"]) {
             "0"=>(($reg->estado=='Aceptado')
 				?'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idingreso.')" title="Ver detalle"><i class="fa fa-eye"></i></button> '
 				 .'<button class="btn btn-success btn-xs" onclick="abrirAmpliarIngreso('.$reg->idingreso.')" title="Agregar artículos a esta compra"><i class="fa fa-plus"></i></button> '
-				 .'<button class="btn btn-danger btn-xs" onclick="anular('.$reg->idingreso.')"><i class="fa fa-close"></i></button>'
-				:'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idingreso.')" title="Ver detalle"><i class="fa fa-eye"></i></button>')
-				.'<a target="_blank" href="'.$url.$reg->idingreso.'"> <button class="btn btn-info btn-xs"><i class="fa fa-file"></i></button></a>',
+				 .'<button class="btn btn-danger btn-xs" onclick="anular('.$reg->idingreso.')" title="Anular compra"><i class="fa fa-close"></i></button> '
+				 .'<a target="_blank" href="'.$url.$reg->idingreso.'"> <button class="btn btn-info btn-xs" title="Ver PDF"><i class="fa fa-file"></i></button></a>'
+				:'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idingreso.')" title="Ver detalle"><i class="fa fa-eye"></i></button> '
+				 .'<a target="_blank" href="'.$url.$reg->idingreso.'"> <button class="btn btn-info btn-xs" title="Ver PDF"><i class="fa fa-file"></i></button></a> '
+				 .'<button class="btn btn-primary btn-xs" onclick="recuperarIngreso('.$reg->idingreso.')" title="Recuperar / activar compra"><i class="fa fa-undo"></i></button> '
+				 .'<button class="btn btn-danger btn-xs" onclick="eliminarDefinitivoIngreso('.$reg->idingreso.')" title="Eliminar definitivamente"><i class="fa fa-trash"></i></button>'),
             "1"=>$reg->fecha,
             "2"=>$reg->proveedor,
             "3"=>$reg->usuario,

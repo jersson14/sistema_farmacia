@@ -468,6 +468,42 @@ function anular(idingreso){
 	});
 }
 
+//funcion para recuperar / reactivar una compra anulada
+function recuperarIngreso(idingreso){
+	bootbox.confirm("¿Deseas recuperar esta compra? Volverá al estado Aceptado.", function(result){
+		if (result) {
+			$.post("../ajax/ingreso.php?op=activar", {idingreso : idingreso}, function(e){
+				notifyIngreso("success", e);
+				tabla.ajax.reload();
+			});
+		}
+	});
+}
+
+//funcion para eliminar definitivamente una compra anulada (no se puede deshacer)
+function eliminarDefinitivoIngreso(idingreso){
+	bootbox.confirm({
+		title: "Eliminar compra definitivamente",
+		message: "Esta acción no se puede deshacer. Se eliminará la compra, su detalle y se descontará el stock que había ingresado. ¿Deseas continuar?",
+		buttons: {
+			confirm: { label: "Sí, eliminar definitivo", className: "btn-danger" },
+			cancel: { label: "Cancelar", className: "btn-default" }
+		},
+		callback: function(result){
+			if (result) {
+				$.post("../ajax/ingreso.php?op=eliminarDefinitivo", {idingreso : idingreso}, function(data){
+					var r = {};
+					try { r = JSON.parse(data); } catch(e) { r = {ok:false, message:"Respuesta inválida del servidor"}; }
+					notifyIngreso(r.ok ? "success" : "error", r.message || (r.ok ? "Compra eliminada" : "No se pudo eliminar la compra"));
+					if (r.ok) {
+						tabla.ajax.reload();
+					}
+				});
+			}
+		}
+	});
+}
+
 //declaramos variables necesarias para trabajar con las compras y sus detalles
 var impuesto=18;
 var cont=0;
