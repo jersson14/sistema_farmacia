@@ -297,13 +297,56 @@ public function insertar($idproveedor,$idusuario,$tipo_comprobante,$serie_compro
 }
 
 public function anular($idingreso){
-	$sql="UPDATE ingreso SET estado='Anulado' WHERE idingreso='$idingreso'";
-	return ejecutarConsulta($sql);
+	global $conexion;
+	$idingreso = (int)$idingreso;
+	$cab = ejecutarConsultaSimpleFila("SELECT estado, IFNULL(stock_ajustado,0) AS stock_ajustado FROM ingreso WHERE idingreso='$idingreso' LIMIT 1");
+	if (!$cab) return false;
+	if ($cab['estado'] === 'Anulado') return true;
+
+	$detalles = ejecutarConsulta("SELECT idarticulo, cantidad FROM detalle_ingreso WHERE idingreso='$idingreso'");
+	$filas = array();
+	while ($d = $detalles->fetch_object()) { $filas[] = $d; }
+
+	$conexion->autocommit(false);
+	try {
+		ejecutarConsulta("UPDATE ingreso SET estado='Anulado', stock_ajustado=1 WHERE idingreso='$idingreso'");
+		foreach ($filas as $d) {
+			ejecutarConsulta("UPDATE articulo SET stock = stock - '".(float)$d->cantidad."' WHERE idarticulo='".(int)$d->idarticulo."'");
+		}
+		$conexion->commit();
+		$conexion->autocommit(true);
+	} catch (Throwable $e) {
+		$conexion->rollback();
+		$conexion->autocommit(true);
+		return false;
+	}
+	return true;
 }
 
 public function activar($idingreso){
-	$sql="UPDATE ingreso SET estado='Aceptado' WHERE idingreso='$idingreso'";
-	return ejecutarConsulta($sql);
+	global $conexion;
+	$idingreso = (int)$idingreso;
+	$cab = ejecutarConsultaSimpleFila("SELECT estado, IFNULL(stock_ajustado,0) AS stock_ajustado FROM ingreso WHERE idingreso='$idingreso' LIMIT 1");
+	if (!$cab) return false;
+	if ($cab['estado'] === 'Aceptado') return true;
+
+	$conexion->autocommit(false);
+	try {
+		ejecutarConsulta("UPDATE ingreso SET estado='Aceptado', stock_ajustado=0 WHERE idingreso='$idingreso'");
+		if ((int)$cab['stock_ajustado'] === 1) {
+			$detalles = ejecutarConsulta("SELECT idarticulo, cantidad FROM detalle_ingreso WHERE idingreso='$idingreso'");
+			while ($d = $detalles->fetch_object()) {
+				ejecutarConsulta("UPDATE articulo SET stock = stock + '".(float)$d->cantidad."' WHERE idarticulo='".(int)$d->idarticulo."'");
+			}
+		}
+		$conexion->commit();
+		$conexion->autocommit(true);
+	} catch (Throwable $e) {
+		$conexion->rollback();
+		$conexion->autocommit(true);
+		return false;
+	}
+	return true;
 }
 
 public function eliminarDefinitivo($idingreso){
@@ -312,13 +355,14 @@ public function eliminarDefinitivo($idingreso){
 	if ($idingreso <= 0) {
 		return array("ok"=>false, "message"=>"ID de compra inválido");
 	}
-	$cab = ejecutarConsultaSimpleFila("SELECT idingreso, estado FROM ingreso WHERE idingreso='$idingreso' LIMIT 1");
+	$cab = ejecutarConsultaSimpleFila("SELECT idingreso, estado, IFNULL(stock_ajustado,0) AS stock_ajustado FROM ingreso WHERE idingreso='$idingreso' LIMIT 1");
 	if (!$cab) {
 		return array("ok"=>false, "message"=>"La compra no existe");
 	}
 	if ($cab["estado"] !== "Anulado") {
 		return array("ok"=>false, "message"=>"Solo se pueden eliminar definitivamente las compras anuladas");
 	}
+	$stockYaAjustado = (int)$cab['stock_ajustado'] === 1;
 
 	$rspta = ejecutarConsulta("SELECT iddetalle_ingreso, idarticulo, cantidad, IFNULL(idlote,0) AS idlote FROM detalle_ingreso WHERE idingreso='$idingreso'");
 	$filas = array();
@@ -335,7 +379,9 @@ public function eliminarDefinitivo($idingreso){
 	$conexion->autocommit(false);
 	try {
 		foreach ($filas as $d) {
-			ejecutarConsulta("UPDATE articulo SET stock = stock - '".(float)$d->cantidad."' WHERE idarticulo='".(int)$d->idarticulo."'");
+			if (!$stockYaAjustado) {
+				ejecutarConsulta("UPDATE articulo SET stock = stock - '".(float)$d->cantidad."' WHERE idarticulo='".(int)$d->idarticulo."'");
+			}
 			if ((int)$d->idlote > 0) {
 				ejecutarConsulta("DELETE FROM lote_articulo WHERE idlote='".(int)$d->idlote."'");
 			}
