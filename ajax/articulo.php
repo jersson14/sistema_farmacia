@@ -8,6 +8,40 @@ require_once "../modelos/Articulo.php";
 
 $articulo=new Articulo();
 
+// Máximo de imágenes que admite un artículo (imagen, imagen2, imagen3)
+define('ART_MAX_IMAGENES', 3);
+
+/**
+ * Sube (si corresponde) la imagen del slot indicado y devuelve el nombre de archivo
+ * que debe quedar guardado. Reglas:
+ *  - Sin archivo nuevo → conserva la imagen actual del slot.
+ *  - Marcada para quitar → cadena vacía.
+ *  - Archivo nuevo válido → nombre generado; si falla la subida, conserva la actual.
+ */
+function resolverImagenArticulo($campo){
+	$actual = isset($_POST[$campo . "actual"]) ? trim($_POST[$campo . "actual"]) : "";
+	if (!empty($_POST["quitar_" . $campo])) {
+		$actual = "";
+	}
+	if (!isset($_FILES[$campo]['tmp_name']) || !is_uploaded_file($_FILES[$campo]['tmp_name'])) {
+		return $actual;
+	}
+	$allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+	$allowedExts  = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+	$ext  = strtolower(pathinfo($_FILES[$campo]['name'], PATHINFO_EXTENSION));
+	$mime = strtolower($_FILES[$campo]['type']);
+	if (!in_array($mime, $allowedMimes, true) || !in_array($ext, $allowedExts, true)) {
+		return $actual;
+	}
+	// Nombre único: microtiempo + slot + aleatorio (evita colisiones al subir 3 a la vez)
+	$nuevoNombre = round(microtime(true)) . '_' . $campo . mt_rand(100, 999) . '.' . $ext;
+	$destino = "../files/articulos/" . $nuevoNombre;
+	if (move_uploaded_file($_FILES[$campo]['tmp_name'], $destino)) {
+		return $nuevoNombre;
+	}
+	return $actual;
+}
+
 $idarticulo       = isset($_POST["idarticulo"])        ? limpiarCadena($_POST["idarticulo"])        : "";
 $idcategoria      = isset($_POST["idcategoria"])       ? limpiarCadena($_POST["idcategoria"])       : "";
 $idunidad         = isset($_POST["idunidad"])          ? limpiarCadena($_POST["idunidad"])          : "";
@@ -46,32 +80,33 @@ switch ($_GET["op"]) {
 		echo "Sin permiso para modificar artículos";
 		break;
 	}
-	// Siempre partir de la imagen actual; solo sobreescribir si el upload es válido y exitoso
-	$imagen = isset($_POST["imagenactual"]) ? trim($_POST["imagenactual"]) : "";
-	if (isset($_FILES['imagen']['tmp_name']) && is_uploaded_file($_FILES['imagen']['tmp_name'])) {
-		$allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-		$allowedExts  = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-		$ext  = strtolower(pathinfo($_FILES['imagen']['name'], PATHINFO_EXTENSION));
-		$mime = strtolower($_FILES['imagen']['type']);
-		if (in_array($mime, $allowedMimes, true) && in_array($ext, $allowedExts, true)) {
-			$nuevoNombre = round(microtime(true)) . '.' . $ext;
-			$destino = "../files/articulos/" . $nuevoNombre;
-			if (move_uploaded_file($_FILES['imagen']['tmp_name'], $destino)) {
-				$imagen = $nuevoNombre;
-			}
+	// Resolver los 3 slots de imagen y compactarlos: la galería nunca queda con huecos,
+	// así la primera imagen siempre es la principal (la que usan venta, reportes y tickets).
+	$imagenes = array();
+	foreach (array('imagen', 'imagen2', 'imagen3') as $campoImg) {
+		$nombreImg = resolverImagenArticulo($campoImg);
+		if ($nombreImg !== "") {
+			$imagenes[] = $nombreImg;
 		}
 	}
+	$imagenes = array_slice($imagenes, 0, ART_MAX_IMAGENES);
+	$imagen  = isset($imagenes[0]) ? $imagenes[0] : "";
+	$imagen2 = isset($imagenes[1]) ? $imagenes[1] : "";
+	$imagen3 = isset($imagenes[2]) ? $imagenes[2] : "";
+
 	if (empty($idarticulo)) {
 		$rspta=$articulo->insertar($idcategoria,$idunidad,$codigo,$nombre,$stock,$stock_minimo,$precio_venta,$descripcion,$imagen,
 			$principio_activo,$concentracion,$forma_farmaceutica,$via_administracion,
 			$laboratorio,$registro_sanitario,$requiere_frio,$tipo_venta,
-			$en_oferta,$descuento_porcentaje,$oferta_fecha_inicio,$oferta_fecha_fin);
+			$en_oferta,$descuento_porcentaje,$oferta_fecha_inicio,$oferta_fecha_fin,
+			$imagen2,$imagen3);
 		echo $rspta ? "Datos registrados correctamente" : "No se pudo registrar los datos";
 	}else{
 		$rspta=$articulo->editar($idarticulo,$idcategoria,$idunidad,$codigo,$nombre,$stock,$stock_minimo,$precio_venta,$descripcion,$imagen,
 			$principio_activo,$concentracion,$forma_farmaceutica,$via_administracion,
 			$laboratorio,$registro_sanitario,$requiere_frio,$tipo_venta,
-			$en_oferta,$descuento_porcentaje,$oferta_fecha_inicio,$oferta_fecha_fin);
+			$en_oferta,$descuento_porcentaje,$oferta_fecha_inicio,$oferta_fecha_fin,
+			$imagen2,$imagen3);
 		echo $rspta ? "Datos actualizados correctamente" : "No se pudo actualizar los datos";
 	}
 		break;
@@ -121,6 +156,17 @@ switch ($_GET["op"]) {
 			} else {
 				$ofertaCol = '<span class="label bg-default">Vencida</span>';
 			}
+			$galeria = array_values(array_filter(array($reg->imagen, $reg->imagen2, $reg->imagen3), function($f){
+				return $f !== null && trim($f) !== '';
+			}));
+			if (count($galeria) === 0) {
+				$imgCol = '<span class="text-muted"><i class="fa fa-image"></i> Sin imagen</span>';
+			} else {
+				$imgCol = "<img src='../files/articulos/" . htmlspecialchars($galeria[0]) . "' height='50px' width='50px'>";
+				if (count($galeria) > 1) {
+					$imgCol .= ' <span class="label bg-blue" title="Imágenes en la galería">+' . (count($galeria) - 1) . '</span>';
+				}
+			}
 			$data[]=array(
             "0"=>($reg->condicion)?'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idarticulo.')"><i class="fa fa-pencil"></i></button>'.' '.'<button class="btn btn-danger btn-xs" onclick="desactivar('.$reg->idarticulo.')"><i class="fa fa-close"></i></button>':'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idarticulo.')"><i class="fa fa-pencil"></i></button>'.' '.'<button class="btn btn-primary btn-xs" onclick="activar('.$reg->idarticulo.')"><i class="fa fa-check"></i></button>',
             "1"=>$reg->nombre,
@@ -130,7 +176,7 @@ switch ($_GET["op"]) {
             "5"=>(int)round((float)$reg->stock),
             "6"=>(int)round((float)$reg->stock_minimo),
             "7"=>formatearMoneda((float)$reg->precio_venta),
-            "8"=>"<img src='../files/articulos/".$reg->imagen."' height='50px' width='50px'>",
+            "8"=>$imgCol,
             "9"=>$reg->descripcion,
             "10"=>($reg->condicion)?'<span class="label bg-green">Activado</span>':'<span class="label bg-red">Desactivado</span>',
             "11"=>$vencCol,

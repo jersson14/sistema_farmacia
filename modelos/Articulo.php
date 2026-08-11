@@ -27,18 +27,19 @@ private function normalizarOferta($en_oferta, $descuento_porcentaje, $oferta_fec
 public function insertar($idcategoria,$idunidad,$codigo,$nombre,$stock,$stock_minimo,$precio_venta,$descripcion,$imagen,
 	$principio_activo='',$concentracion='',$forma_farmaceutica='',$via_administracion='',
 	$laboratorio='',$registro_sanitario='',$requiere_frio=0,$tipo_venta='OTC',
-	$en_oferta=0,$descuento_porcentaje=0,$oferta_fecha_inicio='',$oferta_fecha_fin=''){
+	$en_oferta=0,$descuento_porcentaje=0,$oferta_fecha_inicio='',$oferta_fecha_fin='',
+	$imagen2='',$imagen3=''){
 	$tiposVentaPermitidos = array('OTC','RX','CONTROL_ESPECIAL');
 	$tipo_venta = in_array($tipo_venta, $tiposVentaPermitidos, true) ? $tipo_venta : 'OTC';
 	$requiere_frio = $requiere_frio ? 1 : 0;
 	$precio_venta = max(0, (float)$precio_venta);
 	$o = $this->normalizarOferta($en_oferta, $descuento_porcentaje, $oferta_fecha_inicio, $oferta_fecha_fin);
 	$sql="INSERT INTO articulo
-		(idcategoria,idunidad,codigo,nombre,stock,stock_minimo,precio_venta,descripcion,imagen,condicion,
+		(idcategoria,idunidad,codigo,nombre,stock,stock_minimo,precio_venta,descripcion,imagen,imagen2,imagen3,condicion,
 		 principio_activo,concentracion,forma_farmaceutica,via_administracion,
 		 laboratorio,registro_sanitario,requiere_frio,tipo_venta,
 		 en_oferta,descuento_porcentaje,oferta_fecha_inicio,oferta_fecha_fin)
-	 VALUES ('$idcategoria','$idunidad','$codigo','$nombre','$stock','$stock_minimo','$precio_venta','$descripcion','$imagen','1',
+	 VALUES ('$idcategoria','$idunidad','$codigo','$nombre','$stock','$stock_minimo','$precio_venta','$descripcion','$imagen','$imagen2','$imagen3','1',
 	 		 '$principio_activo','$concentracion','$forma_farmaceutica','$via_administracion',
 	 		 '$laboratorio','$registro_sanitario','$requiere_frio','$tipo_venta',
 	 		 '{$o['en_oferta']}','{$o['descuento_porcentaje']}',{$o['oferta_fecha_inicio']},{$o['oferta_fecha_fin']})";
@@ -48,7 +49,8 @@ public function insertar($idcategoria,$idunidad,$codigo,$nombre,$stock,$stock_mi
 public function editar($idarticulo,$idcategoria,$idunidad,$codigo,$nombre,$stock,$stock_minimo,$precio_venta,$descripcion,$imagen,
 	$principio_activo='',$concentracion='',$forma_farmaceutica='',$via_administracion='',
 	$laboratorio='',$registro_sanitario='',$requiere_frio=0,$tipo_venta='OTC',
-	$en_oferta=0,$descuento_porcentaje=0,$oferta_fecha_inicio='',$oferta_fecha_fin=''){
+	$en_oferta=0,$descuento_porcentaje=0,$oferta_fecha_inicio='',$oferta_fecha_fin='',
+	$imagen2='',$imagen3=''){
 	$tiposVentaPermitidos = array('OTC','RX','CONTROL_ESPECIAL');
 	$tipo_venta = in_array($tipo_venta, $tiposVentaPermitidos, true) ? $tipo_venta : 'OTC';
 	$requiere_frio = $requiere_frio ? 1 : 0;
@@ -57,7 +59,7 @@ public function editar($idarticulo,$idcategoria,$idunidad,$codigo,$nombre,$stock
 	$sql="UPDATE articulo SET
 		idcategoria='$idcategoria',idunidad='$idunidad',codigo='$codigo',nombre='$nombre',
 		stock='$stock',stock_minimo='$stock_minimo',precio_venta='$precio_venta',
-		descripcion='$descripcion',imagen='$imagen',
+		descripcion='$descripcion',imagen='$imagen',imagen2='$imagen2',imagen3='$imagen3',
 		principio_activo='$principio_activo',concentracion='$concentracion',
 		forma_farmaceutica='$forma_farmaceutica',via_administracion='$via_administracion',
 		laboratorio='$laboratorio',registro_sanitario='$registro_sanitario',
@@ -87,6 +89,7 @@ public function listar(){
 	$vigente = sqlOfertaVigenteExpr('a');
 	$sql="SELECT a.idarticulo,a.idcategoria,a.idunidad,c.nombre as categoria,u.nombre as unidad,u.abreviatura,
 		a.codigo,a.nombre,a.stock,a.stock_minimo,a.precio_venta,a.descripcion,a.imagen,a.condicion,
+		IFNULL(a.imagen2,'') AS imagen2, IFNULL(a.imagen3,'') AS imagen3,
 		a.en_oferta,a.descuento_porcentaje,a.oferta_fecha_inicio,a.oferta_fecha_fin,
 		$vigente AS oferta_vigente,
 		(SELECT DATE_FORMAT(la.fecha_vencimiento,'%d/%m/%Y')

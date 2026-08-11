@@ -35,6 +35,61 @@ if ($_SESSION['almacen']==1) {
 .leyenda-stock { display:flex; gap:18px; align-items:center; margin-bottom:8px; font-size:12px; }
 .leyenda-stock span { display:inline-flex; align-items:center; gap:5px; }
 .leyenda-dot { width:14px; height:14px; border-radius:3px; display:inline-block; border:1px solid rgba(0,0,0,.12); }
+
+/* ── Galería de imágenes del artículo (máx. 3) ── */
+.img-slot {
+  position: relative;
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.img-slot:hover { border-color: #3c8dbc; background: #f1f5f9; }
+.img-slot.tiene-imagen { border-style: solid; border-color: #d0d7e2; background: #fff; }
+.img-slot-principal { height: 200px; }
+.img-slots-extra { display: flex; gap: 8px; margin-top: 8px; }
+.img-slots-extra .img-slot { flex: 1; height: 96px; }
+.img-slot-input {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  opacity: 0; cursor: pointer; z-index: 2;
+}
+.img-slot-preview {
+  display: none;
+  width: 100%; height: 100%;
+  object-fit: contain;
+  padding: 6px;
+}
+.img-slot-placeholder {
+  height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 3px;
+  color: #94a3b8; text-align: center;
+}
+.img-slot-principal .img-slot-placeholder i { font-size: 40px; }
+.img-slot-principal .img-slot-placeholder span { font-size: 13px; font-weight: 600; }
+.img-slot-placeholder small { font-size: 11px; }
+.img-slots-extra .img-slot-placeholder i { font-size: 20px; }
+.img-slots-extra .img-slot-placeholder span { font-size: 11px; }
+.img-slot-tag {
+  position: absolute; top: 6px; left: 6px; z-index: 3;
+  background: #3c8dbc; color: #fff;
+  font-size: 10px; font-weight: 700;
+  padding: 2px 8px; border-radius: 10px;
+}
+.img-slot-quitar {
+  display: none;
+  position: absolute; top: 6px; right: 6px; z-index: 3;
+  width: 24px; height: 24px; line-height: 1;
+  border: 0; border-radius: 50%;
+  background: #dd4b39; color: #fff;
+  font-size: 16px; font-weight: 700;
+  cursor: pointer;
+}
+.img-slot-quitar:hover { background: #c23321; }
+.img-slot.tiene-imagen .img-slot-quitar { display: block; }
 </style>
 
 <div class="leyenda-stock">
@@ -143,24 +198,56 @@ if ($_SESSION['almacen']==1) {
 
       </div><!-- /col izquierda -->
 
-      <!-- ── Columna derecha: imagen ── -->
+      <!-- ── Columna derecha: galería de imágenes (máx. 3) ── -->
       <div class="col-md-4 col-xs-12" style="padding-right:0">
-        <div class="form-group">
-          <label>Imagen del producto</label>
-          <input class="form-control" type="file" name="imagen" id="imagen" accept="image/jpg,image/jpeg,image/png,image/gif">
-          <input type="hidden" name="imagenactual" id="imagenactual">
+        <div class="form-group" style="margin-bottom:6px">
+          <label>Imágenes del producto <small class="text-muted">(máximo 3)</small></label>
         </div>
-        <div id="imgPreviewWrap" style="text-align:center; margin-top:6px">
-          <img src="" alt="Vista previa" id="imagenmuestra"
-               style="display:none; max-width:100%; width:100%; height:260px; object-fit:contain;
-                      border:2px dashed #cbd5e1; border-radius:12px; background:#f8fafc; padding:8px;">
-          <div id="imgPlaceholder" style="height:260px; border:2px dashed #cbd5e1; border-radius:12px;
-               background:#f8fafc; display:flex; align-items:center; justify-content:center;
-               flex-direction:column; color:#94a3b8;">
-            <i class="fa fa-image" style="font-size:48px; margin-bottom:8px"></i>
-            <span style="font-size:13px">Sin imagen</span>
+
+        <!-- Slot 1: imagen principal -->
+        <div class="img-slot img-slot-principal" data-slot="imagen">
+          <input type="file" class="img-slot-input" name="imagen" id="imagen" accept="image/jpeg,image/png,image/gif,image/webp">
+          <input type="hidden" name="imagenactual" id="imagenactual">
+          <input type="hidden" name="quitar_imagen" id="quitar_imagen" value="">
+          <img src="" alt="Vista previa" class="img-slot-preview" id="imagenmuestra">
+          <div class="img-slot-placeholder" id="imgPlaceholder">
+            <i class="fa fa-camera"></i>
+            <span>Imagen principal</span>
+            <small>Clic para subir</small>
+          </div>
+          <span class="img-slot-tag">Principal</span>
+          <button type="button" class="img-slot-quitar" onclick="quitarImagen('imagen')" title="Quitar imagen">&times;</button>
+        </div>
+
+        <!-- Slots 2 y 3: imágenes adicionales -->
+        <div class="img-slots-extra">
+          <div class="img-slot" data-slot="imagen2">
+            <input type="file" class="img-slot-input" name="imagen2" id="imagen2" accept="image/jpeg,image/png,image/gif,image/webp">
+            <input type="hidden" name="imagen2actual" id="imagen2actual">
+            <input type="hidden" name="quitar_imagen2" id="quitar_imagen2" value="">
+            <img src="" alt="Vista previa 2" class="img-slot-preview" id="imagen2muestra">
+            <div class="img-slot-placeholder" id="img2Placeholder">
+              <i class="fa fa-plus"></i>
+              <span>Foto 2</span>
+            </div>
+            <button type="button" class="img-slot-quitar" onclick="quitarImagen('imagen2')" title="Quitar imagen">&times;</button>
+          </div>
+          <div class="img-slot" data-slot="imagen3">
+            <input type="file" class="img-slot-input" name="imagen3" id="imagen3" accept="image/jpeg,image/png,image/gif,image/webp">
+            <input type="hidden" name="imagen3actual" id="imagen3actual">
+            <input type="hidden" name="quitar_imagen3" id="quitar_imagen3" value="">
+            <img src="" alt="Vista previa 3" class="img-slot-preview" id="imagen3muestra">
+            <div class="img-slot-placeholder" id="img3Placeholder">
+              <i class="fa fa-plus"></i>
+              <span>Foto 3</span>
+            </div>
+            <button type="button" class="img-slot-quitar" onclick="quitarImagen('imagen3')" title="Quitar imagen">&times;</button>
           </div>
         </div>
+        <p class="help-block" style="font-size:11px; margin-top:6px">
+          <i class="fa fa-info-circle"></i> Las imágenes se muestran en el catálogo de la tienda online.
+          JPG, PNG, GIF o WEBP.
+        </p>
       </div><!-- /col derecha -->
 
     </div><!-- /row principal -->

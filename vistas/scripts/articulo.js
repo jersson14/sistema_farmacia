@@ -36,21 +36,61 @@ function init(){
    	$("#idunidad").html(r);
    	$("#idunidad").selectpicker('refresh');
    });
-   $("#imagenmuestra").hide();
-   $("#imgPlaceholder").show();
-
-   $("#imagen").on("change", function(){
-      var file = this.files[0];
-      if (!file) return;
-      var reader = new FileReader();
-      reader.onload = function(e){
-         $("#imagenmuestra").attr("src", e.target.result).show();
-         $("#imgPlaceholder").hide();
-      };
-      reader.readAsDataURL(file);
+   //galeria: vista previa en vivo de cada uno de los 3 slots
+   SLOTS_IMAGEN.forEach(function(campo){
+      limpiarSlotImagen(campo);
+      $("#" + campo).on("change", function(){
+         var file = this.files[0];
+         if (!file) return;
+         if (file.size > MAX_PESO_IMAGEN) {
+            notify("warning", "La imagen pesa mas de 5 MB. Elige una mas liviana.");
+            this.value = "";
+            return;
+         }
+         var reader = new FileReader();
+         reader.onload = function(e){
+            pintarSlotImagen(campo, e.target.result);
+            $("#quitar_" + campo).val("");
+         };
+         reader.readAsDataURL(file);
+      });
    });
 
    $("#precio_venta, #descuento_porcentaje, #en_oferta").on("input change", actualizarPreviewOferta);
+}
+
+//los 3 slots de imagen que admite un articulo (el primero es la imagen principal)
+var SLOTS_IMAGEN = ["imagen", "imagen2", "imagen3"];
+//peso maximo por imagen (5 MB)
+var MAX_PESO_IMAGEN = 5 * 1024 * 1024;
+
+function slotContenedor(campo){
+	return $(".img-slot[data-slot='" + campo + "']");
+}
+
+function slotPlaceholder(campo){
+	return slotContenedor(campo).find(".img-slot-placeholder");
+}
+
+//muestra una imagen en el slot indicado
+function pintarSlotImagen(campo, src){
+	$("#" + campo + "muestra").attr("src", src).css("display", "block");
+	slotPlaceholder(campo).css("display", "none");
+	slotContenedor(campo).addClass("tiene-imagen");
+}
+
+//deja el slot vacio (solo visual, no toca el flag de quitar)
+function limpiarSlotImagen(campo){
+	$("#" + campo + "muestra").attr("src", "").css("display", "none");
+	slotPlaceholder(campo).css("display", "flex");
+	slotContenedor(campo).removeClass("tiene-imagen");
+}
+
+//quita la imagen del slot: la marca para borrar al guardar
+function quitarImagen(campo){
+	limpiarSlotImagen(campo);
+	$("#" + campo).val("");
+	$("#quitar_" + campo).val("1");
 }
 
 //vista previa en vivo del precio con descuento
@@ -83,10 +123,12 @@ function limpiar(){
 	$("#precio_venta").val("0.00");
 	$("#idunidad").val("");
 	$("#idunidad").selectpicker('refresh');
-	$("#imagenmuestra").attr("src","").hide();
-	$("#imgPlaceholder").show();
-	$("#imagenactual").val("");
-	$("#imagen").val("");
+	SLOTS_IMAGEN.forEach(function(campo){
+		limpiarSlotImagen(campo);
+		$("#" + campo).val("");
+		$("#" + campo + "actual").val("");
+		$("#quitar_" + campo).val("");
+	});
 	$("#print").hide();
 	$("#idarticulo").val("");
 	// Campos farmacéuticos
@@ -206,9 +248,17 @@ function mostrar(idarticulo){
 			$("#stock_minimo").val(normalizarEnteroNoNegativo(data.stock_minimo, 1));
 			$("#precio_venta").val(parseFloat(data.precio_venta || 0).toFixed(2));
 			$("#descripcion").val(data.descripcion);
-			$("#imagenmuestra").attr("src","../files/articulos/"+data.imagen).show();
-			$("#imgPlaceholder").hide();
-			$("#imagenactual").val(data.imagen);
+			//galeria: hasta 3 imagenes ya guardadas
+			SLOTS_IMAGEN.forEach(function(campo){
+				var archivo = data[campo] || "";
+				$("#" + campo + "actual").val(archivo);
+				$("#quitar_" + campo).val("");
+				if (archivo) {
+					pintarSlotImagen(campo, "../files/articulos/" + archivo);
+				} else {
+					limpiarSlotImagen(campo);
+				}
+			});
 			$("#idarticulo").val(data.idarticulo);
 			generarbarcode(true);
 			// Campos farmacéuticos

@@ -524,18 +524,28 @@ body {
 }
 .product-card:hover .img-wrap img { transform: scale(1.06); }
 
-.product-card .badge-otc {
+/* ── Condición de venta: con receta / sin receta ── */
+.product-card .badge-venta {
   position: absolute;
   top: 10px;
   left: 10px;
-  background: #10b981;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: #fff;
   font-size: 10px;
-  font-weight: 700;
-  padding: 2px 8px;
+  font-weight: 800;
+  padding: 3px 9px;
   border-radius: var(--radius-full);
-  letter-spacing: .3px;
+  letter-spacing: .2px;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(15,23,42,.22);
 }
+.product-card .badge-venta i { font-size: 11px; }
+.badge-venta.venta-libre   { background: #059669; }
+.badge-venta.venta-receta  { background: #d97706; }
+.badge-venta.venta-control { background: #be123c; }
 
 .product-card .card-body {
   padding: 14px;
@@ -585,43 +595,6 @@ body {
   font-size: 13px;
   font-weight: 500;
   color: var(--text-secondary);
-}
-
-.tag-oferta {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  background: linear-gradient(90deg, #f59e0b, #ef4444);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  margin-top: 8px;
-  box-shadow: 0 3px 12px rgba(239,68,68,.45);
-  animation: tagOfertaPulse 1.4s ease-in-out infinite;
-}
-
-@keyframes tagOfertaPulse {
-  0%, 100% { transform: scale(1); box-shadow: 0 3px 12px rgba(239,68,68,.45); }
-  50%      { transform: scale(1.035); box-shadow: 0 4px 16px rgba(239,68,68,.65); }
-}
-
-.product-card .badge-oferta {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background: #dc2626;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 800;
-  padding: 3px 9px;
-  border-radius: var(--radius-full);
-  letter-spacing: .3px;
-  box-shadow: 0 2px 6px rgba(220,38,38,.35);
 }
 
 .precio-tachado {
@@ -1243,24 +1216,36 @@ body {
 }
 .pm-price small { font-size: 16px; font-weight: 500; color: var(--text-secondary); }
 .pm-price .precio-tachado { font-size: 18px; }
-.pm-badge-oferta {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: linear-gradient(90deg, #f59e0b, #ef4444);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: .4px;
-  padding: 5px 14px;
-  border-radius: 8px;
-  margin-bottom: 12px;
-  box-shadow: 0 3px 12px rgba(239,68,68,.45);
-}
 .pm-divider { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }
 .pm-desc-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
 .pm-desc { font-size: 14px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 20px; }
+/* ── Aviso de receta médica en el detalle del producto ── */
+.pm-receta {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid;
+  margin-bottom: 4px;
+}
+.pm-receta i { font-size: 20px; flex-shrink: 0; line-height: 1.3; }
+.pm-receta strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 800;
+  margin-bottom: 2px;
+}
+.pm-receta span {
+  display: block;
+  font-size: 12.5px;
+  line-height: 1.55;
+  opacity: .88;
+}
+.pm-receta.venta-libre   { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+.pm-receta.venta-receta  { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+.pm-receta.venta-control { background: #fff1f2; border-color: #fda4af; color: #9f1239; }
+
 .pm-nostock { font-size: 13px; color: var(--danger); font-weight: 600; margin-bottom: 12px; }
 .pm-stock-ok { font-size: 13px; color: #16a34a; font-weight: 600; margin-bottom: 12px; }
 
@@ -1435,4 +1420,587 @@ body {
 
 @media (min-width: 900px) {
   .products-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+}
+
+/* ============================================================
+   CATÁLOGO CON PANEL DE FILTROS (multiselección)
+   ============================================================ */
+.catalogo-layout {
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  padding-top: 20px;
+}
+.catalogo-main { min-width: 0; }
+
+/* ── Panel lateral ── */
+.filtros-panel {
+  position: sticky;
+  top: 80px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 2px 8px rgba(30,58,138,.06);
+  overflow: hidden;
+  max-height: calc(100vh - 100px);
+  display: flex;
+  flex-direction: column;
+}
+.filtros-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.filtros-head h3 {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+}
+.filtros-head h3 i { color: var(--primary); font-size: 15px; }
+.filtros-limpiar {
+  background: none;
+  border: 0;
+  color: var(--primary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 0;
+}
+.filtros-limpiar:hover { text-decoration: underline; }
+.filtros-cerrar {
+  display: none;
+  background: var(--border-light);
+  border: 0;
+  border-radius: 50%;
+  width: 30px; height: 30px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+}
+.filtros-body {
+  overflow-y: auto;
+  padding: 4px 0 8px;
+  flex: 1;
+  scrollbar-width: thin;
+}
+.filtros-cargando {
+  padding: 20px 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.filtros-footer { display: none; }
+
+/* ── Grupo de filtros ── */
+.filtro-grupo { border-bottom: 1px solid var(--border-light); }
+.filtro-grupo:last-child { border-bottom: 0; }
+.filtro-grupo-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  user-select: none;
+  transition: var(--transition);
+}
+.filtro-grupo-head:hover { background: var(--primary-xlight); }
+.filtro-grupo-head i { font-size: 12px; color: var(--text-secondary); }
+.filtro-opciones { padding: 0 8px 10px; }
+.filtro-opciones-scroll {
+  max-height: 210px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+/* ── Casilla de multiselección ── */
+.filtro-opcion {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.filtro-opcion:hover { background: var(--primary-xlight); }
+.filtro-opcion input { position: absolute; opacity: 0; width: 0; height: 0; }
+.filtro-check {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 5px;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+}
+.filtro-check i {
+  font-size: 12px;
+  color: #fff;
+  opacity: 0;
+  transform: scale(.5);
+  transition: var(--transition);
+}
+.filtro-opcion.activa .filtro-check {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.filtro-opcion.activa .filtro-check i { opacity: 1; transform: scale(1); }
+.filtro-label {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.35;
+}
+.filtro-opcion.activa .filtro-label { font-weight: 700; color: var(--primary); }
+.filtro-total {
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--border-light);
+  border-radius: var(--radius-full);
+  padding: 1px 8px;
+  flex-shrink: 0;
+}
+
+/* ── Herramientas del encabezado (orden + botón filtros) ── */
+.catalog-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.orden-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.orden-wrap select {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  padding: 8px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+}
+.orden-wrap select:focus { outline: none; border-color: var(--primary); }
+.btn-filtros-movil {
+  display: none;
+  align-items: center;
+  gap: 7px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--primary);
+  background: var(--surface);
+  border: 1.5px solid var(--primary);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+  cursor: pointer;
+}
+.btn-filtros-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-full);
+  background: var(--primary);
+  color: #fff;
+  font-size: 11px;
+}
+
+/* ── Chips de filtros aplicados ── */
+.chips-aplicados {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0 4px;
+}
+.chips-titulo { font-size: 13px; color: var(--text-secondary); font-weight: 600; }
+.chip-aplicado {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--primary-xlight);
+  border: 1px solid var(--primary-light);
+  border-radius: var(--radius-full);
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.chip-aplicado:hover { background: var(--primary-light); }
+.chip-aplicado i { font-size: 13px; }
+.chip-aplicado.chip-oferta {
+  color: var(--accent);
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+.chip-limpiar {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.chip-limpiar:hover { color: var(--accent); }
+.btn-quitar-filtros {
+  margin-top: 14px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--primary);
+  border: 0;
+  border-radius: var(--radius);
+  padding: 10px 20px;
+  cursor: pointer;
+}
+
+/* ── Backdrop del panel en móvil ── */
+.filtros-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,.5);
+  z-index: 1500;
+}
+.filtros-backdrop.visible { display: block; }
+
+/* ============================================================
+   GALERÍA DE IMÁGENES DE PRODUCTO (hasta 3)
+   ============================================================ */
+.product-card .img-wrap img.pc-img {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 85%;
+  height: 85%;
+  object-fit: contain;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .25s ease, transform .3s cubic-bezier(.4,0,.2,1);
+}
+.product-card .img-wrap img.pc-img.activa { opacity: 1; visibility: visible; }
+.product-card:hover .img-wrap img.pc-img.activa { transform: scale(1.06); }
+.sin-imagen { font-size: 52px; }
+
+/* Puntos para cambiar de foto */
+.pc-dots {
+  position: absolute;
+  bottom: 8px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  z-index: 2;
+}
+.pc-dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.9);
+  background: rgba(148,163,184,.75);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.pc-dot:hover { transform: scale(1.25); }
+.pc-dot.activa { background: var(--primary); width: 20px; border-radius: var(--radius-full); }
+.pc-nfotos {
+  position: absolute;
+  bottom: 8px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(15,23,42,.62);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  z-index: 2;
+}
+
+/* Galería del modal */
+.pm-img { position: relative; }
+.pm-img img.pc-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 20px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .25s ease;
+}
+.pm-img img.pc-img.activa { opacity: 1; visibility: visible; }
+.pm-thumbs {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 20px 0;
+}
+.pm-thumb {
+  width: 62px;
+  height: 62px;
+  padding: 4px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  overflow: hidden;
+  transition: var(--transition);
+}
+.pm-thumb img { width: 100%; height: 100%; object-fit: contain; }
+.pm-thumb:hover { border-color: var(--primary-light); }
+.pm-thumb.activa { border-color: var(--primary); box-shadow: 0 2px 10px rgba(29,78,216,.25); }
+
+/* ============================================================
+   SELLO DE OFERTA — cinta diagonal + medallón sobre la foto
+   La tarjeta mantiene el mismo tamaño que las demás; lo que
+   destaca es el distintivo de oferta, no el tamaño.
+   ============================================================ */
+.product-card.pc-oferta {
+  border-color: #fca5a5;
+  box-shadow: 0 4px 16px rgba(220,38,38,.12);
+}
+.product-card.pc-oferta:hover {
+  border-color: var(--accent);
+  box-shadow: 0 14px 38px rgba(220,38,38,.24);
+}
+/* El precio de un producto en oferta va en rojo para reforzar el ahorro */
+.product-card.pc-oferta .pprice { color: var(--accent); }
+.product-card.pc-oferta .pc-dot.activa { background: var(--accent); }
+
+/* ── Cinta diagonal "OFERTA" en la esquina de la foto ── */
+.pc-cinta {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 116px;
+  height: 116px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 3;
+}
+.pc-cinta span {
+  position: absolute;
+  top: 20px;
+  right: -34px;
+  width: 148px;
+  padding: 6px 0;
+  transform: rotate(45deg);
+  background: linear-gradient(90deg, #facc15 0%, #f59e0b 38%, #dc2626 100%);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 1.6px;
+  text-align: center;
+  text-transform: uppercase;
+  text-shadow: 0 1px 2px rgba(120,20,20,.45);
+  box-shadow: 0 3px 10px rgba(185,28,28,.45);
+}
+/* Brillo que recorre la cinta para llamar la atención sin ser molesto */
+.pc-cinta span::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,.65), transparent);
+  animation: cintaBrillo 2.8s ease-in-out infinite;
+}
+@keyframes cintaBrillo {
+  0%        { left: -60%; }
+  55%, 100% { left: 130%; }
+}
+
+/* ── Medallón con el porcentaje de descuento ── */
+.pc-sello {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 3;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2.5px solid #fff;
+  background: radial-gradient(circle at 32% 26%, #f87171 0%, #dc2626 55%, #991b1b 100%);
+  box-shadow: 0 5px 16px rgba(153,27,27,.45);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -.5px;
+  pointer-events: none;
+  transition: transform .2s cubic-bezier(.4,0,.2,1);
+}
+.pc-sello small {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .8px;
+  opacity: .92;
+  margin-top: 2px;
+}
+.product-card:hover .pc-sello { transform: scale(1.06); }
+
+/* ── Pastilla de ahorro en el cuerpo de la tarjeta ── */
+.pc-ahorro {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 5px;
+  margin-top: 7px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 800;
+}
+.pc-ahorro i { font-size: 12px; }
+
+/* ── Cinta y medallón dentro del modal (foto más grande) ── */
+.pm-img-oferta .pc-cinta { width: 148px; height: 148px; }
+.pm-img-oferta .pc-cinta span {
+  top: 30px;
+  right: -38px;
+  width: 186px;
+  padding: 8px 0;
+  font-size: 14px;
+  letter-spacing: 2px;
+}
+.pm-img-oferta .pc-sello {
+  width: 74px;
+  height: 74px;
+  left: 16px;
+  bottom: 16px;
+  font-size: 22px;
+  border-width: 3px;
+}
+.pm-img-oferta .pc-sello small { font-size: 9px; }
+
+/* ============================================================
+   RESPONSIVE DEL CATÁLOGO CON FILTROS
+   ============================================================ */
+@media (max-width: 980px) {
+  .catalogo-layout { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .btn-filtros-movil { display: inline-flex; }
+
+  /* El panel pasa a ser un cajón lateral */
+  .filtros-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 300px;
+    max-width: 88vw;
+    max-height: none;
+    border-radius: 0;
+    border: 0;
+    z-index: 1600;
+    transform: translateX(-102%);
+    transition: transform .26s cubic-bezier(.4,0,.2,1);
+  }
+  .filtros-panel.abierto { transform: translateX(0); }
+  .filtros-cerrar { display: block; }
+  .filtros-footer {
+    display: block;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .btn-ver-resultados {
+    width: 100%;
+    padding: 12px 0;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--primary);
+    border: 0;
+    border-radius: var(--radius);
+    cursor: pointer;
+  }
+}
+
+@media (max-width: 640px) {
+  .catalogo-layout { padding-top: 8px; }
+  .catalog-tools { width: 100%; justify-content: space-between; }
+  .orden-wrap span { display: none; }
+  .orden-wrap select { padding: 7px 10px; font-size: 12px; }
+  .chips-aplicados { padding: 10px 0 2px; gap: 6px; }
+  .chips-titulo { width: 100%; font-size: 12px; }
+
+  /* Cinta y medallón proporcionales a la tarjeta pequeña de 2 columnas */
+  .pc-cinta { width: 92px; height: 92px; }
+  .pc-cinta span {
+    top: 15px;
+    right: -30px;
+    width: 122px;
+    padding: 4px 0;
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+  .pc-sello {
+    width: 44px;
+    height: 44px;
+    left: 7px;
+    bottom: 7px;
+    font-size: 13px;
+    border-width: 2px;
+  }
+  .pc-sello small { font-size: 7px; }
+  .pc-ahorro { font-size: 10px; padding: 2px 8px; }
+
+  /* El distintivo de receta se ajusta (puede partirse en 2 líneas)
+     para no chocar con la cinta de oferta en tarjetas angostas */
+  .product-card .badge-venta {
+    font-size: 9px;
+    padding: 2px 7px;
+    max-width: calc(100% - 62px);
+    white-space: normal;
+    line-height: 1.25;
+  }
+  .product-card .badge-venta i { font-size: 10px; }
+
+  .pm-receta { padding: 11px 12px; gap: 9px; }
+  .pm-receta i { font-size: 18px; }
+  .pm-thumb { width: 52px; height: 52px; }
 }
