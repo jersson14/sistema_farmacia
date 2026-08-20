@@ -23,6 +23,7 @@ switch ($op) {
     // ── REGISTRO ──────────────────────────────────────────
     case 'registro':
         $nombre    = trim($_POST['nombre']    ?? '');
+        $dni       = trim($_POST['dni']       ?? '');
         $email     = trim($_POST['email']     ?? '');
         $password  = trim($_POST['password']  ?? '');
         $password2 = trim($_POST['password2'] ?? '');
@@ -30,25 +31,26 @@ switch ($op) {
         $direccion = trim($_POST['direccion'] ?? '');
         $distrito  = trim($_POST['distrito']  ?? '');
 
-        if (!$nombre || !$email || !$password)
-            authJson(array('ok'=>false,'message'=>'Nombre, email y contraseña son obligatorios.'));
+        if (!$nombre || !$dni || !$password)
+            authJson(array('ok'=>false,'message'=>'Nombre, DNI y contraseña son obligatorios.'));
         if ($password !== $password2)
             authJson(array('ok'=>false,'message'=>'Las contraseñas no coinciden.'));
         if (strlen($password) < 6)
             authJson(array('ok'=>false,'message'=>'La contraseña debe tener al menos 6 caracteres.'));
 
         $mdl = new ClienteTienda();
-        $r   = $mdl->registrar($nombre, $email, $password, $telefono, $direccion, $distrito);
+        $r   = $mdl->registrar($nombre, $dni, $password, $telefono, $direccion, $distrito, $email);
 
         if ($r === false)
-            authJson(array('ok'=>false,'message'=>'No se pudo crear la cuenta. Asegurate de haber ejecutado migrations/20260525_tienda_online.sql en phpMyAdmin.'));
+            authJson(array('ok'=>false,'message'=>'No se pudo crear la cuenta. Asegurate de haber ejecutado migrations/20260820_cliente_tienda_dni.sql en phpMyAdmin.'));
         if (is_array($r) && !$r['ok'])
             authJson($r);
 
         $_SESSION['tienda_cliente'] = array(
             'idcliente_tienda' => $r['idcliente_tienda'],
             'nombre'           => $r['nombre'],
-            'email'            => $r['email'],
+            'dni'              => $r['dni'],
+            'email'            => $r['email']     ?? '',
             'telefono'         => $r['telefono']  ?? '',
             'direccion'        => $r['direccion'] ?? '',
             'distrito'         => $r['distrito']  ?? ''
@@ -57,24 +59,25 @@ switch ($op) {
 
     // ── LOGIN ─────────────────────────────────────────────
     case 'login':
-        $email    = trim($_POST['email']    ?? '');
+        $dni      = trim($_POST['dni']      ?? '');
         $password = trim($_POST['password'] ?? '');
 
-        if (!$email || !$password)
-            authJson(array('ok'=>false,'message'=>'Ingresa tu email y contraseña.'));
+        if (!$dni || !$password)
+            authJson(array('ok'=>false,'message'=>'Ingresa tu DNI y contraseña.'));
 
         $mdl = new ClienteTienda();
-        $r   = $mdl->login($email, $password);
+        $r   = $mdl->login($dni, $password);
 
         if (!$r)
-            authJson(array('ok'=>false,'message'=>'Email o contraseña incorrectos.'));
+            authJson(array('ok'=>false,'message'=>'DNI o contraseña incorrectos.'));
         if (is_array($r) && isset($r['ok']) && !$r['ok'])
             authJson($r);
 
         $_SESSION['tienda_cliente'] = array(
             'idcliente_tienda' => $r['idcliente_tienda'],
             'nombre'           => $r['nombre'],
-            'email'            => $r['email'],
+            'dni'              => $r['dni'],
+            'email'            => $r['email']     ?? '',
             'telefono'         => $r['telefono']  ?? '',
             'direccion'        => $r['direccion'] ?? '',
             'distrito'         => $r['distrito']  ?? ''
