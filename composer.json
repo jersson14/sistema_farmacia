@@ -1,0 +1,17 @@
+{
+    "name": "itventas/farmacia",
+    "description": "Sistema de gestion para farmacia con capacidades de IA (reporting + chat)",
+    "type": "project",
+    "require": {
+        "php": ">=8.0",
+        "openai-php/client": "^0.10",
+        "phpmailer/phpmailer": "^6.9",
+        "guzzlehttp/guzzle": "^7.8"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
+    }
+}

@@ -171,6 +171,15 @@ switch ($op) {
 		in_array(10,$valores)?$_SESSION['cuentas']=1:$_SESSION['cuentas']=0;
 		in_array(11,$valores)?$_SESSION['backup']=1:$_SESSION['backup']=0;
 
+		// Permiso IA: dinamico por nombre (no depende del idpermiso).
+		// Admin siempre lo tiene.
+		$_SESSION['ia'] = 0;
+		$rsIa = ejecutarConsultaSimpleFila("SELECT idpermiso FROM permiso WHERE nombre='IA' LIMIT 1");
+		if ($rsIa && in_array((int)$rsIa['idpermiso'], $valores)) {
+			$_SESSION['ia'] = 1;
+		}
+		if ($_SESSION['acceso'] == 1) $_SESSION['ia'] = 1;
+
 	}
 	echo json_encode($fetch);
 

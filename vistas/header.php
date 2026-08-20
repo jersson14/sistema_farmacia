@@ -691,6 +691,22 @@ if ($_sEmpresa || $_sKardex || $_sCuentas || $_sBackup) {
   if ($_sBackup)  echo '<li><a href="backup.php"><i class="bi bi-cloud-arrow-up"></i> Backup</a></li>';
   echo '</ul></li>';
 }
+
+// Modulo IA (visible para admin o usuarios con permiso IA)
+$_sIA = ($_SESSION['acceso']==1 || (!empty($_SESSION['ia']) && $_SESSION['ia']==1));
+if ($_sIA) {
+  echo '<li class="treeview">
+          <a href="#">
+            <i class="bi bi-robot"></i> <span>Inteligencia Artificial</span>
+            <span class="pull-right-container"><i class="fa fa-angle-left pull-right"></i></span>
+          </a>
+          <ul class="treeview-menu">
+            <li><a href="ai_chat.php"><i class="bi bi-chat-dots"></i> AI Chat</a></li>
+            <li><a href="ai_reportes.php"><i class="bi bi-envelope-paper"></i> Reportes por correo</a></li>
+            <li><a href="ai_config.php"><i class="bi bi-gear"></i> Integraciones (OpenAI + SMTP)</a></li>
+          </ul>
+        </li>';
+}
         ?>
              
         
