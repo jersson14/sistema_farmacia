@@ -8,7 +8,7 @@ $bannerTxt = $cfgTienda->obtener('banner_texto', 'Tu salud, nuestra prioridad');
 <div class="hero">
   <div class="hero-bg-img"></div>
   <div class="hero-inner">
-    <img src="../files/famacia.png" alt="<?php echo htmlspecialchars($nombreEmp); ?>" class="hero-logo">
+    <?php if ($logo): ?><img src="<?php echo htmlspecialchars($logo); ?>" alt="<?php echo htmlspecialchars($nombreEmp); ?>" class="hero-logo"><?php endif; ?>
     <h1><?php echo htmlspecialchars($nombreEmp); ?></h1>
     <p class="hero-sub">Al cuidado de tu salud &nbsp;·&nbsp; <?php echo htmlspecialchars($bannerTxt); ?></p>
     <div class="hero-search">
@@ -102,12 +102,18 @@ $bannerTxt = $cfgTienda->obtener('banner_texto', 'Tu salud, nuestra prioridad');
 <!-- Footer -->
 <div class="tienda-footer">
   <div class="tf-top">
-    <img src="../files/famacia.png" alt="<?php echo htmlspecialchars($nombreEmp); ?>" class="tf-logo">
+    <?php if ($logo): ?><img src="<?php echo htmlspecialchars($logo); ?>" alt="<?php echo htmlspecialchars($nombreEmp); ?>" class="tf-logo"><?php endif; ?>
     <div class="tf-info">
       <div class="tf-name"><?php echo htmlspecialchars($nombreEmp); ?></div>
       <p class="tf-tag">Al cuidado de tu salud</p>
+      <?php if ($direccionEmp): ?>
+      <p class="tf-contact"><a href="https://maps.google.com/?q=<?php echo urlencode($direccionEmp); ?>" target="_blank" rel="noopener"><i class="bi bi-geo-alt-fill"></i> <?php echo htmlspecialchars($direccionEmp); ?></a></p>
+      <?php endif; ?>
       <?php if ($telefono): ?>
       <p class="tf-contact"><i class="bi bi-telephone-fill"></i> <?php echo htmlspecialchars($telefono); ?></p>
+      <?php endif; ?>
+      <?php if ($correoEmp): ?>
+      <p class="tf-contact"><a href="mailto:<?php echo htmlspecialchars($correoEmp); ?>"><i class="bi bi-envelope-fill"></i> <?php echo htmlspecialchars($correoEmp); ?></a></p>
       <?php endif; ?>
     </div>
   </div>

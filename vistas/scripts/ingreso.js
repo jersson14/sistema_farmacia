@@ -12,8 +12,13 @@ var correlativoRequestIdIngreso = 0;
 var proveedoresCargados = false;
 var numeroComprobanteManualIngreso = false;
 var modoAmpliar = false;
+var modoVer = false;
+var estadoIngresoActual = '';          // '', 'Borrador', 'Aceptado'
 var modoAmpliarData = { idingreso: 0, proveedor: '', comprobante: '' };
 var borradorTimerIngreso = null;
+var cabeceraPromesa = null;            // creación de cabecera en curso (una sola vez)
+var cabeceraTimer = null;
+var tablaDetallesOriginal = '';
 
 function notifyIngreso(type, message){
 	if (typeof appNotify === "function") {
@@ -21,6 +26,17 @@ function notifyIngreso(type, message){
 		return;
 	}
 	alert(message);
+}
+
+function parseJsonIngreso(resp){
+	if (resp && typeof resp === "object") return resp;
+	try { return JSON.parse(resp); } catch (e) { return {ok:false, message:"Respuesta inválida del servidor"}; }
+}
+
+function moneyIngreso(v){
+	var n = parseFloat(v || 0);
+	if (!isFinite(n)) n = 0;
+	return window.appMoney ? window.appMoney(n, 2) : ((window.appCurrencySymbol || "S/") + " " + n.toFixed(2));
 }
 
 function normalizarCantidadEntera(valor, minimo){
@@ -68,6 +84,7 @@ function normalizarFechaHoraInput(valor){
 
 //funcion que se ejecuta al inicio
 function init(){
+   tablaDetallesOriginal = $("#detalles").html();
    mostrarform(false);
    listar();
 
@@ -104,10 +121,23 @@ function init(){
    });
    cargarDefaultsEmpresaIngreso();
    setInterval(guardarBorradorIngreso, 30000);
-   $(document).on("input change", "#detalles input", function(){
+
+   // ── Autoguardado por fila: cualquier cambio en una fila del carrito ──
+   $(document).on("input change", "#detalles .filas input", function(ev){
+   	var $fila = $(this).closest("tr.filas");
+   	if (!$fila.find('input[name="idarticulo[]"]').length) return; // filas de solo lectura (ver detalle)
    	clearTimeout(borradorTimerIngreso);
    	borradorTimerIngreso = setTimeout(guardarBorradorIngreso, 1500);
+   	marcarFilaSucia($fila);
+   	programarAutoguardado($fila, ev.type === "change" ? 250 : 900);
    });
+
+   // ── Autoguardado de cabecera (proveedor, comprobante, pago, temperatura) ──
+   $("#idproveedor, #tipo_comprobante, #serie_comprobante, #num_comprobante, #fecha_hora, #ing_metodo_pago, #temperatura_recepcion, #temp_observacion")
+   	.on("change", function(){
+   		programarAutoguardadoCabecera();
+   	});
+
    $("#formProveedorRapido").on("submit", function(e){
    	guardarProveedorRapido(e);
    });
@@ -169,12 +199,7 @@ function guardarProveedorRapido(e){
 		type: "POST",
 		data: $("#formProveedorRapido").serialize(),
 		success: function(resp){
-			var r = {};
-			try {
-				r = JSON.parse(resp);
-			} catch (e) {
-				r = {ok:false, message:"No se pudo registrar el proveedor."};
-			}
+			var r = parseJsonIngreso(resp);
 			if (!r.ok) {
 				notifyIngreso("error", r.message || "No se pudo registrar el proveedor.");
 				$("#btnGuardarProveedorRapido").prop("disabled", false);
@@ -183,6 +208,7 @@ function guardarProveedorRapido(e){
 			notifyIngreso("success", r.message || "Proveedor registrado correctamente.");
 			$("#modalProveedorIngreso").modal("hide");
 			cargarProveedores(r.idproveedor || "");
+			setTimeout(programarAutoguardadoCabecera, 600);
 		},
 		error: function(){
 			notifyIngreso("error", "Ocurrio un error al registrar el proveedor.");
@@ -221,6 +247,9 @@ function cargarDefaultsEmpresaIngreso(){
 function limpiar(){
 
 	$("#idingreso").val("");
+	estadoIngresoActual = '';
+	cabeceraPromesa = null;
+	clearTimeout(cabeceraTimer);
 	if (proveedoresCargados) {
 		var primerProveedor = $("#idproveedor option:first").val() || "";
 		$("#idproveedor").val(primerProveedor);
@@ -235,8 +264,16 @@ function limpiar(){
 	numeroComprobanteManualIngreso = false;
 
 	$("#total_compra").val("");
-	$(".filas").remove();
-	$("#total").html(window.appMoney ? window.appMoney(0,2) : ((window.appCurrencySymbol || "S/") + " 0.00"));
+	// Restaurar la tabla del carrito (la vista "ver detalle" la reemplaza por completo)
+	if (tablaDetallesOriginal) {
+		$("#detalles").html(tablaDetallesOriginal);
+	} else {
+		$(".filas").remove();
+	}
+	cont = 0;
+	detalles = 0;
+	$("#total").html(moneyIngreso(0));
+	$("#autoguardadoEstado").text("");
 	actualizarContadorItems();
 
 	$("#fecha_hora").val(fechaHoraActualInput());
@@ -244,8 +281,24 @@ function limpiar(){
 	//marcamos el primer tipo_documento
 	$("#tipo_comprobante").val("Boleta");
 	$("#tipo_comprobante").selectpicker('refresh');
+
+	$("#ing_metodo_pago").val("EFECTIVO");
+	$("#temperatura_recepcion").val("");
+	$("#temp_observacion").val("");
+	$("#panelTemperatura").hide();
+	habilitarCabecera(true);
+	$("#bannerBorradorDB, #bannerBorradorPendiente, #bannerBorradorIngreso, #bannerBorradorAmpliar").remove();
+
 	aplicarSerieImpuestoIngreso();
 
+}
+
+function habilitarCabecera(habilitar){
+	$("#tipo_comprobante, #serie_comprobante, #num_comprobante, #fecha_hora, #ing_metodo_pago, #temperatura_recepcion, #temp_observacion").prop("disabled", !habilitar);
+	$("#idproveedor").prop("disabled", !habilitar);
+	try { $("#idproveedor").selectpicker("refresh"); } catch(e) {}
+	try { $("#tipo_comprobante").selectpicker("refresh"); } catch(e) {}
+	$("#btnNuevoProveedor").toggle(!!habilitar);
 }
 
 //funcion mostrar formulario
@@ -262,29 +315,102 @@ function mostrarform(flag, esNuevo){
 		$("#btnAgregarArt").show();
 
 		if (esNuevo) {
-			restaurarBorradorIngreso();
+			modoAmpliar = false;
+			modoVer = false;
+			$("#btnGuardar").html('<i class="fa fa-check-circle"></i> Confirmar compra');
+			detectarBorradores();
 		}
 	}else{
 		modoAmpliar = false;
+		modoVer = false;
 		$("#bannerAmpliar, #panelItemsExistentes").remove();
 		$("#serie_comprobante, #num_comprobante, #fecha_hora").prop("readonly", false);
-		$("#btnGuardar").html('<i class="fa fa-save"></i>  Guardar');
+		$("#btnGuardar").html('<i class="fa fa-check-circle"></i> Confirmar compra').prop("disabled", false);
 		$("#listadoregistros").show();
 		$("#formularioregistros").hide();
 		$("#btnagregar").show();
 	}
 }
 
+function salirFormulario(){
+	modoAmpliar = false;
+	modoVer = false;
+	modoAmpliarData = { idingreso: 0, proveedor: '', comprobante: '' };
+	$("#bannerAmpliar, #panelItemsExistentes, #bannerBorradorAmpliar, #bannerBorradorDB, #bannerBorradorPendiente, #bannerBorradorIngreso").remove();
+	$("#serie_comprobante, #num_comprobante, #fecha_hora").prop("readonly", false);
+	mostrarform(false);
+}
+
 //cancelar form
 function cancelarform(){
-	if (modoAmpliar) {
-		modoAmpliar = false;
-		$("#bannerAmpliar, #panelItemsExistentes").remove();
-		$("#serie_comprobante, #num_comprobante, #fecha_hora").prop("readonly", false);
-		$("#btnGuardar").html('<i class="fa fa-save"></i>  Guardar');
+	if (modoVer) {
+		salirFormulario();
+		return;
 	}
-	limpiar();
-	mostrarform(false);
+	var idingreso = parseInt($("#idingreso").val(), 10) || 0;
+	var filasGuardadas = filasCarrito().filter(function(){ return $(this).attr("data-guardado") === "1"; }).length;
+	var enVuelo = filasCarrito().filter(function(){ return !!$(this).data("guardando"); }).length;
+	if (enVuelo > 0) {
+		notifyIngreso("info", "Espera un momento, se están guardando filas…");
+		return;
+	}
+	if (idingreso > 0 && estadoIngresoActual === 'Borrador') {
+		if (filasGuardadas === 0) {
+			// Borrador vacío: se elimina en silencio
+			$.post("../ajax/ingreso.php?op=descartarBorrador", { idingreso: idingreso });
+			limpiarBorradorIngreso();
+			salirFormulario();
+			listar();
+			return;
+		}
+		bootbox.dialog({
+			title: "Compra en borrador",
+			message: "Esta compra tiene <strong>" + filasGuardadas + " artículo(s)</strong> ya guardados como borrador.<br>¿Qué deseas hacer?",
+			buttons: {
+				seguir: { label: "Seguir editando", className: "btn-default" },
+				guardar: {
+					label: '<i class="fa fa-clock-o"></i> Guardar borrador y salir',
+					className: "btn-primary",
+					callback: function(){
+						notifyIngreso("info", "La compra quedó en borrador. Puedes continuarla desde el listado.");
+						salirFormulario();
+						listar();
+					}
+				},
+				descartar: {
+					label: '<i class="fa fa-trash"></i> Descartar compra',
+					className: "btn-danger",
+					callback: function(){ descartarBorradorActual(idingreso); }
+				}
+			}
+		});
+		return;
+	}
+	if (modoAmpliar && filasGuardadas > 0) {
+		notifyIngreso("info", filasGuardadas + " artículo(s) ya quedaron guardados en la compra.");
+		limpiarBorradorAmpliar();
+		salirFormulario();
+		listar();
+		cargarResumenPagosIngreso();
+		return;
+	}
+	salirFormulario();
+}
+
+function descartarBorradorActual(idingreso){
+	$.post("../ajax/ingreso.php?op=descartarBorrador", { idingreso: idingreso }, function(resp){
+		var r = parseJsonIngreso(resp);
+		if (r.ok) {
+			notifyIngreso("success", r.message || "Borrador descartado.");
+			limpiarBorradorIngreso();
+			salirFormulario();
+			listar();
+		} else {
+			notifyIngreso("error", r.message || "No se pudo descartar el borrador.");
+		}
+	}).fail(function(){
+		notifyIngreso("error", "Sin conexión con el servidor. No se pudo descartar.");
+	});
 }
 
 //funcion listar
@@ -360,87 +486,241 @@ function listarArticulos(){
 	}).DataTable();
 }
 
-//funcion para guardaryeditar
+// ── Datos de cabecera que viajan al servidor ──────────────────────
+function datosCabecera(){
+	return {
+		idproveedor:           $("#idproveedor").val() || "",
+		tipo_comprobante:      $("#tipo_comprobante").val() || "Boleta",
+		serie_comprobante:     $("#serie_comprobante").val() || "",
+		num_comprobante:       $("#num_comprobante").val() || "",
+		fecha_hora:            $("#fecha_hora").val() || "",
+		impuesto:              $("#impuesto").val() || "",
+		metodo_pago:           $("#ing_metodo_pago").val() || "EFECTIVO",
+		temperatura_recepcion: $("#temperatura_recepcion").val() || "",
+		temp_observacion:      $("#temp_observacion").val() || ""
+	};
+}
+
+function setAutoguardadoEstado(texto, clase){
+	$("#autoguardadoEstado").attr("class", clase || "text-success").text(texto || "");
+}
+
+/** Crea la cabecera en borrador si aún no existe. Devuelve promesa con idingreso. */
+function asegurarCabecera(){
+	var id = parseInt($("#idingreso").val(), 10) || 0;
+	if (id > 0) {
+		return $.Deferred().resolve(id).promise();
+	}
+	if (cabeceraPromesa) {
+		return cabeceraPromesa;
+	}
+	var d = $.Deferred();
+	var prov = ($("#idproveedor").val() || "").toString().trim();
+	if (!prov) {
+		notifyIngreso("warning", "Selecciona un proveedor para poder guardar los artículos.");
+		d.reject("Falta elegir el proveedor");
+		return d.promise();
+	}
+	cabeceraPromesa = d.promise();
+	$.post("../ajax/ingreso.php?op=crearBorrador", datosCabecera()).done(function(resp){
+		var r = parseJsonIngreso(resp);
+		if (r.ok && r.idingreso) {
+			$("#idingreso").val(r.idingreso);
+			estadoIngresoActual = 'Borrador';
+			if (r.serie_comprobante) $("#serie_comprobante").val(r.serie_comprobante);
+			if (r.num_comprobante) {
+				$("#num_comprobante").val(r.num_comprobante);
+				numeroComprobanteManualIngreso = true;
+				correlativoRequestIdIngreso++;
+			}
+			mostrarBannerBorradorDB({
+				serie_comprobante: r.serie_comprobante,
+				num_comprobante: r.num_comprobante,
+				tipo_comprobante: r.tipo_comprobante
+			});
+			d.resolve(r.idingreso);
+		} else {
+			notifyIngreso("error", r.message || "No se pudo iniciar la compra.");
+			d.reject(r.message || "No se pudo iniciar la compra");
+		}
+	}).fail(function(){
+		notifyIngreso("error", "Sin conexión con el servidor. No se pudo iniciar la compra.");
+		d.reject("Sin conexión con el servidor");
+	}).always(function(){
+		cabeceraPromesa = null;
+	});
+	return cabeceraPromesa;
+}
+
+function mostrarBannerBorradorDB(c){
+	$("#bannerBorradorDB").remove();
+	var comp = (c.tipo_comprobante || "") + " " + (c.serie_comprobante || "") + "-" + (c.num_comprobante || "");
+	$('<div id="bannerBorradorDB" class="alert alert-info" style="font-weight:600;margin-bottom:10px;padding:8px 12px;">' +
+		'<i class="fa fa-magic"></i>&nbsp; COMPRA EN BORRADOR <strong>' + escHtml(comp) + '</strong> &nbsp;|&nbsp; ' +
+		'Cada fila completa se guarda sola. Al terminar presiona <strong>Confirmar compra</strong>.' +
+	'</div>').prependTo("#formularioregistros form");
+}
+
+/** Guarda la cabecera (sin confirmar) con retardo, solo si la compra ya existe. */
+function programarAutoguardadoCabecera(){
+	clearTimeout(cabeceraTimer);
+	if (modoVer) return;
+	var id = parseInt($("#idingreso").val(), 10) || 0;
+	if (id <= 0) {
+		// Aún no hay cabecera: reintentar filas que fallaron (p.ej. faltaba proveedor)
+		filasCarrito().filter('[data-estado="error"], [data-estado="incompleta"]').each(function(){
+			programarAutoguardado($(this), 400);
+		});
+		return;
+	}
+	cabeceraTimer = setTimeout(function(){
+		guardarCabeceraAhora();
+	}, 900);
+}
+
+function guardarCabeceraAhora(){
+	var id = parseInt($("#idingreso").val(), 10) || 0;
+	if (id <= 0 || modoVer) return;
+	var datos = $.extend({ idingreso: id }, datosCabecera());
+	$.post("../ajax/ingreso.php?op=guardarCabecera", datos, function(resp){
+		var r = parseJsonIngreso(resp);
+		if (r.ok) {
+			if (r.num_comprobante && $("#num_comprobante").val() !== r.num_comprobante) {
+				$("#num_comprobante").val(r.num_comprobante);
+			}
+			setAutoguardadoEstado("Datos de la compra guardados ✓", "text-success");
+		} else {
+			setAutoguardadoEstado(r.message || "No se pudo guardar la cabecera", "text-danger");
+			notifyIngreso("error", r.message || "No se pudieron guardar los datos de la compra.");
+		}
+	}).fail(function(){
+		setAutoguardadoEstado("Sin conexión: los datos de la compra no se guardaron", "text-danger");
+	});
+}
+
+//funcion para guardaryeditar → ahora CONFIRMA que todo está guardado
 function guardaryeditar(e){
      e.preventDefault();
-     if (modoAmpliar) {
-     	guardarAmpliacion();
-     	return;
-     }
-     var proveedorSeleccionado = ($("#idproveedor").val() || "").toString().trim();
-     if (!proveedorSeleccionado) {
-     	notifyIngreso("warning", "Selecciona un proveedor antes de guardar.");
-     	return;
-     }
-     // Validar fecha_vencimiento obligatoria en todos los artículos
-     var fvFaltantes = [];
-     $("#detalles .filas").each(function(){
-     	var $fv = $(this).find('input[name="fecha_vencimiento[]"]');
-     	if ($fv.length && !$.trim($fv.val())) {
-     		$fv.css("border", "2px solid #d9534f");
-     		var nombre = $(this).find('td').eq(1).clone().find('input').remove().end().text().trim();
-     		fvFaltantes.push(nombre || '?');
-     	}
-     });
-     if (fvFaltantes.length > 0) {
-     	notifyIngreso("warning", "Falta fecha de vencimiento en: " + fvFaltantes.join(', '));
-     	return;
-     }
-     var formData=new FormData($("#formulario")[0]);
+     confirmarCompra();
+}
 
-     $.ajax({
-     	url: "../ajax/ingreso.php?op=guardaryeditar",
-     	type: "POST",
-     	data: formData,
-     	contentType: false,
-     	processData: false,
-     	success: function(datos){
-     		var r = null;
-     		try {
-     			r = JSON.parse(datos);
-     		} catch (e) {
-     			r = null;
-     		}
+function filasCarrito(){
+	return $("#detalles .filas").filter(function(){
+		return $(this).find('input[name="idarticulo[]"]').length > 0;
+	});
+}
 
-     		if (r && typeof r.ok !== "undefined") {
-     			if (r.ok) {
-     				notifyIngreso("success", r.message || "Datos registrados correctamente");
-     				limpiarBorradorIngreso();
-     				mostrarform(false);
-     				listar();
-     			} else {
-     				notifyIngreso("error", r.message || "No se pudo registrar el ingreso.");
-     			}
-     	} else {
-     		if ((datos || "").trim() === "") {
-     			notifyIngreso("error", "No se recibio respuesta del servidor.");
-     		} else {
-     			notifyIngreso("success", datos);
-     			limpiarBorradorIngreso();
-     			mostrarform(false);
-     			listar();
-     		}
-     	}
-     	}
-     });
+function nombreFila($fila){
+	return $fila.find('td').eq(1).clone().find('input').remove().end().text().trim() || '?';
+}
+
+function confirmarCompra(){
+	if (modoVer) return;
+	var $filas = filasCarrito();
+	if ($filas.length === 0) {
+		notifyIngreso("warning", "Agrega al menos un artículo a la compra.");
+		return;
+	}
+	var proveedorSeleccionado = ($("#idproveedor").val() || "").toString().trim();
+	if (!proveedorSeleccionado) {
+		notifyIngreso("warning", "Selecciona un proveedor antes de confirmar.");
+		return;
+	}
+	var $btn = $("#btnGuardar");
+	var htmlBtn = $btn.html();
+	$btn.prop("disabled", true).html('<i class="fa fa-spinner fa-spin"></i> Verificando guardado…');
+	function restaurarBtn(){ $btn.prop("disabled", false).html(htmlBtn); }
+
+	// 1) Forzar el guardado de toda fila que aún no esté guardada
+	var promesas = [];
+	$filas.each(function(){
+		var $f = $(this);
+		clearTimeout($f.data("timer"));
+		if ($f.attr("data-guardado") !== "1" || $f.data("guardando")) {
+			promesas.push(autoguardarFila($f));
+		}
+	});
+
+	$.when.apply($, promesas).always(function(){
+		// 2) Revisar que TODAS quedaron guardadas
+		var incompletas = [], errores = [];
+		filasCarrito().each(function(){
+			var $f = $(this);
+			if ($f.attr("data-guardado") !== "1") {
+				if ($f.attr("data-estado") === "error") errores.push(nombreFila($f));
+				else incompletas.push(nombreFila($f));
+			}
+		});
+		if (incompletas.length > 0) {
+			notifyIngreso("warning", "Completa las filas marcadas antes de confirmar: " + incompletas.join(", "));
+			restaurarBtn();
+			return;
+		}
+		if (errores.length > 0) {
+			notifyIngreso("error", "No se pudieron guardar: " + errores.join(", ") + ". Usa el botón Reintentar de la fila.");
+			restaurarBtn();
+			return;
+		}
+		// 3) Confirmar la compra (cabecera + estado Aceptado)
+		var datos = $.extend({ idingreso: $("#idingreso").val() }, datosCabecera());
+		$.post("../ajax/ingreso.php?op=confirmarIngreso", datos, function(resp){
+			var r = parseJsonIngreso(resp);
+			if (r.ok) {
+				var msg = (modoAmpliar ? "Compra actualizada: " : "Compra confirmada: ") + (r.items || 0) + " artículo(s), total " + moneyIngreso(r.total);
+				notifyIngreso("success", msg);
+				limpiarBorradorIngreso();
+				limpiarBorradorAmpliar();
+				salirFormulario();
+				listar();
+				cargarResumenPagosIngreso();
+			} else {
+				notifyIngreso("error", r.message || "No se pudo confirmar la compra.");
+				restaurarBtn();
+			}
+		}).fail(function(){
+			notifyIngreso("error", "Sin conexión con el servidor. Las filas ya guardadas no se pierden; intenta confirmar de nuevo.");
+			restaurarBtn();
+		});
+	});
+}
+
+// ── Fijar cabecera desde la BD (ver, ampliar, continuar borrador) ──
+function fijarCabeceraDesdeBD(d){
+	$("#idingreso").val(d.idingreso);
+	if (proveedoresCargados) {
+		$("#idproveedor").val(d.idproveedor);
+		try { $("#idproveedor").selectpicker("refresh"); } catch(e) {}
+	} else {
+		cargarProveedores(d.idproveedor);
+	}
+	$("#tipo_comprobante").val(d.tipo_comprobante);
+	try { $("#tipo_comprobante").selectpicker("refresh"); } catch(e) {}
+	$("#serie_comprobante").val(d.serie_comprobante);
+	$("#num_comprobante").val(d.num_comprobante);
+	numeroComprobanteManualIngreso = true;
+	correlativoRequestIdIngreso++;   // invalida correlativos en vuelo para no pisar el número real
+	$("#fecha_hora").val(normalizarFechaHoraInput(d.fecha));
+	$("#impuesto").val(d.impuesto);
+	$("#ing_metodo_pago").val(d.metodo_pago || "EFECTIVO");
+	if (!$("#ing_metodo_pago").val()) { $("#ing_metodo_pago").val("EFECTIVO"); }
+	var temp = (d.temperatura_recepcion === null || typeof d.temperatura_recepcion === "undefined") ? "" : d.temperatura_recepcion;
+	$("#temperatura_recepcion").val(temp);
+	$("#temp_observacion").val(d.temp_observacion || "");
+	if (temp !== "" || (d.temp_observacion || "") !== "") {
+		$("#panelTemperatura").show();
+	}
+	estadoIngresoActual = d.estado || '';
 }
 
 function mostrar(idingreso){
 	$.post("../ajax/ingreso.php?op=mostrar",{idingreso : idingreso},
 		function(data,status)
 		{
-			data=JSON.parse(data);
+			data=parseJsonIngreso(data);
 			mostrarform(true);
-
-			$("#idproveedor").val(data.idproveedor);
-			$("#idproveedor").selectpicker('refresh');
-			$("#tipo_comprobante").val(data.tipo_comprobante);
-			$("#tipo_comprobante").selectpicker('refresh');
-			$("#serie_comprobante").val(data.serie_comprobante);
-			$("#num_comprobante").val(data.num_comprobante);
-			$("#fecha_hora").val(normalizarFechaHoraInput(data.fecha));
-			$("#impuesto").val(data.impuesto);
-			$("#idingreso").val(data.idingreso);
+			modoVer = true;
+			fijarCabeceraDesdeBD(data);
+			habilitarCabecera(false);
 
 			//ocultar y mostrar los botones
 			$("#btnGuardar").hide();
@@ -492,14 +772,37 @@ function eliminarDefinitivoIngreso(idingreso){
 		callback: function(result){
 			if (result) {
 				$.post("../ajax/ingreso.php?op=eliminarDefinitivo", {idingreso : idingreso}, function(data){
-					var r = {};
-					try { r = JSON.parse(data); } catch(e) { r = {ok:false, message:"Respuesta inválida del servidor"}; }
+					var r = parseJsonIngreso(data);
 					notifyIngreso(r.ok ? "success" : "error", r.message || (r.ok ? "Compra eliminada" : "No se pudo eliminar la compra"));
 					if (r.ok) {
 						tabla.ajax.reload();
 					}
 				});
 			}
+		}
+	});
+}
+
+// Descartar un borrador desde el listado
+function descartarBorradorLista(idingreso){
+	bootbox.confirm({
+		title: "Descartar compra en borrador",
+		message: "Se eliminará el borrador y el stock que ya había sumado volverá a su valor anterior. ¿Deseas continuar?",
+		buttons: {
+			confirm: { label: "Sí, descartar", className: "btn-danger" },
+			cancel: { label: "Cancelar", className: "btn-default" }
+		},
+		callback: function(result){
+			if (!result) return;
+			$.post("../ajax/ingreso.php?op=descartarBorrador", {idingreso : idingreso}, function(data){
+				var r = parseJsonIngreso(data);
+				notifyIngreso(r.ok ? "success" : "error", r.message || "");
+				if (r.ok) {
+					tabla.ajax.reload();
+				}
+			}).fail(function(){
+				notifyIngreso("error", "Sin conexión con el servidor.");
+			});
 		}
 	});
 }
@@ -546,12 +849,7 @@ function cargarCorrelativoIngreso(){
 		if (reqId !== correlativoRequestIdIngreso) {
 			return;
 		}
-		var r = {};
-		try {
-			r = JSON.parse(resp);
-		} catch (e) {
-			return;
-		}
+		var r = parseJsonIngreso(resp);
 		if (!r.ok) {
 			return;
 		}
@@ -559,15 +857,214 @@ function cargarCorrelativoIngreso(){
 		if (!numeroComprobanteManualIngreso || !$.trim($("#num_comprobante").val())) {
 			$("#num_comprobante").val(r.numero || "");
 			numeroComprobanteManualIngreso = false;
+			programarAutoguardadoCabecera();
 		}
 	});
 }
 
+// ── Estado visual de cada fila ────────────────────────────────────
+function estadoFilaHtml(estado, msg){
+	msg = msg || '';
+	switch (estado) {
+		case 'guardado':
+			return '<span class="label label-success" title="Guardado en la base de datos"><i class="fa fa-check"></i> Guardado</span>';
+		case 'guardando':
+			return '<span class="label label-info"><i class="fa fa-spinner fa-spin"></i> ' + escHtml(msg || 'Guardando…') + '</span>';
+		case 'incompleta':
+			return '<span class="label label-warning" title="' + escHtml(msg) + '"><i class="fa fa-pencil"></i> ' + escHtml(msg || 'Incompleta') + '</span>';
+		case 'error':
+			return '<span class="label label-danger" title="' + escHtml(msg) + '"><i class="fa fa-exclamation-triangle"></i> Error</span> ' +
+				'<button type="button" class="btn btn-xs btn-default" onclick="reintentarFila(this)" title="Volver a intentar guardar"><i class="fa fa-refresh"></i> Reintentar</button>' +
+				'<div style="font-size:10px;color:#a94442;max-width:170px;line-height:1.2;margin-top:2px;">' + escHtml(msg) + '</div>';
+		default:
+			return '<span class="label label-default"><i class="fa fa-clock-o"></i> Pendiente</span>';
+	}
+}
+
+function setEstadoFila($fila, estado, msg){
+	$fila.attr("data-estado", estado);
+	$fila.find(".td-estado-fila").html(estadoFilaHtml(estado, msg));
+}
+
+function marcarFilaSucia($fila){
+	$fila.attr("data-guardado", "0");
+	if (!$fila.data("guardando")) {
+		setEstadoFila($fila, "pendiente");
+	}
+}
+
+function programarAutoguardado($fila, delay){
+	clearTimeout($fila.data("timer"));
+	$fila.data("timer", setTimeout(function(){
+		autoguardarFila($fila);
+	}, delay || 900));
+}
+
+function reintentarFila(btn){
+	var $fila = $(btn).closest("tr.filas");
+	if ($fila.length) autoguardarFila($fila);
+}
+
+function leerFila($fila){
+	return {
+		iddetalle:         parseInt($fila.attr("data-iddetalle"), 10) || 0,
+		idarticulo:        $fila.find('input[name="idarticulo[]"]').val(),
+		cantidad:          $fila.find('input[name="cantidad[]"]').val(),
+		precio_compra:     $fila.find('input[name="precio_compra[]"]').val(),
+		precio_venta:      $fila.find('input[name="precio_venta[]"]').val(),
+		numero_lote:       $fila.find('input[name="numero_lote[]"]').val(),
+		fecha_vencimiento: $fila.find('input[name="fecha_vencimiento[]"]').val()
+	};
+}
+
+/** Devuelve {ok, msg}. Una fila está completa cuando tiene cantidad, precios y vencimiento válidos. */
+function validarFilaCarrito($fila){
+	var d = leerFila($fila);
+	var faltan = [];
+	if (!(parseFloat(d.cantidad) > 0)) faltan.push("cantidad");
+	if (!(parseFloat(d.precio_compra) > 0)) faltan.push("precio compra");
+	if (!(parseFloat(d.precio_venta) > 0)) faltan.push("precio venta");
+	var $fv = $fila.find('input[name="fecha_vencimiento[]"]');
+	if (!d.fecha_vencimiento) {
+		faltan.push("vencimiento");
+		$fv.css("border", "2px solid #d9534f");
+	} else {
+		var hoy = new Date(); hoy.setHours(0,0,0,0);
+		var fv = new Date(d.fecha_vencimiento + "T00:00:00");
+		if (isNaN(fv.getTime())) {
+			faltan.push("vencimiento inválido");
+			$fv.css("border", "2px solid #d9534f");
+		} else if (fv < hoy) {
+			faltan.push("vencimiento ya pasó");
+			$fv.css("border", "2px solid #d9534f");
+		} else {
+			$fv.css("border", "1px solid #ccc");
+		}
+	}
+	if (faltan.length) {
+		return { ok:false, msg: "Falta: " + faltan.join(", ") };
+	}
+	return { ok:true, msg:"" };
+}
+
+/**
+ * Guarda una fila en la BD (inserta o actualiza). Nunca rechaza: resuelve true/false.
+ * Si ya hay un guardado en curso para la fila, se vuelve a guardar al terminar.
+ */
+function autoguardarFila($fila){
+	if (!$fila || !$fila.length || !$.contains(document, $fila[0])) {
+		return $.Deferred().resolve(false).promise();
+	}
+	if ($fila.data("guardando")) {
+		$fila.data("reintentar", true);
+		return $fila.data("promesa") || $.Deferred().resolve(false).promise();
+	}
+	var d = $.Deferred();
+	var v = validarFilaCarrito($fila);
+	if (!v.ok) {
+		setEstadoFila($fila, "incompleta", v.msg);
+		d.resolve(false);
+		return d.promise();
+	}
+	$fila.data("guardando", true).data("promesa", d.promise()).data("reintentar", false);
+	setEstadoFila($fila, "guardando");
+	var datos = leerFila($fila);
+
+	function finalizar(ok){
+		$fila.data("guardando", false);
+		if ($fila.data("eliminarAlTerminar")) {
+			d.resolve(ok);
+			return;
+		}
+		if ($fila.data("reintentar")) {
+			$fila.data("reintentar", false);
+			autoguardarFila($fila).always(function(ok2){ d.resolve(!!ok2); });
+		} else {
+			d.resolve(ok);
+		}
+		actualizarResumenGuardado();
+	}
+
+	asegurarCabecera().done(function(idingreso){
+		datos.idingreso = idingreso;
+		$.post("../ajax/ingreso.php?op=guardarFila", datos).done(function(resp){
+			var r = parseJsonIngreso(resp);
+			if (r.ok) {
+				if (r.iddetalle) $fila.attr("data-iddetalle", r.iddetalle);
+				if (!$fila.data("reintentar")) {
+					$fila.attr("data-guardado", "1");
+					setEstadoFila($fila, "guardado");
+				}
+				if (typeof r.nuevo_total !== "undefined") {
+					$fila.data("totalServidor", parseFloat(r.nuevo_total));
+					window._totalGuardadoIngreso = parseFloat(r.nuevo_total);
+				}
+				guardarBorradorIngreso();
+				finalizar(true);
+			} else {
+				setEstadoFila($fila, "error", r.message || "No se pudo guardar");
+				notifyIngreso("error", r.message || "No se pudo guardar la fila.");
+				finalizar(false);
+			}
+		}).fail(function(){
+			setEstadoFila($fila, "error", "Sin conexión con el servidor");
+			finalizar(false);
+		});
+	}).fail(function(msg){
+		setEstadoFila($fila, "error", msg || "No se pudo iniciar la compra");
+		finalizar(false);
+	});
+	return d.promise();
+}
+
+function actualizarResumenGuardado(){
+	var $filas = filasCarrito();
+	var total = $filas.length;
+	var guardadas = $filas.filter(function(){ return $(this).attr("data-guardado") === "1"; }).length;
+	if (total === 0) { setAutoguardadoEstado(""); return; }
+	var texto = "Guardadas " + guardadas + " de " + total + " filas";
+	if (typeof window._totalGuardadoIngreso === "number") {
+		texto += " · Total en BD: " + moneyIngreso(window._totalGuardadoIngreso);
+	}
+	setAutoguardadoEstado(texto, guardadas === total ? "text-success" : "text-warning");
+}
+
+// ── Construcción de filas del carrito ─────────────────────────────
+function filaCarritoHtml(it, idx){
+	var cant = normalizarCantidadEntera(it.cantidad || 1, 1);
+	var pc = parseFloat(it.precio_compra || 0); if (!isFinite(pc)) pc = 0;
+	var pv = parseFloat(it.precio_venta || 0);  if (!isFinite(pv)) pv = 0;
+	var iddet = parseInt(it.iddetalle || 0, 10) || 0;
+	var fv = it.fecha_vencimiento || '';
+	var sub = (cant * pc).toFixed(2);
+	var fvBorder = fv ? '1px solid #ccc' : '2px solid #d9534f';
+	return '<tr class="filas" id="fila' + idx + '" data-idx="' + idx + '" data-iddetalle="' + iddet + '" data-guardado="' + (iddet > 0 ? '1' : '0') + '" data-estado="' + (iddet > 0 ? 'guardado' : 'pendiente') + '">' +
+		'<td><button type="button" class="btn btn-danger" onclick="eliminarDetalle(' + idx + ')" title="Quitar de la compra">X</button></td>' +
+		'<td><input type="hidden" name="idarticulo[]" value="' + escHtml(it.idarticulo) + '">' + escHtml(it.nombre) + '</td>' +
+		'<td>' + escHtml(it.unidad || 'und') + '</td>' +
+		'<td><input type="number" step="1" min="1" name="cantidad[]" value="' + cant + '" oninput="modificarSubtotales()"></td>' +
+		'<td><input type="number" step="0.01" min="0.01" name="precio_compra[]" value="' + pc.toFixed(2) + '" oninput="modificarSubtotales()"></td>' +
+		'<td><input type="number" step="0.01" min="0.01" name="precio_venta[]" value="' + pv.toFixed(2) + '"></td>' +
+		'<td><input type="text" name="numero_lote[]" maxlength="50" placeholder="N° Lote" style="width:90px" value="' + escHtml(it.numero_lote || '') + '"></td>' +
+		'<td><input type="date" name="fecha_vencimiento[]" value="' + escHtml(fv) + '" style="width:130px;border:' + fvBorder + ';" title="Fecha de vencimiento obligatoria"><span style="color:#d9534f;font-size:10px;display:block;">* obligatorio</span></td>' +
+		'<td><span id="subtotal' + idx + '" name="subtotal">' + sub + '</span></td>' +
+		'<td class="td-estado-fila" style="min-width:120px;">' + estadoFilaHtml(iddet > 0 ? 'guardado' : 'pendiente') + '</td>' +
+	'</tr>';
+}
+
+function agregarFilaCarrito(it){
+	var idx = cont;
+	var html = filaCarritoHtml(it, idx);
+	cont++;
+	detalles++;
+	var $tbody = $("#detalles tbody");
+	if ($tbody.length) { $tbody.append(html); } else { $("#detalles").append(html); }
+	return $("#fila" + idx);
+}
+
 function agregarDetalle(idarticulo,articulo,unidad,precio_compra_ref){
-	var cantidad=1;
+	if (modoVer) return;
 	var precio_compra=(precio_compra_ref && parseFloat(precio_compra_ref) > 0) ? parseFloat(precio_compra_ref) : 1;
-	var precio_venta=1;
-	var unidadTexto = unidad || "und";
 	var articulos = document.getElementsByName("idarticulo[]");
 	var cantidades = document.getElementsByName("cantidad[]");
 
@@ -577,6 +1074,9 @@ function agregarDetalle(idarticulo,articulo,unidad,precio_compra_ref){
 				var nuevaCantidad = normalizarCantidadEntera(parseFloat(cantidades[i].value || 0) + 1, 1);
 				cantidades[i].value = nuevaCantidad;
 				modificarSubtotales();
+				var $filaExistente = $(cantidades[i]).closest("tr.filas");
+				marcarFilaSucia($filaExistente);
+				programarAutoguardado($filaExistente, 300);
 				$('#myModal').modal('hide');
 				notifyIngreso("info", "El artículo ya estaba agregado. Se incrementó la cantidad.");
 				guardarBorradorIngreso();
@@ -584,29 +1084,17 @@ function agregarDetalle(idarticulo,articulo,unidad,precio_compra_ref){
 			}
 		}
 
-		var subtotal=cantidad*precio_compra;
-		var fvStyle = 'style="width:130px;border:2px solid #d9534f;" title="Fecha de vencimiento obligatoria" oninput="this.style.border=this.value?\'1px solid #ccc\':\'2px solid #d9534f\'"';
-		var fvLabel = '<span style="color:#d9534f;font-size:10px;display:block;">* obligatorio</span>';
-		var fila='<tr class="filas" id="fila'+cont+'">'+
-        '<td><button type="button" class="btn btn-danger" onclick="eliminarDetalle('+cont+')">X</button></td>'+
-        '<td><input type="hidden" name="idarticulo[]" value="'+idarticulo+'">'+articulo+'</td>'+
-        '<td>'+unidadTexto+'</td>'+
-        '<td><input type="number" step="1" min="1" name="cantidad[]" id="cantidad[]" value="'+cantidad+'" oninput="modificarSubtotales()"></td>'+
-        '<td><input type="number" step="0.01" min="0.01" name="precio_compra[]" id="precio_compra[]" value="'+precio_compra.toFixed(2)+'" oninput="modificarSubtotales()"></td>'+
-        '<td><input type="number" step="0.01" min="0.01" name="precio_venta[]" value="'+precio_venta.toFixed(2)+'"></td>'+
-        '<td><input type="text" name="numero_lote[]" maxlength="50" placeholder="N° Lote" style="width:90px"></td>'+
-        '<td><input type="date" name="fecha_vencimiento[]" '+fvStyle+'>'+fvLabel+'</td>'+
-        '<td><span id="subtotal'+cont+'" name="subtotal">'+subtotal.toFixed(2)+'</span></td>'+
-        '<td><button type="button" onclick="modificarSubtotales()" class="btn btn-info"><i class="fa fa-refresh"></i></button></td>'+
-		'</tr>';
-		cont++;
-		detalles++;
-		$('#detalles').append(fila);
+		var $fila = agregarFilaCarrito({
+			idarticulo: idarticulo, nombre: articulo, unidad: unidad || "und",
+			cantidad: 1, precio_compra: precio_compra, precio_venta: 1, numero_lote: '', fecha_vencimiento: ''
+		});
+		setEstadoFila($fila, "incompleta", "Falta: vencimiento");
 		modificarSubtotales();
 		actualizarContadorItems();
 		$('#myModal').modal('hide');
-		notifyIngreso("success", "Artículo agregado a la compra.");
+		notifyIngreso("success", "Artículo agregado. Completa cantidad, precios y vencimiento: la fila se guarda sola.");
 		guardarBorradorIngreso();
+		setTimeout(function(){ $fila.find('input[name="cantidad[]"]').focus().select(); }, 150);
 
 	}else{
 		notifyIngreso("warning", "No se pudo agregar el artículo. Revisa la información del producto.");
@@ -638,14 +1126,14 @@ function calcularTotales(){
 	for (var i = 0; i < sub.length; i++) {
 		total += parseFloat(document.getElementsByName("subtotal")[i].value || 0);
 	}
-	$("#total").html(window.appMoney ? window.appMoney(total,2) : ((window.appCurrencySymbol || "S/") + " " + total.toFixed(2)));
+	$("#total").html(moneyIngreso(total));
 	$("#total_compra").val(total.toFixed(2));
 	evaluar();
 }
 
 function evaluar(){
 
-	if (detalles>0)
+	if (detalles>0 && !modoVer)
 	{
 		$("#btnGuardar").show();
 	}
@@ -656,12 +1144,50 @@ function evaluar(){
 	}
 }
 
-function eliminarDetalle(indice){
+function quitarFilaLocal(indice){
 	$("#fila"+indice).remove();
 	calcularTotales();
 	detalles=detalles-1;
+	if (detalles < 0) detalles = 0;
 	actualizarContadorItems();
+	actualizarResumenGuardado();
 	guardarBorradorIngreso();
+}
+
+function eliminarDetalle(indice){
+	var $fila = $("#fila"+indice);
+	if (!$fila.length) return;
+	clearTimeout($fila.data("timer"));
+	if ($fila.data("guardando")) {
+		// Esperar a que termine el guardado en curso para no dejar la fila huérfana en la BD
+		$fila.data("eliminarAlTerminar", true);
+		setEstadoFila($fila, "guardando", "Quitando…");
+		($fila.data("promesa") || $.Deferred().resolve().promise()).always(function(){
+			$fila.data("eliminarAlTerminar", false);
+			eliminarDetalle(indice);
+		});
+		return;
+	}
+	var iddet = parseInt($fila.attr("data-iddetalle"), 10) || 0;
+	if (iddet <= 0) {
+		quitarFilaLocal(indice);
+		return;
+	}
+	setEstadoFila($fila, "guardando", "Quitando…");
+	$.post("../ajax/ingreso.php?op=eliminarDetalle", { iddetalle: iddet }, function(resp){
+		var r = parseJsonIngreso(resp);
+		if (r.ok) {
+			if (typeof r.nuevo_total !== "undefined") window._totalGuardadoIngreso = parseFloat(r.nuevo_total);
+			quitarFilaLocal(indice);
+			notifyIngreso("info", "Artículo quitado de la compra.");
+		} else {
+			setEstadoFila($fila, "guardado");
+			notifyIngreso("error", r.message || "No se pudo quitar el artículo.");
+		}
+	}).fail(function(){
+		setEstadoFila($fila, "guardado");
+		notifyIngreso("error", "Sin conexión con el servidor. No se pudo quitar el artículo.");
+	});
 }
 
 function actualizarContadorItems(){
@@ -680,38 +1206,164 @@ function estilizarBuscadorCatalogo(){
 
 // ── Utilidad HTML escape ──────────────────────────────────────────
 function escHtml(s) {
-	return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+	return String(s === null || typeof s === "undefined" ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ── Borrador automático (localStorage) ───────────────────────────
+// ── Detección de borradores al abrir "Agregar" ────────────────────
+function detectarBorradores(){
+	$.get("../ajax/ingreso.php?op=borradorPendiente", function(resp){
+		var r = parseJsonIngreso(resp);
+		if (r.ok && r.borrador && r.borrador.idingreso) {
+			mostrarBannerBorradorPendiente(r.borrador);
+			return;
+		}
+		restaurarBorradorIngreso();
+	}).fail(function(){
+		restaurarBorradorIngreso();
+	});
+}
+
+function mostrarBannerBorradorPendiente(b){
+	window._borradorPendiente = b;
+	$("#bannerBorradorPendiente").remove();
+	$('<div id="bannerBorradorPendiente" class="alert alert-warning" style="font-size:13px;font-weight:600;">' +
+		'<i class="fa fa-clock-o"></i> Tienes una compra en borrador sin confirmar: ' +
+		'<strong>' + escHtml(b.proveedor || '?') + '</strong> · ' + escHtml(b.tipo_comprobante || '') + ' ' + escHtml(b.serie_comprobante || '') + '-' + escHtml(b.num_comprobante || '') +
+		' · ' + (parseInt(b.items, 10) || 0) + ' artículo(s) · ' + escHtml(b.fecha || '') +
+		' &nbsp;<button type="button" class="btn btn-xs btn-success" onclick="continuarBorradorPendiente()"><i class="fa fa-edit"></i> Continuar esa compra</button>' +
+		' &nbsp;<button type="button" class="btn btn-xs btn-default" onclick="descartarBorradorPendiente()">Descartar</button>' +
+	'</div>').prependTo("#formularioregistros form");
+}
+
+function continuarBorradorPendiente(){
+	var b = window._borradorPendiente;
+	if (!b) return;
+	continuarBorrador(b.idingreso);
+}
+
+function descartarBorradorPendiente(){
+	var b = window._borradorPendiente;
+	if (!b) return;
+	bootbox.confirm({
+		title: "Descartar borrador",
+		message: "Se eliminará ese borrador (" + (parseInt(b.items, 10) || 0) + " artículo(s)) y el stock volverá a su valor anterior. ¿Continuar?",
+		buttons: { confirm: { label: "Sí, descartar", className: "btn-danger" }, cancel: { label: "Cancelar", className: "btn-default" } },
+		callback: function(result){
+			if (!result) return;
+			$.post("../ajax/ingreso.php?op=descartarBorrador", { idingreso: b.idingreso }, function(resp){
+				var r = parseJsonIngreso(resp);
+				notifyIngreso(r.ok ? "success" : "error", r.message || "");
+				if (r.ok) {
+					$("#bannerBorradorPendiente").remove();
+					window._borradorPendiente = null;
+					if (tabla) tabla.ajax.reload(null, false);
+					restaurarBorradorIngreso();
+				}
+			});
+		}
+	});
+}
+
+/** Reabre una compra en Borrador con sus filas ya guardadas. */
+function continuarBorrador(idingreso){
+	modoAmpliar = false;
+	modoVer = false;
+	mostrarform(true, false);
+	$("#btnGuardar").html('<i class="fa fa-check-circle"></i> Confirmar compra');
+	$.get("../ajax/ingreso.php?op=detalleJson&id=" + idingreso, function(resp){
+		var r = parseJsonIngreso(resp);
+		if (!r.ok || !r.cabecera) {
+			notifyIngreso("error", r.message || "No se pudo cargar el borrador.");
+			salirFormulario();
+			return;
+		}
+		var c = r.cabecera;
+		if (c.estado !== 'Borrador') {
+			notifyIngreso("warning", "Esta compra ya no está en borrador.");
+			salirFormulario();
+			listar();
+			return;
+		}
+		fijarCabeceraDesdeBD(c);
+		estadoIngresoActual = 'Borrador';
+		mostrarBannerBorradorDB(c);
+		$("#detalles .filas").remove();
+		cont = 0; detalles = 0;
+		var items = r.items || [];
+		for (var i = 0; i < items.length; i++) {
+			agregarFilaCarrito(items[i]);
+		}
+		window._totalGuardadoIngreso = parseFloat(c.total_compra || 0);
+		// Filas que quedaron sin guardar en este navegador (borrador local)
+		var local = leerBorradorLocal();
+		var pendientes = 0;
+		if (local && String(local.idingreso) === String(idingreso) && local.items) {
+			for (var j = 0; j < local.items.length; j++) {
+				if (!local.items[j].iddetalle) {
+					var $f = agregarFilaCarrito($.extend({}, local.items[j], { iddetalle: 0 }));
+					setEstadoFila($f, "incompleta", "Revisa la fila");
+					pendientes++;
+				}
+			}
+		}
+		modificarSubtotales();
+		actualizarContadorItems();
+		actualizarResumenGuardado();
+		$("#btnAgregarArt").show();
+		notifyIngreso("info", "Continuando compra en borrador: " + items.length + " artículo(s) ya guardados" + (pendientes ? ", " + pendientes + " pendiente(s) de completar" : "") + ".");
+	}).fail(function(){
+		notifyIngreso("error", "Sin conexión con el servidor.");
+		salirFormulario();
+	});
+}
+
+// ── Borrador local (localStorage): solo respalda filas aún no guardadas ──
 var BORRADOR_KEY_ING = 'farmacia_borrador_ingreso';
+
+function itemsCarritoLocal(){
+	var items = [];
+	filasCarrito().each(function() {
+		var $f = $(this);
+		var d = leerFila($f);
+		items.push({
+			iddetalle:         d.iddetalle,
+			idarticulo:        d.idarticulo,
+			nombre:            nombreFila($f),
+			unidad:            $f.find('td').eq(2).text().trim(),
+			cantidad:          d.cantidad,
+			precio_compra:     d.precio_compra,
+			precio_venta:      d.precio_venta,
+			numero_lote:       d.numero_lote,
+			fecha_vencimiento: d.fecha_vencimiento
+		});
+	});
+	return items;
+}
+
+function leerBorradorLocal(){
+	var raw;
+	try { raw = localStorage.getItem(BORRADOR_KEY_ING); } catch(e) { return null; }
+	if (!raw) return null;
+	try { return JSON.parse(raw); } catch(e) { return null; }
+}
 
 function guardarBorradorIngreso() {
 	if (!$("#formularioregistros").is(":visible")) return;
+	if (modoVer) return;
 	if (modoAmpliar) { guardarBorradorAmpliar(); return; }
-	if ($("#idingreso").val()) return;
-	var items = [];
-	$("#detalles .filas").each(function() {
-		var $f = $(this);
-		var nombre = $f.find('td').eq(1).clone().find('input').remove().end().text().trim();
-		items.push({
-			idarticulo:        $f.find('input[name="idarticulo[]"]').val(),
-			nombre:            nombre,
-			unidad:            $f.find('td').eq(2).text().trim(),
-			cantidad:          $f.find('input[name="cantidad[]"]').val(),
-			precio_compra:     $f.find('input[name="precio_compra[]"]').val(),
-			precio_venta:      $f.find('input[name="precio_venta[]"]').val(),
-			numero_lote:       $f.find('input[name="numero_lote[]"]').val(),
-			fecha_vencimiento: $f.find('input[name="fecha_vencimiento[]"]').val()
-		});
-	});
-	if (items.length === 0) return;
+	var items = itemsCarritoLocal();
+	if (items.length === 0) {
+		limpiarBorradorIngreso();
+		return;
+	}
 	try {
 		localStorage.setItem(BORRADOR_KEY_ING, JSON.stringify({
 			ts: Date.now(),
+			idingreso:        parseInt($("#idingreso").val(), 10) || 0,
 			idproveedor:      $("#idproveedor").val(),
 			proveedor_nombre: $("#idproveedor option:selected").text(),
 			tipo_comprobante: $("#tipo_comprobante").val(),
+			metodo_pago:      $("#ing_metodo_pago").val(),
 			items: items
 		}));
 	} catch(e) {}
@@ -722,22 +1374,27 @@ function limpiarBorradorIngreso() {
 }
 
 function restaurarBorradorIngreso() {
-	var raw;
-	try { raw = localStorage.getItem(BORRADOR_KEY_ING); } catch(e) { return; }
-	if (!raw) return;
-	var b;
-	try { b = JSON.parse(raw); } catch(e) { return; }
+	var b = leerBorradorLocal();
 	if (!b || !b.items || b.items.length === 0) return;
+	var pendientes = [];
+	for (var i = 0; i < b.items.length; i++) {
+		if (!b.items[i].iddetalle) pendientes.push(b.items[i]);
+	}
+	if (pendientes.length === 0) {
+		// Todo lo que había ya está en la BD (o el borrador se confirmó/descartó)
+		limpiarBorradorIngreso();
+		return;
+	}
 	var hace = '';
 	if (b.ts) {
 		var mins = Math.round((Date.now() - b.ts) / 60000);
 		hace = mins < 60 ? ('hace ' + mins + ' min') : ('hace ' + Math.floor(mins/60) + ' h');
 	}
-	window._borradorIngreso = b;
+	window._borradorIngreso = $.extend({}, b, { items: pendientes });
 	$('<div id="bannerBorradorIngreso" class="alert alert-warning" style="font-size:13px;font-weight:600;">' +
-		'<i class="fa fa-clock-o"></i> Tienes un borrador guardado ' + hace + ' con ' +
-		b.items.length + ' artículo(s) (Proveedor: ' + escHtml(b.proveedor_nombre || '?') + ').' +
-		' &nbsp;<button type="button" class="btn btn-xs btn-success" onclick="restaurarBorradorIngresoConfirmar()">Restaurar borrador</button>' +
+		'<i class="fa fa-clock-o"></i> Tienes ' + pendientes.length + ' artículo(s) sin guardar de una compra anterior ' + hace +
+		' (Proveedor: ' + escHtml(b.proveedor_nombre || '?') + ').' +
+		' &nbsp;<button type="button" class="btn btn-xs btn-success" onclick="restaurarBorradorIngresoConfirmar()">Restaurar</button>' +
 		' &nbsp;<button type="button" class="btn btn-xs btn-default" onclick="descartarBorradorIngreso()">Descartar</button>' +
 	'</div>').prependTo("#formularioregistros form");
 }
@@ -745,40 +1402,25 @@ function restaurarBorradorIngreso() {
 function restaurarBorradorIngresoConfirmar() {
 	var b = window._borradorIngreso;
 	if (!b) return;
-	$(".filas").remove();
-	detalles = 0; cont = 0;
-	if (b.idproveedor) {
+	if (b.idproveedor && !(parseInt($("#idingreso").val(), 10) > 0)) {
 		$("#idproveedor").val(b.idproveedor);
 		try { $("#idproveedor").selectpicker("refresh"); } catch(e) {}
 	}
-	if (b.tipo_comprobante) {
+	if (b.tipo_comprobante && !(parseInt($("#idingreso").val(), 10) > 0)) {
 		$("#tipo_comprobante").val(b.tipo_comprobante);
 		try { $("#tipo_comprobante").selectpicker("refresh"); } catch(e) {}
 		aplicarSerieImpuestoIngreso();
 	}
+	if (b.metodo_pago) $("#ing_metodo_pago").val(b.metodo_pago);
 	for (var i = 0; i < b.items.length; i++) {
-		var it = b.items[i];
-		var pcv = parseFloat(it.precio_compra || 0);
-		var sub = (parseFloat(it.cantidad || 1) * pcv).toFixed(2);
-		var fila = '<tr class="filas" id="fila' + cont + '">' +
-			'<td><button type="button" class="btn btn-danger" onclick="eliminarDetalle(' + cont + ')">X</button></td>' +
-			'<td><input type="hidden" name="idarticulo[]" value="' + escHtml(it.idarticulo) + '">' + escHtml(it.nombre) + '</td>' +
-			'<td>' + escHtml(it.unidad) + '</td>' +
-			'<td><input type="number" step="1" min="1" name="cantidad[]" value="' + parseFloat(it.cantidad || 1) + '" oninput="modificarSubtotales()"></td>' +
-			'<td><input type="number" step="0.01" min="0.01" name="precio_compra[]" value="' + pcv.toFixed(2) + '" oninput="modificarSubtotales()"></td>' +
-			'<td><input type="number" step="0.01" min="0.01" name="precio_venta[]" value="' + parseFloat(it.precio_venta || 0).toFixed(2) + '"></td>' +
-			'<td><input type="text" name="numero_lote[]" maxlength="50" placeholder="N° Lote" style="width:90px" value="' + escHtml(it.numero_lote || '') + '"></td>' +
-			'<td><input type="date" name="fecha_vencimiento[]" style="width:130px;border:' + (it.fecha_vencimiento ? '1px solid #ccc' : '2px solid #d9534f') + ';" oninput="this.style.border=this.value?\'1px solid #ccc\':\'2px solid #d9534f\'" value="' + escHtml(it.fecha_vencimiento || '') + '" title="Obligatorio"><span style="color:#d9534f;font-size:10px;display:block;">* obligatorio</span></td>' +
-			'<td><span id="subtotal' + cont + '" name="subtotal">' + sub + '</span></td>' +
-			'<td><button type="button" onclick="modificarSubtotales()" class="btn btn-info"><i class="fa fa-refresh"></i></button></td>' +
-			'</tr>';
-		cont++; detalles++;
-		$('#detalles').append(fila);
+		var $f = agregarFilaCarrito($.extend({}, b.items[i], { iddetalle: 0 }));
+		setEstadoFila($f, "incompleta", "Revisa la fila");
+		programarAutoguardado($f, 1200);
 	}
 	modificarSubtotales();
 	actualizarContadorItems();
 	$("#bannerBorradorIngreso").remove();
-	notifyIngreso("success", "Borrador restaurado: " + b.items.length + " artículo(s).");
+	notifyIngreso("success", "Filas restauradas: " + b.items.length + ". Se guardarán solas al estar completas.");
 }
 
 function descartarBorradorIngreso() {
@@ -788,27 +1430,13 @@ function descartarBorradorIngreso() {
 	notifyIngreso("info", "Borrador descartado.");
 }
 
-// ── Borrador automático en modo AMPLIAR (localStorage por idingreso) ──
+// ── Borrador local en modo AMPLIAR (por idingreso) ────────────────
 var BORRADOR_KEY_AMP = 'farmacia_borrador_ampliar_';
 
 function guardarBorradorAmpliar() {
 	var idingreso = modoAmpliarData.idingreso || $("#idingreso").val();
 	if (!idingreso) return;
-	var items = [];
-	$("#detalles .filas").each(function() {
-		var $f = $(this);
-		var nombre = $f.find('td').eq(1).clone().find('input').remove().end().text().trim();
-		items.push({
-			idarticulo:        $f.find('input[name="idarticulo[]"]').val(),
-			nombre:            nombre,
-			unidad:            $f.find('td').eq(2).text().trim(),
-			cantidad:          $f.find('input[name="cantidad[]"]').val(),
-			precio_compra:     $f.find('input[name="precio_compra[]"]').val(),
-			precio_venta:      $f.find('input[name="precio_venta[]"]').val(),
-			numero_lote:       $f.find('input[name="numero_lote[]"]').val(),
-			fecha_vencimiento: $f.find('input[name="fecha_vencimiento[]"]').val()
-		});
-	});
+	var items = itemsCarritoLocal().filter(function(it){ return !it.iddetalle; });
 	if (items.length === 0) {
 		try { localStorage.removeItem(BORRADOR_KEY_AMP + idingreso); } catch(e) {}
 		return;
@@ -845,8 +1473,8 @@ function restaurarBorradorAmpliar(idingreso) {
 	window._borradorAmpliar = b;
 	$('<div id="bannerBorradorAmpliar" class="alert alert-warning" style="font-size:13px;font-weight:600;margin-top:8px;">' +
 		'<i class="fa fa-clock-o"></i>&nbsp; Borrador guardado ' + hace + ' — ' +
-		b.items.length + ' artículo(s) pendiente(s) de agregar a esta compra.' +
-		'&nbsp;&nbsp;<button type="button" class="btn btn-xs btn-success" onclick="restaurarBorradorAmpliarConfirmar()"><i class="fa fa-undo"></i> Restaurar borrador</button>' +
+		b.items.length + ' artículo(s) sin guardar en esta compra.' +
+		'&nbsp;&nbsp;<button type="button" class="btn btn-xs btn-success" onclick="restaurarBorradorAmpliarConfirmar()"><i class="fa fa-undo"></i> Restaurar</button>' +
 		'&nbsp;<button type="button" class="btn btn-xs btn-default" onclick="descartarBorradorAmpliar()">Descartar</button>' +
 	'</div>').insertAfter("#bannerAmpliar");
 }
@@ -854,31 +1482,15 @@ function restaurarBorradorAmpliar(idingreso) {
 function restaurarBorradorAmpliarConfirmar() {
 	var b = window._borradorAmpliar;
 	if (!b) return;
-	$(".filas").remove();
-	detalles = 0; cont = 0;
 	for (var i = 0; i < b.items.length; i++) {
-		var it = b.items[i];
-		var pcv = parseFloat(it.precio_compra || 0);
-		var sub = (parseFloat(it.cantidad || 1) * pcv).toFixed(2);
-		var fila = '<tr class="filas" id="fila' + cont + '">' +
-			'<td><button type="button" class="btn btn-danger" onclick="eliminarDetalle(' + cont + ')">X</button></td>' +
-			'<td><input type="hidden" name="idarticulo[]" value="' + escHtml(it.idarticulo) + '">' + escHtml(it.nombre) + '</td>' +
-			'<td>' + escHtml(it.unidad) + '</td>' +
-			'<td><input type="number" step="1" min="1" name="cantidad[]" value="' + parseFloat(it.cantidad || 1) + '" oninput="modificarSubtotales()"></td>' +
-			'<td><input type="number" step="0.01" min="0.01" name="precio_compra[]" value="' + pcv.toFixed(2) + '" oninput="modificarSubtotales()"></td>' +
-			'<td><input type="number" step="0.01" min="0.01" name="precio_venta[]" value="' + parseFloat(it.precio_venta || 0).toFixed(2) + '"></td>' +
-			'<td><input type="text" name="numero_lote[]" maxlength="50" placeholder="N° Lote" style="width:90px" value="' + escHtml(it.numero_lote || '') + '"></td>' +
-			'<td><input type="date" name="fecha_vencimiento[]" style="width:130px;border:2px solid #d9534f;" title="Obligatorio" value="' + escHtml(it.fecha_vencimiento || '') + '"><span style="color:#d9534f;font-size:10px;display:block;">* obligatorio</span></td>' +
-			'<td><span id="subtotal' + cont + '" name="subtotal">' + sub + '</span></td>' +
-			'<td><button type="button" onclick="modificarSubtotales()" class="btn btn-info"><i class="fa fa-refresh"></i></button></td>' +
-			'</tr>';
-		cont++; detalles++;
-		$('#detalles').append(fila);
+		var $f = agregarFilaCarrito($.extend({}, b.items[i], { iddetalle: 0 }));
+		setEstadoFila($f, "incompleta", "Revisa la fila");
+		programarAutoguardado($f, 1200);
 	}
 	modificarSubtotales();
 	actualizarContadorItems();
 	$("#bannerBorradorAmpliar").remove();
-	notifyIngreso("success", "Borrador restaurado: " + b.items.length + " artículo(s).");
+	notifyIngreso("success", "Filas restauradas: " + b.items.length + ".");
 }
 
 function descartarBorradorAmpliar() {
@@ -888,26 +1500,25 @@ function descartarBorradorAmpliar() {
 	notifyIngreso("info", "Borrador descartado.");
 }
 
-// ── Ampliar ingreso existente ─────────────────────────────────────
+// ── Ampliar ingreso existente (Aceptado) ──────────────────────────
 function abrirAmpliarIngreso(idingreso) {
 	modoAmpliar = true;
-	numeroComprobanteManualIngreso = true;
+	modoVer = false;
 	mostrarform(true);
+	modoAmpliar = true;
 	$.post("../ajax/ingreso.php?op=mostrar", { idingreso: idingreso }, function(data) {
-		var d;
-		try { d = JSON.parse(data); } catch(e) {
+		var d = parseJsonIngreso(data);
+		if (!d || !d.idingreso) {
 			notifyIngreso("error", "No se pudo cargar el ingreso.");
-			modoAmpliar = false; mostrarform(false); return;
+			salirFormulario(); return;
 		}
-		$("#idingreso").val(d.idingreso);
-		$("#idproveedor").val(d.idproveedor);
-		try { $("#idproveedor").selectpicker("refresh"); } catch(e) {}
-		$("#tipo_comprobante").val(d.tipo_comprobante);
-		try { $("#tipo_comprobante").selectpicker("refresh"); } catch(e) {}
-		$("#serie_comprobante").val(d.serie_comprobante);
-		$("#num_comprobante").val(d.num_comprobante);
-		$("#fecha_hora").val(normalizarFechaHoraInput(d.fecha));
-		$("#impuesto").val(d.impuesto);
+		if (d.estado !== 'Aceptado') {
+			notifyIngreso("warning", "Solo se pueden ampliar compras en estado Aceptado.");
+			salirFormulario(); return;
+		}
+		fijarCabeceraDesdeBD(d);
+		estadoIngresoActual = 'Aceptado';
+		window._totalGuardadoIngreso = parseFloat(d.total_compra || 0);
 
 		modoAmpliarData = {
 			idingreso:   d.idingreso,
@@ -919,9 +1530,10 @@ function abrirAmpliarIngreso(idingreso) {
 			'<i class="fa fa-plus-circle"></i>&nbsp; MODO AMPLIAR COMPRA &nbsp;|&nbsp; ' +
 			'Proveedor: <strong>' + escHtml(d.proveedor) + '</strong> &nbsp;|&nbsp; ' +
 			'Comprobante: <strong>' + escHtml(d.tipo_comprobante) + ' ' + escHtml(d.serie_comprobante) + '-' + escHtml(d.num_comprobante) + '</strong>' +
+			' &nbsp;|&nbsp; <small>Cada artículo nuevo se guarda solo al completar su fila.</small>' +
 		'</div>').prependTo("#formularioregistros form");
 
-		$("#btnGuardar").html('<i class="fa fa-plus-circle"></i> Agregar artículos al ingreso').hide();
+		$("#btnGuardar").html('<i class="fa fa-check-circle"></i> Confirmar cambios').hide();
 		$("#btnAgregarArt").show();
 
 		// Verificar si hay borrador guardado para este ingreso
@@ -951,71 +1563,13 @@ function abrirAmpliarIngreso(idingreso) {
 
 function filtrarItemsExistentes(valor) {
 	var termino = (valor || "").toLowerCase().trim();
-	$("#tablaItemsExistentes tbody tr").each(function() {
+	$("#tablaItemsExistentes tbody tr, #tablaItemsExistentes tr.filas").each(function() {
 		var nombre = $(this).find("td").eq(1).text().toLowerCase();
 		$(this).toggle(termino === "" || nombre.indexOf(termino) !== -1);
 	});
 }
 
-function guardarAmpliacion() {
-	var idingreso = $("#idingreso").val();
-	if (!idingreso || !parseInt(idingreso, 10)) {
-		notifyIngreso("error", "ID de ingreso inválido."); return;
-	}
-	if (document.getElementsByName("idarticulo[]").length === 0) {
-		notifyIngreso("warning", "Agrega al menos un artículo nuevo para guardar."); return;
-	}
-	// Validar que todos los artículos nuevos tengan fecha de vencimiento
-	var faltanFechas = false;
-	$("#detalles .filas").each(function(){
-		var $fv = $(this).find('input[name="fecha_vencimiento[]"]');
-		if ($fv.length) {
-			if (!$.trim($fv.val())) {
-				$fv.css("border", "2px solid #d9534f");
-				faltanFechas = true;
-			} else {
-				$fv.css("border", "");
-			}
-		}
-	});
-	if (faltanFechas) {
-		notifyIngreso("warning", "La fecha de vencimiento es obligatoria para todos los artículos.");
-		return;
-	}
-	$("#btnGuardar").prop("disabled", true);
-	var formData = new FormData($("#formulario")[0]);
-	$.ajax({
-		url: "../ajax/ingreso.php?op=agregarDetalle",
-		type: "POST",
-		data: formData,
-		contentType: false,
-		processData: false,
-		success: function(resp) {
-			var r = {};
-			try { r = JSON.parse(resp); } catch(e) {}
-			if (r.ok) {
-				notifyIngreso("success", r.message || "Artículos agregados correctamente.");
-				limpiarBorradorAmpliar();
-				modoAmpliar = false;
-				modoAmpliarData = { idingreso: 0, proveedor: '', comprobante: '' };
-				$("#bannerAmpliar, #panelItemsExistentes, #bannerBorradorAmpliar").remove();
-				$("#serie_comprobante, #num_comprobante, #fecha_hora").prop("readonly", false);
-				mostrarform(false);
-				listar();
-				cargarResumenPagosIngreso();
-			} else {
-				notifyIngreso("error", r.message || "No se pudo agregar los artículos.");
-			}
-			$("#btnGuardar").prop("disabled", false).html('<i class="fa fa-save"></i>  Guardar');
-		},
-		error: function() {
-			notifyIngreso("error", "Error de conexión al guardar.");
-			$("#btnGuardar").prop("disabled", false).html('<i class="fa fa-save"></i>  Guardar');
-		}
-	});
-}
-
-// ── Edición interactiva de filas ya guardadas ──────────────────────
+// ── Edición interactiva de filas ya guardadas (ver detalle / ampliar) ──
 function recalcFilaDetalle(input) {
 	var $fila = $(input).closest('tr');
 	var cant = parseFloat($fila.find('input[name="det_cantidad"]').val() || 0);
@@ -1024,7 +1578,7 @@ function recalcFilaDetalle(input) {
 }
 
 function guardarFilaDetalle(iddetalle) {
-	var $fila = $('[data-iddetalle="' + iddetalle + '"]');
+	var $fila = $('[data-iddetalle="' + iddetalle + '"]').filter(function(){ return $(this).find('input[name="det_cantidad"]').length > 0; }).first();
 	var cantidad          = $fila.find('input[name="det_cantidad"]').val();
 	var precio_compra     = $fila.find('input[name="det_precio_compra"]').val();
 	var precio_venta      = $fila.find('input[name="det_precio_venta"]').val();
@@ -1058,23 +1612,24 @@ function guardarFilaDetalle(iddetalle) {
 		numero_lote:      numero_lote,
 		fecha_vencimiento: fecha_vencimiento
 	}, function(resp) {
-		var r = {};
-		try { r = JSON.parse(resp); } catch(e) {}
+		var r = parseJsonIngreso(resp);
 		if (r.ok) {
 			notifyIngreso("success", r.message || "Detalle actualizado.");
 			if (typeof r.nuevo_total !== "undefined") {
-				var sym = window.appCurrencySymbol || "S/";
-				$("#det-total-view").text(sym + " " + parseFloat(r.nuevo_total).toFixed(2));
+				$("#det-total-view").text(moneyIngreso(r.nuevo_total));
+				window._totalGuardadoIngreso = parseFloat(r.nuevo_total);
 			}
-			// Recargar la tabla de detalles para reflejar los nuevos valores
 			var idingreso = $("#idingreso").val();
 			if (idingreso) {
 				$.post("../ajax/ingreso.php?op=listarDetalle&id=" + idingreso, function(html) {
-					$("#detalles").html(html);
+					if (modoAmpliar) {
+						$("#tablaItemsExistentes").html(html);
+					} else {
+						$("#detalles").html(html);
+					}
 					actualizarContadorItems();
 				});
 			}
-			// Actualizar silenciosamente el listado principal
 			if (tabla) { tabla.ajax.reload(null, false); }
 		} else {
 			notifyIngreso("error", r.message || "No se pudo actualizar.");
@@ -1090,23 +1645,27 @@ function eliminarFilaDetalle(iddetalle) {
 	if (!confirm("¿Eliminar este artículo de la compra? Esta acción no se puede deshacer.")) {
 		return;
 	}
-	var $fila = $('[data-iddetalle="' + iddetalle + '"]');
+	var $fila = $('[data-iddetalle="' + iddetalle + '"]').filter(function(){ return $(this).find('input[name="det_cantidad"]').length > 0; }).first();
 	var $btn = $fila.find('.btn-danger');
 	$btn.prop("disabled", true);
 
 	$.post("../ajax/ingreso.php?op=eliminarDetalle", { iddetalle: iddetalle }, function(resp) {
-		var r = {};
-		try { r = JSON.parse(resp); } catch(e) {}
+		var r = parseJsonIngreso(resp);
 		if (r.ok) {
 			notifyIngreso("success", r.message || "Artículo eliminado de la compra.");
 			if (typeof r.nuevo_total !== "undefined") {
-				var sym = window.appCurrencySymbol || "S/";
-				$("#det-total-view").text(sym + " " + parseFloat(r.nuevo_total).toFixed(2));
+				$("#det-total-view").text(moneyIngreso(r.nuevo_total));
+				window._totalGuardadoIngreso = parseFloat(r.nuevo_total);
 			}
 			var idingreso = $("#idingreso").val();
 			if (idingreso) {
 				$.get("../ajax/ingreso.php?op=listarDetalle&id=" + idingreso, function(html) {
-					$("#tablaItemsExistentes").html(html);
+					if (modoAmpliar) {
+						$("#tablaItemsExistentes").html(html);
+					} else {
+						$("#detalles").html(html);
+					}
+					actualizarContadorItems();
 				});
 			}
 			if (tabla) { tabla.ajax.reload(null, false); }

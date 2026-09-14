@@ -344,6 +344,14 @@ $documento = array(
   "fecha" => formatearFechaComprobante($reg->fecha)
 );
 
+$etiquetasPago = array(
+  'EFECTIVO' => 'Efectivo', 'YAPE' => 'Yape', 'PLIN' => 'Plin', 'TARJETA' => 'Tarjeta',
+  'TRANSFERENCIA' => 'Transferencia bancaria', 'MIXTO' => 'Mixto'
+);
+$metodoPagoRaw = isset($reg->metodo_pago) ? strtoupper(trim((string)$reg->metodo_pago)) : 'EFECTIVO';
+$metodoPagoTexto = isset($etiquetasPago[$metodoPagoRaw]) ? $etiquetasPago[$metodoPagoRaw] : ucfirst(strtolower($metodoPagoRaw));
+$estadoCompra = isset($reg->estado) ? (string)$reg->estado : '';
+
 $proveedor = array(
   "nombre" => $reg->proveedor,
   "documento" => $reg->tipo_documento.": ".$reg->num_documento,
@@ -397,7 +405,7 @@ $V->substituir_un_mil_por_mil = true;
 $con_letra = strtoupper(trim($V->ValorEnLetras(round($total, 2), " ".$nombreMonedaLetras)));
 $con_letra = preg_replace('/\s+/', ' ', str_replace('--', '', $con_letra));
 
-if ($pdf->GetY() > 228) {
+if ($pdf->GetY() > 222) {
   $pdf->AddPage();
 }
 
@@ -405,7 +413,7 @@ $startY = $pdf->GetY() + 6;
 
 $pdf->SetDrawColor(214, 223, 233);
 $pdf->SetFillColor(248, 250, 252);
-$pdf->Rect(10, $startY, 122, 24, 'DF');
+$pdf->Rect(10, $startY, 122, 30, 'DF');
 $pdf->SetFont('Arial', 'B', 9.5);
 $pdf->SetTextColor(30, 41, 59);
 $pdf->SetXY(13, $startY + 2.5);
@@ -413,11 +421,16 @@ $pdf->Cell(116, 5, $pdf->u('TOTAL EN LETRAS'), 0, 1, 'L');
 $pdf->SetFont('Arial', '', 9.2);
 $pdf->SetXY(13, $startY + 8);
 $pdf->MultiCell(116, 5, $pdf->u($con_letra." CON 00/100"), 0, 'L');
+$pdf->SetFont('Arial', 'B', 9.2);
+$pdf->SetXY(13, $startY + 22);
+$pdf->Cell(34, 5, $pdf->u('FORMA DE PAGO:'), 0, 0, 'L');
+$pdf->SetFont('Arial', '', 9.2);
+$pdf->Cell(82, 5, $pdf->u($metodoPagoTexto.($estadoCompra === 'Borrador' ? '   (COMPRA EN BORRADOR, NO CONFIRMADA)' : '')), 0, 1, 'L');
 
 $boxX = 137;
 $boxW = 63;
 $pdf->SetFillColor(248, 250, 252);
-$pdf->Rect($boxX, $startY, $boxW, 24, 'DF');
+$pdf->Rect($boxX, $startY, $boxW, 30, 'DF');
 $pdf->SetFillColor(2, 132, 199);
 $pdf->SetTextColor(255, 255, 255);
 $pdf->Rect($boxX, $startY, $boxW, 6, 'F');

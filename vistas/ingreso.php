@@ -123,7 +123,7 @@ if ($_SESSION['compras']==1) {
         <th>N&deg; Lote</th>
         <th>Vencimiento</th>
         <th>Subtotal</th>
-        <th>Actualizar</th>
+        <th>Guardado</th>
        </thead>
        <tfoot>
          <th>TOTAL</th>
@@ -141,6 +141,10 @@ if ($_SESSION['compras']==1) {
          
        </tbody>
      </table>
+     <p class="text-muted" style="margin:4px 0 0 0;font-size:12px;">
+       <i class="fa fa-magic"></i> Cada fila se guarda sola al completar cantidad, precios y vencimiento.
+       <span id="autoguardadoEstado" style="margin-left:8px;font-weight:600;"></span>
+     </p>
     </div>
     <!-- Control de temperatura (cadena de frío) -->
     <div class="form-group col-lg-12 col-md-12 col-xs-12">
@@ -170,6 +174,8 @@ if ($_SESSION['compras']==1) {
       <label>Método de pago al proveedor</label>
       <select class="form-control" name="metodo_pago" id="ing_metodo_pago">
         <option value="EFECTIVO">Efectivo</option>
+        <option value="YAPE">Yape</option>
+        <option value="PLIN">Plin</option>
         <option value="TARJETA">Tarjeta</option>
         <option value="TRANSFERENCIA">Transferencia bancaria</option>
         <option value="MIXTO">Mixto</option>
@@ -177,7 +183,7 @@ if ($_SESSION['compras']==1) {
     </div>
 
     <div class="form-group col-lg-12 col-md-12 col-sm-12 col-xs-12 form-actions-row">
-      <button class="btn btn-primary" type="submit" id="btnGuardar"><i class="fa fa-save"></i>  Guardar</button>
+      <button class="btn btn-primary" type="submit" id="btnGuardar"><i class="fa fa-check-circle"></i> Confirmar compra</button>
       <button class="btn btn-danger" onclick="cancelarform()" type="button" id="btnCancelar"><i class="fa fa-arrow-circle-left"></i> Cancelar</button>
     </div>
   </form>
@@ -292,7 +298,7 @@ if ($_SESSION['compras']==1) {
 
 require 'footer.php';
  ?>
- <script src="scripts/ingreso.js?v=20260624a"></script>
+ <script src="scripts/ingreso.js?v=20260914a"></script>
  <?php 
 }
 

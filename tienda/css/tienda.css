@@ -1295,6 +1295,8 @@ body {
   gap: 6px;
 }
 .tf-contact i { color: #60a5fa; }
+.tf-contact a { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.tf-contact a:hover { color: #fff; }
 .tf-links {
   display: flex;
   justify-content: center;
@@ -2004,3 +2006,11 @@ body {
   .pm-receta i { font-size: 18px; }
   .pm-thumb { width: 52px; height: 52px; }
 }
+
+/* ── Validación de formularios (checkout) ── */
+.fgroup input.is-invalid, .fgroup select.is-invalid, .fgroup textarea.is-invalid {
+  border-color: #ef4444;
+  background: #fff5f5;
+  box-shadow: 0 0 0 3px rgba(239,68,68,.15);
+}
+.fgroup .err-text { font-size: 12.5px; color: #b91c1c; margin-top: 5px; font-weight: 600; }

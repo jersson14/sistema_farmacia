@@ -129,11 +129,11 @@ if ($yapeQR && file_exists(__DIR__ . '/../files/tienda/' . $yapeQR)) {
     <div id="datosFactura" style="display:none;margin-top:12px">
       <div class="fgroup">
         <label>RUC de la empresa</label>
-        <input type="text" id="ruc_factura" placeholder="20XXXXXXXXX">
+        <input type="text" id="ruc_factura" placeholder="20XXXXXXXXX" inputmode="numeric" maxlength="11" oninput="this.value=this.value.replace(/\D/g,''); limpiarError(this)">
       </div>
       <div class="fgroup">
         <label>Razón social</label>
-        <input type="text" id="razon_social" placeholder="Empresa S.A.C.">
+        <input type="text" id="razon_social" placeholder="Empresa S.A.C." oninput="limpiarError(this)">
       </div>
     </div>
   </div>
@@ -180,7 +180,9 @@ if ($yapeQR && file_exists(__DIR__ . '/../files/tienda/' . $yapeQR)) {
       <?php endif; ?>
       <div class="fgroup" style="margin-top:12px">
         <label>N° de operación Yape *</label>
-        <input type="text" id="referencia_yape" placeholder="Ej: 1234567">
+        <input type="text" id="referencia_yape" placeholder="Ej: 12345678" inputmode="numeric" maxlength="12" autocomplete="off"
+               oninput="this.value=this.value.replace(/\D/g,''); limpiarError(this)">
+        <div class="hint">Lo encuentras en la constancia de pago de tu app Yape (6 a 12 dígitos).</div>
       </div>
       <div class="fgroup">
         <label>Captura del comprobante de pago</label>
@@ -249,6 +251,8 @@ function selPago(m){
   document.getElementById('cardContra').classList.toggle('selected', m === 'CONTRAENTREGA');
   marcarRadio('metodo_pago', m);
   document.getElementById('datosYape').style.display = (m === 'YAPE') ? 'block' : 'none';
+  var refY = document.getElementById('referencia_yape');
+  if (refY) { limpiarError(refY); if (m === 'YAPE') setTimeout(function(){ refY.focus(); }, 150); }
 }
 
 function selComp(t){
@@ -293,8 +297,92 @@ function actualizarTotales(){
   document.getElementById('showTotal').textContent    = 'S/ ' + (subtotalCart + envio).toFixed(2);
 }
 
+function marcarError(el, msg){
+  if (!el) return;
+  el.classList.add('is-invalid');
+  var wrap = el.closest('.fgroup');
+  if (wrap) {
+    var e = wrap.querySelector('.err-text');
+    if (!e) { e = document.createElement('div'); e.className = 'err-text'; wrap.appendChild(e); }
+    e.textContent = msg;
+  }
+}
+function limpiarError(el){
+  if (!el) return;
+  el.classList.remove('is-invalid');
+  var wrap = el.closest('.fgroup');
+  if (wrap) { var e = wrap.querySelector('.err-text'); if (e) e.remove(); }
+}
+function mostrarMsgCheckout(txt){
+  var msg = document.getElementById('msgCheckout');
+  msg.style.display = 'block';
+  msg.textContent   = txt;
+}
+function ocultarMsgCheckout(){
+  var msg = document.getElementById('msgCheckout');
+  msg.style.display = 'none';
+  msg.textContent   = '';
+}
+
+// Devuelve el primer error {el, msg} o null si todo está bien
+function validarCheckout(){
+  var errores = [];
+  var $id = function(id){ return document.getElementById(id); };
+  var val = function(id){ var e = $id(id); return e ? e.value.trim() : ''; };
+  document.querySelectorAll('.is-invalid').forEach(limpiarError);
+
+  if (!val('nombre_entrega'))
+    errores.push({el: $id('nombre_entrega'), msg: 'Ingresa tu nombre completo.'});
+
+  var tel = val('telefono_entrega').replace(/\D/g,'');
+  if (!tel)
+    errores.push({el: $id('telefono_entrega'), msg: 'Ingresa un teléfono de contacto.'});
+  else if (tel.length < 9)
+    errores.push({el: $id('telefono_entrega'), msg: 'El teléfono debe tener 9 dígitos.'});
+
+  if (tipoEntregaSel === 'ENVIO') {
+    if (!val('direccion_entrega'))
+      errores.push({el: $id('direccion_entrega'), msg: 'Ingresa la dirección donde entregaremos tu pedido.'});
+    if (!val('distrito_entrega'))
+      errores.push({el: $id('distrito_entrega'), msg: 'Ingresa tu distrito.'});
+  }
+
+  if (tipoCompSel === 'Factura') {
+    var ruc = val('ruc_factura');
+    if (!ruc)
+      errores.push({el: $id('ruc_factura'), msg: 'Ingresa el RUC para emitir la factura.'});
+    else if (!/^(10|15|17|20)\d{9}$/.test(ruc))
+      errores.push({el: $id('ruc_factura'), msg: 'El RUC debe tener 11 dígitos.'});
+    if (!val('razon_social'))
+      errores.push({el: $id('razon_social'), msg: 'Ingresa la razón social de la empresa.'});
+  }
+
+  if (metodoPagoSel === 'YAPE') {
+    var ref = val('referencia_yape');
+    if (!ref)
+      errores.push({el: $id('referencia_yape'), msg: 'Ingresa el número de operación de tu pago Yape. Sin él no podemos confirmar tu pedido.'});
+    else if (!/^\d{6,12}$/.test(ref))
+      errores.push({el: $id('referencia_yape'), msg: 'El número de operación debe tener entre 6 y 12 dígitos.'});
+  }
+
+  errores.forEach(function(e){ marcarError(e.el, e.msg); });
+  return errores.length ? errores[0] : null;
+}
+
 function confirmarPedido(){
   var btn = document.getElementById('btnConfirmar');
+
+  var err = validarCheckout();
+  if (err) {
+    mostrarMsgCheckout(err.msg);
+    if (err.el) {
+      err.el.scrollIntoView({behavior:'smooth', block:'center'});
+      setTimeout(function(){ err.el.focus(); }, 300);
+    }
+    tiendaNotify('warn', 'Revisa los datos marcados en rojo.');
+    return;
+  }
+  ocultarMsgCheckout();
   btn.disabled = true;
   btn.textContent = 'Procesando...';
   btn.classList.add('loading');
@@ -321,9 +409,12 @@ function confirmarPedido(){
       if (d.ok) {
         window.location.href = 'pedido_ok.php?id=' + d.idpedido;
       } else {
-        var msg = document.getElementById('msgCheckout');
-        msg.style.display = 'block';
-        msg.textContent   = d.message || 'No se pudo procesar el pedido.';
+        mostrarMsgCheckout(d.message || 'No se pudo procesar el pedido.');
+        if (d.campo) {
+          var elc = document.getElementById(d.campo);
+          marcarError(elc, d.message);
+          if (elc) { elc.scrollIntoView({behavior:'smooth', block:'center'}); setTimeout(function(){ elc.focus(); }, 300); }
+        }
         btn.disabled = false;
         btn.textContent = '✔ Confirmar pedido';
         btn.classList.remove('loading');

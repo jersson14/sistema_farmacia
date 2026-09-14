@@ -71,11 +71,35 @@ switch ($op) {
             'costo_envio'      => $costoEnvio
         );
 
-        if (!$datos['nombre_entrega'] || !$datos['telefono_entrega']) {
-            echo json_encode(array('ok'=>false,'message'=>'Nombre y teléfono de contacto son obligatorios.')); break;
+        if (!$datos['nombre_entrega']) {
+            echo json_encode(array('ok'=>false,'message'=>'Ingresa tu nombre completo.','campo'=>'nombre_entrega')); break;
+        }
+        $telDigitos = preg_replace('/\D/', '', $datos['telefono_entrega']);
+        if (strlen($telDigitos) < 9) {
+            echo json_encode(array('ok'=>false,'message'=>'El teléfono de contacto debe tener 9 dígitos.','campo'=>'telefono_entrega')); break;
         }
         if ($tipoEntrega === 'ENVIO' && !$datos['direccion_entrega']) {
-            echo json_encode(array('ok'=>false,'message'=>'Ingresa tu dirección de entrega.')); break;
+            echo json_encode(array('ok'=>false,'message'=>'Ingresa la dirección donde entregaremos tu pedido.','campo'=>'direccion_entrega')); break;
+        }
+        if ($tipoEntrega === 'ENVIO' && !$datos['distrito_entrega']) {
+            echo json_encode(array('ok'=>false,'message'=>'Ingresa tu distrito.','campo'=>'distrito_entrega')); break;
+        }
+        if ($datos['tipo_comprobante'] === 'Factura') {
+            if (!preg_match('/^(10|15|17|20)\d{9}$/', $datos['ruc_factura'])) {
+                echo json_encode(array('ok'=>false,'message'=>'Para emitir factura ingresa un RUC válido de 11 dígitos.','campo'=>'ruc_factura')); break;
+            }
+            if ($datos['razon_social'] === '') {
+                echo json_encode(array('ok'=>false,'message'=>'Ingresa la razón social de la empresa.','campo'=>'razon_social')); break;
+            }
+        }
+        // Pago con Yape: el número de operación es obligatorio para poder verificar el pago
+        if ($metodoPago === 'YAPE') {
+            if ($datos['referencia_yape'] === '') {
+                echo json_encode(array('ok'=>false,'message'=>'Ingresa el número de operación de tu pago Yape. Sin él no podemos confirmar tu pedido.','campo'=>'referencia_yape')); break;
+            }
+            if (!preg_match('/^\d{6,12}$/', $datos['referencia_yape'])) {
+                echo json_encode(array('ok'=>false,'message'=>'El número de operación Yape debe tener entre 6 y 12 dígitos.','campo'=>'referencia_yape')); break;
+            }
         }
 
         $r = $mdl->crear($datos, $items);

@@ -1,15 +1,16 @@
 <?php
 require_once "config/Conexion.php";
+require_once "modelos/Empresa.php";
 
-$empresa = [];
-$stmt = $conexion->query("SELECT * FROM configuracion_empresa LIMIT 1");
-if ($stmt && $stmt->num_rows > 0) $empresa = $stmt->fetch_assoc();
-
-$telefono  = $empresa['telefono'] ?? '+51 999 999 999';
-$correo    = $empresa['correo']   ?? 'contacto@farmasuyana.com';
-$ruc       = $empresa['ruc']      ?? '';
+// Datos de la empresa: todo sale de configuracion_empresa (Acceso > Empresa)
+$empresa   = (new Empresa())->datosPublicos('');
+$nombreEmp = $empresa['nombre'];
+$telefono  = $empresa['telefono'] !== '' ? $empresa['telefono'] : '+51 999 999 999';
+$correo    = $empresa['correo']   !== '' ? $empresa['correo']   : 'contacto@farmasuyana.com';
+$ruc       = $empresa['ruc'];
 $waNro     = preg_replace('/\D/', '', $telefono);
-$direccion = 'Urb. Patibamba Baja, Av. Sinchi Roca Lote 1 – al Costado de la Iglesia Cristiana';
+$direccion = $empresa['direccion'] !== '' ? $empresa['direccion'] : 'Urb. Patibamba Baja, Av. Sinchi Roca Lote 1 – al Costado de la Iglesia Cristiana';
+$logoUrl   = $empresa['logo_url'] !== '' ? $empresa['logo_url'] : 'files/famacia.png';
 
 $productos = [];
 $sqlProd = "SELECT a.idarticulo AS id, a.nombre, a.imagen,
@@ -29,8 +30,8 @@ if ($rProd) while ($row = $rProd->fetch_assoc()) $productos[] = $row;
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Botica FarmaSuyana – Al Cuidado de Tu Salud</title>
-<meta name="description" content="Botica FarmaSuyana, tu farmacia de confianza. Medicamentos de calidad, asesoría farmacéutica y venta online. Al cuidado de tu salud en Patibamba.">
+<title><?= htmlspecialchars($nombreEmp) ?> – Al Cuidado de Tu Salud</title>
+<meta name="description" content="<?= htmlspecialchars($nombreEmp) ?>, tu farmacia de confianza. Medicamentos de calidad, asesoría farmacéutica y venta online. Al cuidado de tu salud.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
 <!-- Bootstrap Icons (moderno 2025) -->
@@ -563,7 +564,7 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
 <nav class="nav" id="mainNav">
   <div class="nav-inner">
     <a href="#inicio" class="nav-logo">
-      <img src="files/famacia.png" alt="Botica FarmaSuyana">
+      <img src="<?= htmlspecialchars($logoUrl) ?>" alt="<?= htmlspecialchars($nombreEmp) ?>">
     </a>
     <ul class="nav-links">
       <li><a href="#inicio">Inicio</a></li>
@@ -615,7 +616,7 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
         Tu salud, nuestra razón de ser
       </div>
       <h1 class="rev d1">
-        <span class="brand-name">Botica FarmaSuyana</span>
+        <span class="brand-name"><?= htmlspecialchars($nombreEmp) ?></span>
         Al cuidado de<br>tu salud
       </h1>
       <p class="hero-tagline rev d2">
@@ -624,7 +625,7 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
       <p class="hero-sub rev d2">
         Medicamentos certificados, asesoría farmacéutica personalizada
         y venta online desde la comodidad de tu hogar.
-        Estamos en el corazón de Patibamba para servirte.
+        Estamos cerca de ti para servirte.
       </p>
       <div class="hero-btns rev d3">
         <a href="tienda/index.php" class="btn-hero-w">
@@ -653,7 +654,7 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
     <div class="hero-right rev-r d2">
       <div class="hero-float">
         <div class="hero-card">
-          <img src="files/famacia.png" alt="Botica FarmaSuyana">
+          <img src="<?= htmlspecialchars($logoUrl) ?>" alt="<?= htmlspecialchars($nombreEmp) ?>">
           <div class="hero-card-tag">Botica · Farmacia · Salud</div>
           <div class="hero-card-addr">
             <i class="bi bi-geo-alt-fill"></i>
@@ -871,7 +872,7 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
     <div class="nos-grid">
       <div class="nos-img-wrap rev-l">
         <img src="https://images.unsplash.com/photo-1576602976047-174e57a47881?w=800&q=80"
-             alt="Interior Botica FarmaSuyana" class="nos-main-img">
+             alt="Interior <?= htmlspecialchars($nombreEmp) ?>" class="nos-main-img">
         <div class="nos-badge">
           <strong>+5</strong>
           <span>Años al<br>servicio</span>
@@ -881,8 +882,8 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
         <div class="sec-tag"><i class="bi bi-info-circle-fill"></i> ¿Quiénes Somos?</div>
         <h2>Tu salud es <em>nuestra misión</em></h2>
         <p>
-          Botica FarmaSuyana nació con el compromiso de brindar acceso a medicamentos
-          de calidad a toda la comunidad de Patibamba Baja y sus alrededores.
+          <?= htmlspecialchars($nombreEmp) ?> nació con el compromiso de brindar acceso a medicamentos
+          de calidad a toda la comunidad.
           Contamos con farmacéuticos titulados, sistema digital de gestión y
           una plataforma de venta online para servirte mejor.
         </p>
@@ -928,7 +929,7 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
         <h3>Misión</h3>
         <p>
           Brindar acceso a medicamentos de calidad y asesoría farmacéutica confiable a la
-          comunidad de Patibamba Baja y sus alrededores, con atención cercana, profesionales
+          comunidad, con atención cercana, profesionales
           titulados y precios justos, cuidando la salud de cada familia como si fuera la nuestra.
         </p>
       </div>
@@ -992,7 +993,7 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
       <div class="rev-r">
         <div class="cnt-map">
           <i class="bi bi-geo-alt-fill"></i>
-          <h4>Botica FarmaSuyana</h4>
+          <h4><?= htmlspecialchars($nombreEmp) ?></h4>
           <p><?= htmlspecialchars($direccion) ?></p>
           <a href="https://maps.google.com/?q=<?= urlencode($direccion) ?>"
              target="_blank" class="btn btn-blue" style="font-size:.8rem;padding:10px 22px;margin-top:6px">
@@ -1009,8 +1010,8 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
   <div class="foot-in">
     <div class="foot-top">
       <div class="foot-brand">
-        <img src="files/famacia.png" alt="FarmaSuyana">
-        <p>Botica de confianza en Patibamba. Al cuidado de tu salud y de toda tu familia con calidad, responsabilidad y el más alto estándar farmacéutico.</p>
+        <img src="<?= htmlspecialchars($logoUrl) ?>" alt="<?= htmlspecialchars($nombreEmp) ?>">
+        <p>Tu botica de confianza. Al cuidado de tu salud y de toda tu familia con calidad, responsabilidad y el más alto estándar farmacéutico.</p>
         <div class="foot-social">
           <a href="#" title="Facebook"><i class="bi bi-facebook"></i></a>
           <a href="#" title="Instagram"><i class="bi bi-instagram"></i></a>
@@ -1063,8 +1064,8 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
     </div>
     <hr class="foot-hr">
     <div class="foot-bot">
-      <p>&copy; <?= date('Y') ?> <a href="#inicio">Botica FarmaSuyana</a> – Al cuidado de tu salud. Todos los derechos reservados.</p>
-      <p style="color:#334155;font-size:.78rem">Desarrollado con <i class="bi bi-heart-fill" style="color:var(--red)"></i> para la salud de Patibamba</p>
+      <p>&copy; <?= date('Y') ?> <a href="#inicio"><?= htmlspecialchars($nombreEmp) ?></a> – Al cuidado de tu salud. Todos los derechos reservados.</p>
+      <p style="color:#334155;font-size:.78rem">Desarrollado con <i class="bi bi-heart-fill" style="color:var(--red)"></i> para la salud de tu familia</p>
     </div>
   </div>
 </footer>

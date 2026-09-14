@@ -20,11 +20,13 @@ if (!$cfgTienda->estaActiva() && !isset($_SESSION['nombre'])) {
 }
 
 $empMdl   = new Empresa();
-$emp      = $empMdl->datosReporte();
-$telefono = !empty($emp['telefono']) ? $emp['telefono'] : '';
+$emp      = $empMdl->datosPublicos('../');   // logo, nombre, dirección y contacto desde Acceso > Empresa
+$telefono = $emp['telefono'];
+$direccionEmp = $emp['direccion'];
+$correoEmp    = $emp['correo'];
 $waNum    = $cfgTienda->obtener('whatsapp_numero','');
 
-// Nombre: usar BD solo si no es un dato viejo/genérico
+// Nombre comercial (ignora datos viejos/genéricos del sistema base)
 $_viejosNombres = ['PERNO CENTRO', 'pernocentro', 'mi tienda', 'itiendas', 'farmacia', ''];
 $_empNombreBD   = strtolower(trim($emp['nombre'] ?? ''));
 $nombreEmp = (!empty($emp['nombre']) && !in_array($_empNombreBD, $_viejosNombres)
@@ -32,18 +34,8 @@ $nombreEmp = (!empty($emp['nombre']) && !in_array($_empNombreBD, $_viejosNombres
              ? $emp['nombre']
              : 'Botica FarmaSuyana';
 
-// Logo: prioridad → BD → farmasuyana.png → famacia.png
-$logo = '';
-if (!empty($emp['logo'])) {
-    $logoFS = realpath(__DIR__ . '/../files/empresa/' . $emp['logo']);
-    if ($logoFS && file_exists($logoFS)) $logo = '../files/empresa/' . $emp['logo'];
-}
-if (empty($logo)) {
-    if (file_exists(__DIR__ . '/../files/empresa/farmasuyana.png'))
-        $logo = '../files/empresa/farmasuyana.png';
-    elseif (file_exists(__DIR__ . '/../files/famacia.png'))
-        $logo = '../files/famacia.png';
-}
+// Logo ya resuelto por el modelo (BD → farmasuyana.png → famacia.png), con cache-busting
+$logo = $emp['logo_url'];
 
 $clienteLogado = !empty($_SESSION['tienda_cliente']);
 $nombreCliente = $clienteLogado ? $_SESSION['tienda_cliente']['nombre'] : '';
@@ -72,7 +64,7 @@ $nombreCliente = $clienteLogado ? $_SESSION['tienda_cliente']['nombre'] : '';
 <!-- Navbar -->
 <nav class="tienda-nav">
   <a href="index.php" class="brand">
-    <?php if ($logo): ?><img src="<?php echo htmlspecialchars($logo); ?>" alt="Logo"><?php endif; ?>
+    <?php if ($logo): ?><img src="<?php echo htmlspecialchars($logo); ?>" alt="<?php echo htmlspecialchars($nombreEmp); ?>"><?php endif; ?>
     <span><?php echo htmlspecialchars($nombreEmp); ?></span>
     <span class="brand-dot"></span>
   </a>

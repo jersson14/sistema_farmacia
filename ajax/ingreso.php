@@ -132,6 +132,68 @@ switch ($_GET["op"]) {
 		echo json_encode($rspta_amp);
 		break;
 
+	// ── Autoguardado por fila / compra en borrador ─────────────────────
+	case 'crearBorrador':
+		$temperatura_cb = (isset($_POST["temperatura_recepcion"]) && $_POST["temperatura_recepcion"] !== '') ? (float)$_POST["temperatura_recepcion"] : null;
+		$temp_obs_cb    = isset($_POST["temp_observacion"]) ? $_POST["temp_observacion"] : '';
+		$metodo_cb      = isset($_POST["metodo_pago"]) ? limpiarCadena($_POST["metodo_pago"]) : 'EFECTIVO';
+		$rspta_cb = $ingreso->crearBorrador($idproveedor, $idusuario, $tipo_comprobante, $serie_comprobante, $num_comprobante, $fecha_hora, $impuesto, $metodo_cb, $temperatura_cb, $temp_obs_cb);
+		echo json_encode($rspta_cb);
+		break;
+
+	case 'guardarFila':
+		$idingreso_gf  = isset($_POST["idingreso"])  ? (int)$_POST["idingreso"]  : 0;
+		$iddetalle_gf  = isset($_POST["iddetalle"])  ? (int)$_POST["iddetalle"]  : 0;
+		$idarticulo_gf = isset($_POST["idarticulo"]) ? (int)$_POST["idarticulo"] : 0;
+		$rspta_gf = $ingreso->guardarFilaDetalle(
+			$idingreso_gf, $iddetalle_gf, $idarticulo_gf,
+			isset($_POST["cantidad"])          ? $_POST["cantidad"]                         : 0,
+			isset($_POST["precio_compra"])     ? $_POST["precio_compra"]                    : 0,
+			isset($_POST["precio_venta"])      ? $_POST["precio_venta"]                     : 0,
+			isset($_POST["numero_lote"])       ? limpiarCadena($_POST["numero_lote"])       : '',
+			isset($_POST["fecha_vencimiento"]) ? limpiarCadena($_POST["fecha_vencimiento"]) : ''
+		);
+		echo json_encode($rspta_gf);
+		break;
+
+	case 'guardarCabecera':
+	case 'confirmarIngreso':
+		$idingreso_gc = isset($_POST["idingreso"]) ? (int)$_POST["idingreso"] : 0;
+		$campos_gc = array(
+			"idproveedor"      => $idproveedor,
+			"tipo_comprobante" => $tipo_comprobante,
+			"serie_comprobante"=> $serie_comprobante,
+			"num_comprobante"  => $num_comprobante,
+			"fecha_hora"       => $fecha_hora,
+			"impuesto"         => $impuesto,
+			"metodo_pago"      => isset($_POST["metodo_pago"]) ? limpiarCadena($_POST["metodo_pago"]) : 'EFECTIVO',
+			"temperatura_recepcion" => (isset($_POST["temperatura_recepcion"]) && $_POST["temperatura_recepcion"] !== '') ? (float)$_POST["temperatura_recepcion"] : null,
+			"temp_observacion" => isset($_POST["temp_observacion"]) ? $_POST["temp_observacion"] : ''
+		);
+		$rspta_gc = $ingreso->guardarCabecera($idingreso_gc, $campos_gc, $_GET["op"] === 'confirmarIngreso');
+		echo json_encode($rspta_gc);
+		break;
+
+	case 'descartarBorrador':
+		$idingreso_db = isset($_POST["idingreso"]) ? (int)$_POST["idingreso"] : 0;
+		echo json_encode($ingreso->descartarBorrador($idingreso_db));
+		break;
+
+	case 'borradorPendiente':
+		$bp = $ingreso->borradorPendiente($idusuario);
+		echo json_encode(array("ok"=>true, "borrador"=>$bp ? $bp : null));
+		break;
+
+	case 'detalleJson':
+		$id_dj = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+		$cab_dj = $ingreso->mostrar($id_dj);
+		if (!$cab_dj) {
+			echo json_encode(array("ok"=>false, "message"=>"La compra no existe"));
+			break;
+		}
+		echo json_encode(array("ok"=>true, "cabecera"=>$cab_dj, "items"=>$ingreso->listarDetalleArray($id_dj)));
+		break;
+
 	case 'siguienteCorrelativo':
 		$tipo = isset($_GET["tipo_comprobante"]) ? limpiarCadena($_GET["tipo_comprobante"]) : "Boleta";
 		$serie = isset($_GET["serie_comprobante"]) ? limpiarCadena($_GET["serie_comprobante"]) : "";
@@ -243,7 +305,10 @@ switch ($_GET["op"]) {
 		while ($reg=$rspta->fetch_object()) {
 			$url='../reportes/exIngreso.php?id=';
 			$data[]=array(
-            "0"=>(($reg->estado=='Aceptado')
+            "0"=>(($reg->estado=='Borrador')
+				?'<button class="btn btn-success btn-xs" onclick="continuarBorrador('.$reg->idingreso.')" title="Continuar registrando esta compra"><i class="fa fa-edit"></i> Continuar</button> '
+				 .'<button class="btn btn-danger btn-xs" onclick="descartarBorradorLista('.$reg->idingreso.')" title="Descartar borrador"><i class="fa fa-trash"></i></button>'
+				:(($reg->estado=='Aceptado')
 				?'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idingreso.')" title="Ver detalle"><i class="fa fa-eye"></i></button> '
 				 .'<button class="btn btn-success btn-xs" onclick="abrirAmpliarIngreso('.$reg->idingreso.')" title="Agregar artículos a esta compra"><i class="fa fa-plus"></i></button> '
 				 .'<button class="btn btn-danger btn-xs" onclick="anular('.$reg->idingreso.')" title="Anular compra"><i class="fa fa-close"></i></button> '
@@ -251,14 +316,14 @@ switch ($_GET["op"]) {
 				:'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idingreso.')" title="Ver detalle"><i class="fa fa-eye"></i></button> '
 				 .'<a target="_blank" href="'.$url.$reg->idingreso.'"> <button class="btn btn-info btn-xs" title="Ver PDF"><i class="fa fa-file"></i></button></a> '
 				 .'<button class="btn btn-primary btn-xs" onclick="recuperarIngreso('.$reg->idingreso.')" title="Recuperar / activar compra"><i class="fa fa-undo"></i></button> '
-				 .'<button class="btn btn-danger btn-xs" onclick="eliminarDefinitivoIngreso('.$reg->idingreso.')" title="Eliminar definitivamente"><i class="fa fa-trash"></i></button>'),
+				 .'<button class="btn btn-danger btn-xs" onclick="eliminarDefinitivoIngreso('.$reg->idingreso.')" title="Eliminar definitivamente"><i class="fa fa-trash"></i></button>')),
             "1"=>$reg->fecha,
             "2"=>$reg->proveedor,
             "3"=>$reg->usuario,
             "4"=>$reg->tipo_comprobante,
             "5"=>$reg->serie_comprobante. '-' .$reg->num_comprobante,
             "6"=>formatearMoneda((float)$reg->total_compra),
-            "7"=>($reg->estado=='Aceptado')?'<span class="label bg-green">Aceptado</span>':'<span class="label bg-red">Anulado</span>'
+            "7"=>($reg->estado=='Aceptado')?'<span class="label bg-green">Aceptado</span>':(($reg->estado=='Borrador')?'<span class="label bg-yellow" title="Compra en borrador, aún no confirmada">Borrador</span>':'<span class="label bg-red">Anulado</span>')
               );
 		}
 		$results=array(
