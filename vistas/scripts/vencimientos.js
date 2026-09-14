@@ -47,7 +47,7 @@ function initTblVencidos() {
             error: function(e) { console.log(e.responseText); }
         },
         iDisplayLength: 20,
-        order: [[4, 'desc']]
+        order: [[5, 'desc']]
     });
 }
 
@@ -67,7 +67,7 @@ function initTblProximos(dias) {
             error: function(e) { console.log(e.responseText); }
         },
         iDisplayLength: 20,
-        order: [[4, 'asc']]
+        order: [[5, 'asc']]
     });
 }
 

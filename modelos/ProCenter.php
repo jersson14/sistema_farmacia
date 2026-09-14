@@ -19,7 +19,7 @@ class ProCenter
 
     public function infoArticulo($idarticulo)
     {
-        $sql = "SELECT a.idarticulo,a.nombre,a.codigo,a.stock,a.stock_minimo,IFNULL(u.abreviatura,'und') AS unidad
+        $sql = "SELECT a.idarticulo,a.nombre,a.codigo,a.stock,a.stock_minimo,IFNULL(a.precio_venta,0) AS precio_venta,IFNULL(u.abreviatura,'und') AS unidad
         FROM articulo a
         LEFT JOIN unidad_medida u ON u.idunidad=a.idunidad
         WHERE a.idarticulo='$idarticulo' LIMIT 1";
@@ -81,7 +81,10 @@ class ProCenter
             di.cantidad AS entrada,
             0.000 AS salida,
             di.precio_compra AS costo,
-            di.precio_venta AS precio_ref
+            di.precio_venta AS precio_ref,
+            IFNULL(di.numero_lote,'') AS lote,
+            di.fecha_vencimiento AS vencimiento,
+            i.idingreso AS iddoc
           FROM detalle_ingreso di
           INNER JOIN ingreso i ON i.idingreso=di.idingreso
           LEFT JOIN persona p ON p.idpersona=i.idproveedor
@@ -100,10 +103,14 @@ class ProCenter
               INNER JOIN ingreso i2 ON i2.idingreso=di2.idingreso
               WHERE di2.idarticulo=dv.idarticulo AND i2.estado='Aceptado' AND i2.fecha_hora<=v.fecha_hora
               ORDER BY i2.fecha_hora DESC, di2.iddetalle_ingreso DESC LIMIT 1) AS costo,
-            dv.precio_venta AS precio_ref
+            dv.precio_venta AS precio_ref,
+            IFNULL(la.numero_lote,'') AS lote,
+            la.fecha_vencimiento AS vencimiento,
+            v.idventa AS iddoc
           FROM detalle_venta dv
           INNER JOIN venta v ON v.idventa=dv.idventa
           LEFT JOIN persona p ON p.idpersona=v.idcliente
+          LEFT JOIN lote_articulo la ON la.idlote=dv.idlote
           WHERE $whereVenta
         ) k
         ORDER BY k.fecha_hora ASC";

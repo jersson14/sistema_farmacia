@@ -65,9 +65,13 @@ class Lote
         $dias = max(1, (int)$dias);
         $sql = "SELECT l.idlote, l.numero_lote, l.fecha_vencimiento, l.cantidad_actual,
                        a.idarticulo, a.nombre AS articulo, a.codigo,
-                       DATEDIFF(l.fecha_vencimiento, CURDATE()) AS dias_restantes
+                       DATEDIFF(l.fecha_vencimiento, CURDATE()) AS dias_restantes,
+                       IFNULL(p.nombre,'') AS proveedor, i.fecha_hora AS fecha_compra,
+                       CONCAT(IFNULL(i.tipo_comprobante,''),' ',IFNULL(i.serie_comprobante,''),'-',IFNULL(i.num_comprobante,'')) AS documento
                 FROM lote_articulo l
                 INNER JOIN articulo a ON a.idarticulo = l.idarticulo
+                LEFT JOIN ingreso i ON i.idingreso = l.idingreso
+                LEFT JOIN persona p ON p.idpersona = i.idproveedor
                 WHERE l.condicion=1
                   AND l.cantidad_actual > 0
                   AND l.fecha_vencimiento BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL '$dias' DAY)
@@ -91,9 +95,13 @@ class Lote
     {
         $sql = "SELECT l.idlote, l.numero_lote, l.fecha_vencimiento, l.cantidad_actual,
                        a.idarticulo, a.nombre AS articulo, a.codigo,
-                       DATEDIFF(CURDATE(), l.fecha_vencimiento) AS dias_vencido
+                       DATEDIFF(CURDATE(), l.fecha_vencimiento) AS dias_vencido,
+                       IFNULL(p.nombre,'') AS proveedor, i.fecha_hora AS fecha_compra,
+                       CONCAT(IFNULL(i.tipo_comprobante,''),' ',IFNULL(i.serie_comprobante,''),'-',IFNULL(i.num_comprobante,'')) AS documento
                 FROM lote_articulo l
                 INNER JOIN articulo a ON a.idarticulo = l.idarticulo
+                LEFT JOIN ingreso i ON i.idingreso = l.idingreso
+                LEFT JOIN persona p ON p.idpersona = i.idproveedor
                 WHERE l.condicion=1
                   AND l.cantidad_actual > 0
                   AND l.fecha_vencimiento < CURDATE()

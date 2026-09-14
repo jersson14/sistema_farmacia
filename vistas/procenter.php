@@ -46,21 +46,25 @@ if ($_SESSION['almacen']==1 || $_SESSION['consultac']==1 || $_SESSION['consultav
                 </div>
                 <div class="row">
                   <div class="col-md-12">
-                    <div class="well well-sm" id="kardexResumen">Selecciona un articulo para ver su historial.</div>
+                    <div id="kardexResumen" class="kardex-resumen">
+                      <div class="well well-sm" style="margin-bottom:10px;"><i class="fa fa-info-circle text-info"></i> Selecciona un producto y presiona <strong>Generar Kardex</strong> para ver de qué proveedor se compró, cuándo, a qué costo y a quién se vendió.</div>
+                    </div>
                   </div>
                 </div>
                 <div class="table-responsive">
                   <table class="table table-striped table-bordered procenter-table" id="tblkardex" style="width:100%;">
                     <thead>
                       <th>Fecha</th>
-                      <th>Tipo</th>
+                      <th>Movimiento</th>
                       <th>Documento</th>
-                      <th>Tercero</th>
+                      <th>Proveedor / Cliente</th>
+                      <th>Lote</th>
+                      <th>Vencimiento</th>
                       <th>Entrada</th>
                       <th>Salida</th>
                       <th>Saldo</th>
-                      <th>Costo</th>
-                      <th>Precio Ref.</th>
+                      <th>Costo unit.</th>
+                      <th>Precio venta</th>
                     </thead>
                     <tbody></tbody>
                   </table>

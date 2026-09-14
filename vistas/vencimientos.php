@@ -45,6 +45,7 @@ if ($_SESSION['almacen'] == 1) {
                 <th>Código</th>
                 <th>Artículo</th>
                 <th>N° Lote</th>
+                <th>Proveedor</th>
                 <th>F. Vencimiento</th>
                 <th>Días vencido</th>
                 <th>Stock lote</th>
@@ -55,6 +56,7 @@ if ($_SESSION['almacen'] == 1) {
                 <th>Código</th>
                 <th>Artículo</th>
                 <th>N° Lote</th>
+                <th>Proveedor</th>
                 <th>F. Vencimiento</th>
                 <th>Días vencido</th>
                 <th>Stock lote</th>
@@ -78,6 +80,7 @@ if ($_SESSION['almacen'] == 1) {
                 <th>Código</th>
                 <th>Artículo</th>
                 <th>N° Lote</th>
+                <th>Proveedor</th>
                 <th>F. Vencimiento</th>
                 <th>Días restantes</th>
                 <th>Stock lote</th>
@@ -88,6 +91,7 @@ if ($_SESSION['almacen'] == 1) {
                 <th>Código</th>
                 <th>Artículo</th>
                 <th>N° Lote</th>
+                <th>Proveedor</th>
                 <th>F. Vencimiento</th>
                 <th>Días restantes</th>
                 <th>Stock lote</th>

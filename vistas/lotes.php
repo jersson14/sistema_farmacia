@@ -38,6 +38,8 @@ if ($_SESSION['almacen'] == 1) {
               <th>Código</th>
               <th>Producto</th>
               <th>N° Lote</th>
+              <th>Proveedor</th>
+              <th>Compra</th>
               <th>F. Fabricación</th>
               <th>F. Vencimiento</th>
               <th>Stock Inicial</th>
@@ -51,6 +53,8 @@ if ($_SESSION['almacen'] == 1) {
               <th>Código</th>
               <th>Producto</th>
               <th>N° Lote</th>
+              <th>Proveedor</th>
+              <th>Compra</th>
               <th>F. Fabricación</th>
               <th>F. Vencimiento</th>
               <th>Stock Inicial</th>
