@@ -286,150 +286,19 @@ body.login-page {
   white-space: nowrap;
 }
 
-/* ── LAYOUT card + panel de accesos demo ─────────────────── */
+/* ── LAYOUT card ──────────────────────────────────────────── */
 .lwrap {
   position: relative;
   z-index: 10;
   display: flex;
-  align-items: stretch;
   justify-content: center;
-  gap: 28px;
   width: 100%;
-  max-width: 800px;
+  max-width: 420px;
 }
-.lwrap .lcard { flex: 0 0 420px; }
-
-.ldemo {
-  flex: 0 0 340px;
-  align-self: center;
-  background: rgba(255, 255, 255, 0.10);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 18px;
-  padding: 22px 22px 18px;
-  color: #ffffff;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
-  animation: card-enter 0.55s 0.12s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.ldemo-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #fde68a;
-  background: rgba(245, 158, 11, 0.18);
-  border: 1px solid rgba(245, 158, 11, 0.45);
-  border-radius: 999px;
-  padding: 4px 10px;
-  margin-bottom: 12px;
-}
-.ldemo-title {
-  font-size: 17px;
-  font-weight: 800;
-  letter-spacing: -0.3px;
-  margin-bottom: 4px;
-}
-.ldemo-sub {
-  font-size: 12.5px;
-  color: rgba(255, 255, 255, 0.72);
-  line-height: 1.5;
-  margin-bottom: 16px;
-}
-.ldemo-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: 13px;
-  overflow: hidden;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-}
-.ldemo-table th {
-  text-align: left;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.65);
-  background: rgba(255, 255, 255, 0.08);
-  padding: 9px 12px;
-}
-.ldemo-table td {
-  padding: 11px 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  vertical-align: middle;
-}
-.ldemo-role {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 700;
-}
-.ldemo-role i {
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-}
-.ldemo-role--admin i { background: rgba(37, 99, 235, 0.45); }
-.ldemo-role--vend  i { background: rgba(220, 38, 38, 0.45); }
-.ldemo-cred {
-  font-size: 12.5px;
-  color: rgba(255, 255, 255, 0.9);
-  line-height: 1.7;
-}
-.ldemo-cred b { color: rgba(255, 255, 255, 0.6); font-weight: 600; margin-right: 4px; }
-.ldemo-cred code {
-  font-family: 'Inter', 'Segoe UI', sans-serif;
-  font-weight: 700;
-  font-size: 12.5px;
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.14);
-  border-radius: 5px;
-  padding: 1px 6px;
-}
-.ldemo-use {
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.10);
-  color: #ffffff;
-  font-family: 'Inter', 'Segoe UI', sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  border-radius: 8px;
-  padding: 7px 11px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.18s, transform 0.18s;
-}
-.ldemo-use:hover { background: rgba(255, 255, 255, 0.22); transform: translateY(-1px); }
-.ldemo-note {
-  margin-top: 12px;
-  font-size: 11.5px;
-  color: rgba(255, 255, 255, 0.6);
-  line-height: 1.5;
-  display: flex;
-  gap: 7px;
-  align-items: flex-start;
-}
-.ldemo-note i { margin-top: 2px; color: #fde68a; }
+.lwrap .lcard { flex: 0 0 auto; width: 100%; }
 
 @media (max-width: 860px) {
   body.login-page { overflow-x: hidden; overflow-y: auto; flex-direction: column; align-items: center; justify-content: flex-start; }
-  .lwrap { flex-direction: column; align-items: center; max-width: 420px; gap: 18px; }
-  .lwrap .lcard { flex: 0 0 auto; }
-  .ldemo { flex: 0 0 auto; width: 100%; }
-  .ldemo { padding: 18px 14px 14px; }
-  .ldemo-table th, .ldemo-table td { padding: 8px 6px; }
-  .ldemo-role { font-size: 12px; gap: 5px; }
-  .ldemo-cred, .ldemo-cred code { font-size: 11.5px; }
-  .ldemo-use { padding: 6px 8px; font-size: 11px; }
   .lpage-credit { position: static; transform: none; margin-top: 18px; text-align: center; }
 }
 
@@ -527,42 +396,6 @@ body.login-page {
 
 </div>
 
-<!-- Accesos de demostración -->
-<aside class="ldemo" aria-label="Accesos de demostración">
-  <span class="ldemo-badge"><i class="fa fa-flask"></i> Demo</span>
-  <div class="ldemo-title">Accesos de prueba</div>
-  <div class="ldemo-sub">Usa cualquiera de estas cuentas para explorar el sistema. Haz clic en <b>Usar</b> y se completa el formulario.</div>
-
-  <table class="ldemo-table">
-    <thead>
-      <tr><th>Rol</th><th>Credenciales</th><th></th></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="ldemo-role ldemo-role--admin"><i class="fa fa-user-secret"></i>Administrador</span></td>
-        <td class="ldemo-cred">
-          <b>Usuario</b><code>Administrador</code><br>
-          <b>Clave</b><code>Administrador</code>
-        </td>
-        <td><button type="button" class="ldemo-use" data-user="Administrador" data-pass="Administrador">Usar</button></td>
-      </tr>
-      <tr>
-        <td><span class="ldemo-role ldemo-role--vend"><i class="fa fa-shopping-basket"></i>Vendedora</span></td>
-        <td class="ldemo-cred">
-          <b>Usuario</b><code>Vendedora</code><br>
-          <b>Clave</b><code>Vendedora</code>
-        </td>
-        <td><button type="button" class="ldemo-use" data-user="Vendedora" data-pass="Vendedora">Usar</button></td>
-      </tr>
-    </tbody>
-  </table>
-
-  <div class="ldemo-note">
-    <i class="fa fa-info-circle"></i>
-    <span>Entorno de demostración. Los datos pueden reiniciarse periódicamente.</span>
-  </div>
-</aside>
-
 </div><!-- /lwrap -->
 
 <!-- Crédito de página -->
@@ -572,13 +405,6 @@ body.login-page {
 
 <script>
 document.getElementById('lp-year').textContent = new Date().getFullYear();
-document.querySelectorAll('.ldemo-use').forEach(function (btn) {
-  btn.addEventListener('click', function () {
-    document.getElementById('logina').value = btn.getAttribute('data-user');
-    document.getElementById('clavea').value = btn.getAttribute('data-pass');
-    document.getElementById('clavea').focus();
-  });
-});
 </script>
 <script src="../public/js/jquery.min.js"></script>
 <script src="../public/js/bootstrap.min.js"></script>
