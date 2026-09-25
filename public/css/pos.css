@@ -10,12 +10,47 @@ body.pos-activo > .wrapper {
   overflow: hidden !important;
 }
 
+/* #mainCW es una columna: avisos superiores (stock bajo, etc.) ocupan su alto
+   y el POS toma el resto. JS fija la altura de #mainCW al alto visible. */
 body.pos-activo #mainCW {
   padding: 0 !important;
   overflow: hidden !important;
+  display: flex;
+  flex-direction: column;
+  min-height: 0 !important;
+  height: calc(100vh - var(--pos-top, 80px)) !important;
+  height: calc(100dvh - var(--pos-top, 80px)) !important;
+}
+body.pos-activo,
+html:has(body.pos-activo) { overflow: hidden !important; height: 100%; }
+body.pos-activo #mainCW > * { flex-shrink: 0; }
+body.pos-activo #mainCW > .pos-wrapper {
+  flex: 1 1 0px;
+  height: auto;
+  min-height: 0;
+}
+/* El menú del header flota y en pantallas angostas "invade" el POS: se contiene */
+body.pos-activo .main-header { display: flow-root; }
+body.pos-activo .main-footer { display: none; }
+/* Avisos compactos dentro del POS: informan sin robar alto al carrito */
+body.pos-activo .alerta-banner { padding: 4px 14px; font-size: 12px; }
+body.pos-activo .alerta-stock { display: none; } /* ya lo indica el ícono ⚠ del header */
+#bannerBorradorVenta {
+  flex-shrink: 0;
+  margin: 0 !important;
+  padding: 5px 14px !important;
+  border-radius: 0 !important;
+  font-size: 12px !important;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 6px;
 }
 
 .pos-wrapper {
+  --pos-cart-w: 400px;
+  --pos-card-min: 150px;
+  --pos-card-img: 72px;
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -215,7 +250,7 @@ body.pos-activo #mainCW {
   overflow-y: auto;
   padding: 10px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--pos-card-min), 1fr));
   gap: 8px;
   align-content: start;
 }
@@ -289,7 +324,7 @@ body.pos-activo #mainCW {
 
 .pos-card-img {
   width: 100%;
-  height: 72px;
+  height: var(--pos-card-img);
   object-fit: cover;
   border-radius: 8px;
   border: 1px solid #f1f5f9;
@@ -413,28 +448,21 @@ body.pos-activo #mainCW {
   line-height: 28px;
 }
 
-/* Panel del carrito — ancho fijo, nunca se encoge */
+/* Panel del carrito — ancho según breakpoint (--pos-cart-w), nunca se encoge */
+/* Si el alto no alcanza (zoom muy alto), el panel se desplaza y COBRAR
+   queda anclado abajo: nunca sale de la pantalla. */
 .pos-carrito-panel {
-  flex: 0 0 420px;
-  width: 420px;
-  min-width: 420px;
-  max-width: 420px;
+  flex: 0 0 var(--pos-cart-w);
+  width: var(--pos-cart-w);
+  min-width: var(--pos-cart-w);
+  max-width: var(--pos-cart-w);
   display: flex;
   flex-direction: column;
   background: #fff;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   min-height: 0;
   border-left: 1px solid #e2e8f0;
-}
-
-@media (max-width: 1280px) and (min-width: 901px) {
-  .pos-carrito-panel { flex: 0 0 380px; width: 380px; min-width: 380px; max-width: 380px; }
-}
-@media (max-width: 1100px) and (min-width: 901px) {
-  .pos-carrito-panel { flex: 0 0 340px; width: 340px; min-width: 340px; max-width: 340px; }
-}
-@media (max-width: 960px) and (min-width: 901px) {
-  .pos-carrito-panel { flex: 0 0 300px; width: 300px; min-width: 300px; max-width: 300px; }
 }
 
 .pos-carrito-header {
@@ -577,10 +605,10 @@ body.pos-activo #mainCW {
 
 .pos-carrito-items {
   flex: 1 1 0;
+  min-height: 72px;
   overflow-y: scroll;   /* barra siempre visible cuando hay ítems suficientes */
   overflow-x: hidden;
   padding: 6px 8px;
-  min-height: 0;
 }
 
 /* Scrollbar delgada y discreta en el área de ítems */
@@ -604,27 +632,35 @@ body.pos-activo #mainCW {
 .pos-carrito-empty small { font-size: 12px; }
 
 .pos-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "info del"
+    "controls precio";
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
   padding: 7px 4px;
   border-bottom: 1px solid #f1f5f9;
 }
 
-.pos-item-info { flex: 1; min-width: 0; }
+.pos-item-info { grid-area: info; min-width: 0; }
 
 .pos-item-nombre {
   font-size: 12px;
   font-weight: 700;
   color: #1f2937;
-  white-space: nowrap;
+  line-height: 1.3;
   overflow: hidden;
-  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
 }
 
-.pos-item-generico { font-size: 10px; color: #94a3b8; }
+.pos-item-generico { font-size: 11px; color: #94a3b8; }
 
 .pos-item-controls {
+  grid-area: controls;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -666,7 +702,8 @@ body.pos-activo #mainCW {
 }
 
 .pos-item-precio {
-  font-size: 12px;
+  grid-area: precio;
+  font-size: 13px;
   font-weight: 700;
   color: #1D4ED8;
   min-width: 50px;
@@ -675,6 +712,8 @@ body.pos-activo #mainCW {
 }
 
 .pos-item-del {
+  grid-area: del;
+  justify-self: end;
   width: 22px;
   height: 22px;
   border: 0;
@@ -691,6 +730,18 @@ body.pos-activo #mainCW {
 }
 
 .pos-item-del:hover { background: #fee2e2; }
+
+@keyframes posItemFlash {
+  0%   { background: #dcfce7; }
+  100% { background: transparent; }
+}
+.pos-item-flash { animation: posItemFlash 0.9s ease-out; border-radius: 8px; }
+
+@keyframes posFloatPulse {
+  0%, 100% { box-shadow: 0 6px 20px rgba(15, 23, 42, 0.3); }
+  40%      { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.45); }
+}
+.pos-float-pulse { animation: posFloatPulse 0.6s ease-out; }
 
 /* Totals */
 .pos-totales {
@@ -771,6 +822,10 @@ body.pos-activo #mainCW {
 
 /* Cobrar — siempre al fondo, nunca scrollea */
 .pos-cobrar-section {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  box-shadow: 0 -4px 12px rgba(15, 23, 42, 0.06);
   padding: 8px 10px;
   border-top: 1px solid #e2e8f0;
   flex-shrink: 0;
@@ -848,269 +903,232 @@ body.pos-activo #mainCW {
 }
 
 /* ── Botón flotante carrito (oculto en desktop) ─────────────── */
-.pos-float-cart-btn {
-  display: none;
-}
+.pos-float-cart-btn { display: none; }
 
 /* ── Backdrop carrito móvil ─────────────────────────────────── */
 .pos-carrito-backdrop {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.45);
+  background: rgba(15, 23, 42, 0.5);
   z-index: 1099;
 }
 
+/* ── Ayuda de atajos ────────────────────────────────────────── */
+.pos-help-btn {
+  height: 36px;
+  width: 36px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  color: #475569;
+  font-size: 15px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.pos-help-btn:hover { border-color: #1D4ED8; color: #1D4ED8; }
+.pos-atajos-lista { margin: 0; padding: 0; list-style: none; }
+.pos-atajos-lista li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 14px;
+}
+.pos-atajos-lista kbd {
+  background: #1f2937;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 /* ════════════════════════════════════════════════════════════
-   ZOOM ALTO / PANTALLA BAJA — comprimir panel de carrito
-   Se activa cuando el navegador hace zoom (100vh se achica)
+   RESPONSIVE — el tamaño de cada zona sale de variables CSS:
+     --pos-cart-w    ancho del carrito (escritorio/tablet)
+     --pos-card-min  ancho mínimo de cada tarjeta de producto
+     --pos-card-img  alto de la imagen de la tarjeta
    ════════════════════════════════════════════════════════════ */
-@media (max-height: 650px) {
-  body.pos-activo #mainCW { height: calc(100vh - 80px) !important; }
-  .pos-topbar { padding: 4px 12px; }
-  .pos-cat-bar { padding: 3px 12px; }
-  .pos-carrito-header { padding: 5px 8px 3px; }
-  .pos-cliente-row { margin-bottom: 3px; }
-  .pos-doc-btn { height: 22px; font-size: 11px; padding: 0 8px; }
-  .pos-totales { padding: 4px 10px; }
+
+/* Monitores grandes (Full HD o más) */
+@media (min-width: 1600px) {
+  .pos-wrapper { --pos-cart-w: 440px; --pos-card-min: 172px; --pos-card-img: 92px; }
+  .pos-search-box { max-width: 720px; }
+  .pos-card-nombre { font-size: 13px; }
+  .pos-card-precio { font-size: 15px; }
+  .pos-item-nombre { font-size: 13px; }
+}
+
+/* Laptop / caja estándar 1366×768 */
+@media (max-width: 1440px) {
+  .pos-wrapper { --pos-cart-w: 370px; --pos-card-min: 140px; --pos-card-img: 64px; }
+  .pos-dni-input { width: 92px; }
+  .pos-cliente-row { flex-wrap: nowrap; }
+  .pos-cliente-row .bootstrap-select { min-width: 0; }
+}
+
+/* Pantallas de 1024–1279 (tablet horizontal, monitores 4:3) */
+@media (max-width: 1279px) {
+  .pos-wrapper { --pos-cart-w: 330px; --pos-card-min: 132px; --pos-card-img: 58px; }
+  .pos-topbar { padding: 6px 10px; }
+  .pos-historial-btn .pos-btn-txt { display: none; }
+  .pos-historial-btn { padding: 0 11px; }
+}
+
+/* Tablet vertical / laptops pequeñas: carrito a la derecha, más angosto */
+@media (max-width: 991px) and (min-width: 768px) {
+  .pos-wrapper { --pos-cart-w: 300px; --pos-card-min: 124px; --pos-card-img: 54px; }
+  .pos-dni-input { width: 92px; }
+  .pos-metodo-btn { font-size: 10px; }
+  .pos-grid { padding: 8px; gap: 6px; }
+}
+
+/* ── Altura reducida (1366×768 con barra de tareas, zoom alto) ── */
+@media (max-height: 720px) and (min-width: 768px) {
+  .pos-topbar { padding: 5px 12px; }
+  .pos-search-input, .pos-scan-btn, .pos-historial-btn, .pos-help-btn { height: 34px; }
+  .pos-cat-bar { padding: 4px 12px; }
+  .pos-cat-pill { height: 26px; }
+  .pos-carrito-header { padding: 6px 8px 5px; }
+  .pos-cliente-row { margin-bottom: 5px; }
+  .pos-dni-input, .pos-dni-btn { height: 32px; }
+  .pos-doc-btn { height: 24px; font-size: 11px; }
+  .pos-totales { padding: 5px 10px; }
   .pos-total-row { margin-bottom: 1px; font-size: 12px; }
-  .pos-grand-total { font-size: 14px; padding-top: 3px; margin-top: 3px; }
-  .pos-pagos { padding: 4px 8px; }
-  .pos-metodo-btn { padding: 3px 2px; font-size: 10px; }
-  .pos-cobrar-section { padding: 5px 8px; gap: 3px; }
-  .btn-pos-cobrar { height: 42px; font-size: 14px; border-radius: 10px; }
-  .btn-cobrar-total { font-size: 15px; }
-  .btn-pos-cancelar { height: 26px; font-size: 11px; border-radius: 8px; }
-  .pos-carrito-items { padding: 3px 6px; }
+  .pos-grand-total { font-size: 15px; padding-top: 3px; margin-top: 3px; }
+  .pos-pagos { padding: 5px 8px; }
+  .pos-metodo-btn { padding: 3px 2px; }
+  .pos-cobrar-section { padding: 6px 8px; gap: 4px; }
+  .btn-pos-cobrar { height: 44px; font-size: 15px; border-radius: 11px; }
+  .btn-cobrar-total { font-size: 16px; }
+  .btn-pos-cancelar { height: 28px; font-size: 12px; }
 }
 
-@media (max-height: 500px) {
-  body.pos-activo #mainCW { height: calc(100vh - 50px) !important; }
-  .pos-topbar { padding: 3px 10px; }
+@media (max-height: 560px) and (min-width: 768px) {
   .pos-cat-bar { display: none; }
-  .pos-totales { padding: 3px 10px; }
-  .pos-grand-total { font-size: 13px; }
-  .pos-pagos { padding: 3px 8px; }
-  .pos-cobrar-section { padding: 4px 8px; gap: 2px; }
-  .btn-pos-cobrar { height: 36px; font-size: 13px; }
-  .btn-pos-cancelar { height: 22px; font-size: 10px; }
-  .pos-carrito-header { padding: 3px 8px 3px; }
-  .pos-cliente-row { margin-bottom: 2px; }
+  .pos-metodo-btn br, .pos-metodo-btn small { display: none; }
+  .pos-metodo-btn { font-size: 15px; padding: 4px 2px; }
+  .btn-pos-cobrar { height: 38px; }
+  .btn-pos-cancelar { display: none; }
 }
 
 /* ════════════════════════════════════════════════════════════
-   TABLET (≤ 900px) — layout apilado básico
+   MÓVIL Y TABLET PEQUEÑA (≤ 767px) — productos a pantalla completa,
+   carrito como panel inferior deslizable + botón flotante
    ════════════════════════════════════════════════════════════ */
-/* Header baja a 54px en ≤767px (custom-theme.css) */
-@media (max-width: 767px) and (min-width: 600px) {
-  body.pos-activo #mainCW { height: calc(100dvh - 54px) !important; }
-  .pos-wrapper             { height: calc(100dvh - 54px); }
-}
+@media (max-width: 767px) {
+  .pos-wrapper { --pos-card-min: 138px; --pos-card-img: 76px; }
 
-@media (max-width: 900px) and (min-width: 600px) {
-  /* Tablet: carrito en la mitad inferior, productos en la superior */
-  .pos-body { position: relative; overflow: hidden; }
+  .pos-topbar { padding: 6px 8px; gap: 6px; }
+  .pos-search-box { max-width: none; }
+  .pos-search-input { height: 40px; font-size: 16px; } /* 16px evita el zoom automático de iOS */
+  .pos-scan-btn, .pos-historial-btn, .pos-help-btn { height: 40px; }
+  .pos-help-btn { display: none; }
+  .pos-historial-btn .pos-btn-txt { display: none; }
+  .pos-historial-btn { padding: 0 12px; }
 
-  .pos-productos-panel {
-    position: absolute;
-    left: 0; right: 0; top: 0;
-    bottom: clamp(200px, 45%, 60%);
-    border-right: 0;
-    border-bottom: 1px solid #e2e8f0;
-  }
-  .pos-carrito-panel {
-    position: absolute;
-    left: 0; right: 0; bottom: 0;
-    top: auto;
-    width: 100%;
-    height: clamp(200px, 45%, 60%);
-    border-left: 0;
-    border-top: 1px solid #e2e8f0;
-  }
-}
+  .pos-cat-bar { padding: 5px 8px; gap: 5px; }
+  .pos-cat-pill { height: 30px; font-size: 12px; }
 
-/* ════════════════════════════════════════════════════════════
-   MÓVIL (≤ 599px) — carrito como bottom-sheet
-   ════════════════════════════════════════════════════════════ */
-@media (max-width: 599px) {
+  .pos-body { flex-direction: column; }
+  .pos-productos-panel { width: 100%; flex: 1 1 0px; border-right: 0; }
+  .pos-grid { padding: 8px 8px 92px; gap: 8px; }
+  .pos-grid-footer { padding-bottom: 84px; }
 
-  /* Wrapper: usa dvh para que browsers móviles no trunquen */
-  body.pos-activo #mainCW { height: calc(100dvh - 80px) !important; }
-  .pos-wrapper {
-    height: calc(100dvh - 80px);
-    overflow: hidden;
-  }
-
-  /* Topbar compacto */
-  .pos-topbar {
-    padding: 5px 8px;
-    gap: 6px;
-  }
-  .pos-search-input {
-    height: 34px;
-    font-size: 13px;
-  }
-  .pos-scan-btn {
-    height: 34px;
-    width: 34px;
-  }
-  .pos-historial-btn {
-    padding: 0 8px;
-    font-size: 12px;
-  }
-
-  /* Cat bar compacto */
-  .pos-cat-bar {
-    padding: 4px 8px;
-    gap: 4px;
-  }
-  .pos-cat-pill {
-    height: 24px;
-    padding: 0 9px;
-    font-size: 11px;
-  }
-
-  /* Body: sólo productos visibles */
-  .pos-body {
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .pos-productos-panel {
-    flex: 1;
-    height: auto;
-    overflow-y: auto;
-    border-right: 0;
-  }
-
-  /* Grid: 2 columnas en móvil */
-  .pos-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-    padding: 8px;
-  }
-  .pos-card-img { height: 80px; }
-  .pos-card-nombre { font-size: 11px; }
-  .pos-card-precio { font-size: 13px; }
-
-  /* ── Carrito como bottom-sheet ──────────────────────────── */
   .pos-carrito-panel {
     position: fixed !important;
-    bottom: 0;
     left: 0;
     right: 0;
+    bottom: 0;
+    flex: none;
     width: 100% !important;
-    height: 0 !important;
-    max-height: 88dvh;
+    min-width: 0 !important;
+    max-width: none !important;
+    height: 0;
+    max-height: 90dvh;
     z-index: 1100;
+    border-left: 0;
     border-radius: 18px 18px 0 0;
-    box-shadow: 0 -6px 32px rgba(0,0,0,0.22);
-    transition: height 0.32s cubic-bezier(0.32,0.72,0,1);
-    overflow: hidden;
-    flex-direction: column;
+    box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.25);
+    transition: height 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    visibility: hidden;
   }
   .pos-carrito-panel.carrito-open {
-    height: 88dvh !important;
-    /* overflow: hidden mantiene el flex interno: solo pos-carrito-items
-       hace scroll; el botón COBRAR queda anclado al fondo del panel */
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
+    height: 90dvh;
+    visibility: visible;
   }
+  .pos-mobile-handle { display: flex; }
 
-  /* Mostrar handle dentro del carrito */
-  .pos-mobile-handle {
-    display: flex;
-  }
-
-  /* Backdrop */
   .pos-carrito-backdrop {
     display: block;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s;
   }
-  .pos-carrito-backdrop.active {
-    opacity: 1;
-    pointer-events: all;
-  }
+  .pos-carrito-backdrop.active { opacity: 1; pointer-events: auto; }
 
-  /* Botón flotante "Ver carrito" */
+  .pos-dni-input { width: 110px; font-size: 16px; height: 40px; }
+  .pos-dni-btn { height: 40px; width: 40px; }
+  .pos-cliente-row .bootstrap-select .btn { height: 40px; font-size: 14px; }
+  .pos-icon-btn { width: 40px; height: 40px; }
+  .pos-doc-btn { height: 32px; padding: 0 14px; font-size: 13px; }
+  .pos-metodo-btn { padding: 8px 4px; font-size: 12px; }
+
+  .pos-cobrar-section { padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .btn-pos-cobrar { height: 52px; }
+
   .pos-float-cart-btn {
-    display: flex;
+    display: none; /* JS lo muestra cuando hay productos */
     align-items: center;
     gap: 10px;
     position: fixed;
-    bottom: 18px;
-    left: 50%;
-    transform: translateX(-50%);
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    left: 12px;
+    right: 12px;
     z-index: 1050;
     background: var(--brand-primary, #1D4ED8);
     color: #fff;
     border: none;
-    border-radius: 50px;
-    padding: 11px 20px 11px 14px;
-    font-size: 14px;
+    border-radius: 14px;
+    padding: 12px 16px;
+    font-size: 15px;
     font-weight: 700;
-    box-shadow: 0 4px 18px rgba(0,0,0,0.28);
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.3);
     cursor: pointer;
     white-space: nowrap;
-    min-width: 180px;
     justify-content: space-between;
-    transition: background 0.2s, transform 0.15s;
   }
-  .pos-float-cart-btn:active {
-    transform: translateX(-50%) scale(0.97);
-  }
+  .pos-float-cart-btn:active { transform: scale(0.98); }
   .pos-float-badge {
-    background: #dc2626;
-    color: #fff;
-    border-radius: 50%;
-    width: 22px;
-    height: 22px;
+    background: #fff;
+    color: var(--brand-primary, #1D4ED8);
+    border-radius: 999px;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 6px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 11px;
-    font-weight: 800;
-    flex-shrink: 0;
-  }
-  .pos-float-label {
-    flex: 1;
-    text-align: left;
-    margin-left: 2px;
-  }
-  .pos-float-total {
-    font-weight: 800;
-    font-size: 15px;
-  }
-
-  /* Padding inferior al grid para que el botón flotante no tape productos */
-  .pos-grid { padding-bottom: 80px; }
-
-  /* Carrito items con scroll */
-  .pos-carrito-items {
-    flex: 1;
-    overflow-y: auto;
-  }
-
-  /* Sección cobrar: siempre visible al fondo del panel */
-  .pos-cobrar-section {
-    flex-shrink: 0;
-    padding: 6px 10px env(safe-area-inset-bottom, 8px);
-    gap: 5px;
-  }
-
-  /* Botón COBRAR un poco más compacto en móvil */
-  .btn-pos-cobrar {
-    height: 46px;
-    font-size: 15px;
-    border-radius: 12px;
-  }
-
-  .btn-cobrar-total { font-size: 16px; }
-
-  .btn-pos-cancelar {
-    height: 30px;
     font-size: 12px;
+    font-weight: 800;
+    flex-shrink: 0;
   }
+  .pos-float-label { flex: 1; text-align: left; }
+  .pos-float-total { font-weight: 800; font-size: 16px; }
+}
+
+@media (max-width: 380px) {
+  .pos-wrapper { --pos-card-min: 128px; --pos-card-img: 64px; }
+  .pos-grid { gap: 6px; padding-left: 6px; padding-right: 6px; }
+  .pos-dni-input { width: 92px; }
+}
+
+/* ── Pantallas táctiles: objetivos de toque ≥ 36px ──────────── */
+@media (pointer: coarse) {
+  .pos-item-qty-btn { width: 36px; height: 36px; font-size: 18px; border-radius: 9px; }
+  .pos-item-qty { width: 48px; height: 36px; font-size: 15px; }
+  .pos-item-del { width: 36px; height: 36px; font-size: 16px; }
+  .pos-pag-btn { min-width: 38px; height: 36px; }
+  .pos-card:active { transform: scale(0.97); }
 }

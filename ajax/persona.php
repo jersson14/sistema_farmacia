@@ -25,8 +25,12 @@ switch ($_GET["op"]) {
 	
 
 	case 'eliminar':
-		$rspta=$persona->eliminar($idpersona);
-		echo $rspta ? "Datos eliminados correctamente" : "No se pudo eliminar los datos";
+		if (session_status() === PHP_SESSION_NONE) session_start();
+		if (empty($_SESSION['idusuario'])) {
+			echo json_encode(array("ok"=>false, "message"=>"Tu sesión venció. Vuelve a iniciar sesión."));
+			break;
+		}
+		echo json_encode($persona->eliminar($idpersona));
 		break;
 	
 	case 'mostrar':

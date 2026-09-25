@@ -55,10 +55,16 @@ switch ($op) {
 	break;
 	
 
-	case 'desactivar':
-	if (!isset($_SESSION['acceso']) || $_SESSION['acceso'] != 1) { echo "Sin permiso"; break; }
-	$rspta=$usuario->desactivar($idusuario);
-	echo $rspta ? "Datos desactivados correctamente" : "No se pudo desactivar los datos";
+	case 'eliminar':
+	if (!isset($_SESSION['acceso']) || $_SESSION['acceso'] != 1) {
+		echo json_encode(array("ok"=>false, "message"=>"No tienes permiso para eliminar usuarios"));
+		break;
+	}
+	if ((int)$idusuario === (int)$_SESSION['idusuario']) {
+		echo json_encode(array("ok"=>false, "message"=>"No puedes eliminar tu propio usuario mientras tienes la sesión abierta"));
+		break;
+	}
+	echo json_encode($usuario->eliminar($idusuario));
 	break;
 
 	case 'activar':
@@ -78,7 +84,7 @@ switch ($op) {
 
 	while ($reg=$rspta->fetch_object()) {
 		$data[]=array(
-			"0"=>($reg->condicion)?'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idusuario.')"><i class="fa fa-pencil"></i></button>'.' '.'<button class="btn btn-danger btn-xs" onclick="desactivar('.$reg->idusuario.')"><i class="fa fa-close"></i></button>':'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idusuario.')"><i class="fa fa-pencil"></i></button>'.' '.'<button class="btn btn-primary btn-xs" onclick="activar('.$reg->idusuario.')"><i class="fa fa-check"></i></button>',
+			"0"=>'<button class="btn btn-warning btn-xs" title="Editar" onclick="mostrar('.$reg->idusuario.')"><i class="fa fa-pencil"></i></button>'.' <button class="btn btn-danger btn-xs" title="Eliminar" onclick="eliminar('.$reg->idusuario.')"><i class="fa fa-trash"></i></button>'.($reg->condicion ? '' : ' <button class="btn btn-primary btn-xs" title="Activar" onclick="activar('.$reg->idusuario.')"><i class="fa fa-check"></i></button>'),
 			"1"=>$reg->nombre,
 			"2"=>$reg->tipo_documento,
 			"3"=>$reg->num_documento,
@@ -86,7 +92,7 @@ switch ($op) {
 			"5"=>$reg->email,
 			"6"=>$reg->login,
 			"7"=>"<img src='../files/usuarios/".$reg->imagen."' height='50px' width='50px'>",
-			"8"=>($reg->condicion)?'<span class="label bg-green">Activado</span>':'<span class="label bg-red">Desactivado</span>'
+			"8"=>($reg->condicion)?'<span class="label bg-green">Activo</span>':'<span class="label bg-red">Inactivo</span>'
 		);
 	}
 

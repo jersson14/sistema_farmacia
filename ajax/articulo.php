@@ -112,10 +112,12 @@ switch ($_GET["op"]) {
 		break;
 	
 
-	case 'desactivar':
-		if (!isset($_SESSION['almacen']) || $_SESSION['almacen'] != 1) { echo "Sin permiso"; break; }
-		$rspta=$articulo->desactivar($idarticulo);
-		echo $rspta ? "Datos desactivados correctamente" : "No se pudo desactivar los datos";
+	case 'eliminar':
+		if (!isset($_SESSION['almacen']) || $_SESSION['almacen'] != 1) {
+			echo json_encode(array("ok"=>false, "message"=>"No tienes permiso para eliminar productos"));
+			break;
+		}
+		echo json_encode($articulo->eliminar($idarticulo));
 		break;
 	case 'activar':
 		if (!isset($_SESSION['almacen']) || $_SESSION['almacen'] != 1) { echo "Sin permiso"; break; }
@@ -168,7 +170,7 @@ switch ($_GET["op"]) {
 				}
 			}
 			$data[]=array(
-            "0"=>($reg->condicion)?'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idarticulo.')"><i class="fa fa-pencil"></i></button>'.' '.'<button class="btn btn-danger btn-xs" onclick="desactivar('.$reg->idarticulo.')"><i class="fa fa-close"></i></button>':'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idarticulo.')"><i class="fa fa-pencil"></i></button>'.' '.'<button class="btn btn-primary btn-xs" onclick="activar('.$reg->idarticulo.')"><i class="fa fa-check"></i></button>',
+            "0"=>'<button class="btn btn-warning btn-xs" title="Editar" onclick="mostrar('.$reg->idarticulo.')"><i class="fa fa-pencil"></i></button>'.' <button class="btn btn-danger btn-xs" title="Eliminar" onclick="eliminar('.$reg->idarticulo.')"><i class="fa fa-trash"></i></button>'.($reg->condicion ? '' : ' <button class="btn btn-primary btn-xs" title="Activar" onclick="activar('.$reg->idarticulo.')"><i class="fa fa-check"></i></button>'),
             "1"=>$reg->nombre,
             "2"=>$reg->categoria,
             "3"=>$reg->abreviatura,
@@ -178,7 +180,7 @@ switch ($_GET["op"]) {
             "7"=>formatearMoneda((float)$reg->precio_venta),
             "8"=>$imgCol,
             "9"=>$reg->descripcion,
-            "10"=>($reg->condicion)?'<span class="label bg-green">Activado</span>':'<span class="label bg-red">Desactivado</span>',
+            "10"=>($reg->condicion)?'<span class="label bg-green">Activo</span>':'<span class="label bg-red">Inactivo</span>',
             "11"=>$vencCol,
             "12"=>$ofertaCol
               );

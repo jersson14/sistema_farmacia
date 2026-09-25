@@ -123,6 +123,14 @@ switch ($_GET["op"]) {
 		echo $rspta ? "Venta anulada correctamente" : "No se pudo anular la venta";
 		break;
 	
+	case 'eliminarDefinitivo':
+		if (!isset($_SESSION['acceso']) || $_SESSION['acceso'] != 1) {
+			echo json_encode(array("ok"=>false, "message"=>"Solo un administrador puede eliminar ventas"));
+			break;
+		}
+		echo json_encode($venta->eliminarDefinitivo($idventa));
+		break;
+
 	case 'mostrar':
 		$rspta=$venta->mostrar($idventa);
 		echo json_encode($rspta);
@@ -212,7 +220,7 @@ switch ($_GET["op"]) {
             );
             $metodoBadge = '<span class="label '.($metodoBadgeColors[$metodo] ?? 'bg-gray').'">'.$metodo.'</span>';
 			$data[]=array(
-            "0"=>(($reg->estado=='Aceptado')?'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idventa.')"><i class="fa fa-eye"></i></button>'.' '.'<button class="btn btn-danger btn-xs" onclick="anular('.$reg->idventa.')"><i class="fa fa-close"></i></button>':'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idventa.')"><i class="fa fa-eye"></i></button>').
+            "0"=>(($reg->estado=='Aceptado')?'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idventa.')"><i class="fa fa-eye"></i></button>'.' '.'<button class="btn btn-danger btn-xs" onclick="anular('.$reg->idventa.')"><i class="fa fa-close"></i></button>':'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idventa.')"><i class="fa fa-eye"></i></button> <button class="btn btn-danger btn-xs" title="Eliminar venta anulada" onclick="eliminarVenta('.$reg->idventa.')"><i class="fa fa-trash"></i></button>').
             '<a target="_blank" href="'.$url.$reg->idventa.'"> <button class="btn btn-info btn-xs"><i class="fa fa-file"></i></button></a>',
             "1"=>$reg->fecha,
             "2"=>$reg->cliente,
@@ -236,7 +244,7 @@ switch ($_GET["op"]) {
 			require_once "../modelos/Persona.php";
 			$persona = new Persona();
 			echo '<option value="0">Consumidor Final</option>';
-			$rsptaCli = ejecutarConsulta("SELECT idpersona, nombre FROM persona WHERE tipo_persona='Cliente' AND nombre != 'CONSUMIDOR FINAL' ORDER BY nombre ASC");
+			$rsptaCli = ejecutarConsulta("SELECT idpersona, nombre FROM persona WHERE tipo_persona='Cliente' AND nombre != 'CONSUMIDOR FINAL'".sqlPersonaVisible()." ORDER BY nombre ASC");
 			if ($rsptaCli) {
 				while ($reg = $rsptaCli->fetch_object()) {
 					echo '<option value=' . (int)$reg->idpersona . '>' . htmlspecialchars($reg->nombre) . '</option>';

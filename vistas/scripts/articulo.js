@@ -301,16 +301,15 @@ function normalizarEnteroNoNegativo(valor, fallback){
 }
 
 
-//funcion para desactivar
-function desactivar(idarticulo){
-	bootbox.confirm("¿Esta seguro de desactivar este dato?", function(result){
-		if (result) {
-			$.post("../ajax/articulo.php?op=desactivar", {idarticulo : idarticulo}, function(e){
-				notifyFromResponse(e);
-				tabla.ajax.reload();
-			});
-		}
-	})
+//funcion para eliminar
+function eliminar(idarticulo){
+	appEliminar({
+		url: "../ajax/articulo.php?op=eliminar",
+		data: {idarticulo: idarticulo},
+		titulo: "Eliminar producto",
+		mensaje: "¿Deseas eliminar este producto? Si ya tiene ventas o compras, desaparecerá del catálogo y del POS, pero su historial se conserva en los reportes.",
+		onSuccess: function(){ tabla.ajax.reload(null, false); }
+	});
 }
 
 function activar(idarticulo){

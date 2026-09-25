@@ -112,6 +112,77 @@ function formatearMoneda($monto, $codigo = null, $decimales = 2){
 	return $simbolo . ' ' . number_format((float)$monto, (int)$decimales, '.', ',');
 }
 
+// Elimina un registro. Si la BD lo impide porque tiene historial (llave foranea, errno 1451)
+// y la tabla tiene campo condicion, se marca condicion=2 (eliminado): desaparece de todo el
+// sistema pero ventas/compras/reportes antiguos siguen cuadrando.
+// $opc['previos']   DELETEs de tablas hijas desechables, en la misma transaccion.
+// $opc['liberar']   campos UNIQUE (nombre, login) que se renombran al archivar para poder reutilizarlos.
+// $opc['archivable'] false si la tabla no tiene campo condicion.
+function eliminarRegistro($tabla, $campoId, $id, $etiqueta = 'El registro', $opc = array()){
+	global $conexion;
+	$previos    = isset($opc['previos']) ? $opc['previos'] : array();
+	$liberar    = isset($opc['liberar']) ? $opc['liberar'] : array();
+	$archivable = isset($opc['archivable']) ? (bool)$opc['archivable'] : true;
+	$id = (int)$id;
+	if ($id <= 0) {
+		return array("ok"=>false, "message"=>"No se encontró el registro a eliminar");
+	}
+	$existe = ejecutarConsultaSimpleFila("SELECT `$campoId` FROM `$tabla` WHERE `$campoId`='$id' LIMIT 1");
+	if (!$existe) {
+		return array("ok"=>false, "message"=>"$etiqueta ya no existe");
+	}
+
+	$conexion->begin_transaction();
+	$errno = 0;
+	try {
+		foreach ($previos as $sqlPrevio) {
+			if (!$conexion->query($sqlPrevio)) { $errno = $conexion->errno; break; }
+		}
+		if ($errno === 0 && !$conexion->query("DELETE FROM `$tabla` WHERE `$campoId`='$id'")) {
+			$errno = $conexion->errno;
+		}
+	} catch (mysqli_sql_exception $e) {
+		$errno = (int)$e->getCode();
+	}
+
+	if ($errno === 0) {
+		$conexion->commit();
+		return array("ok"=>true, "message"=>"$etiqueta se eliminó correctamente", "modo"=>"fisico");
+	}
+	$conexion->rollback();
+
+	if ($errno == 1451 && $archivable) {
+		$sets = array("condicion='2'");
+		foreach ($liberar as $campo) {
+			$col = ejecutarConsultaSimpleFila("SELECT CHARACTER_MAXIMUM_LENGTH AS len FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='$tabla' AND COLUMN_NAME='$campo'");
+			$len = ($col && (int)$col['len'] > 0) ? (int)$col['len'] : 20;
+			$suf = " [elim #$id]";
+			$sets[] = "`$campo`=CONCAT(LEFT(`$campo`, ".max(1, $len - strlen($suf))."), '$suf')";
+		}
+		if (ejecutarConsulta("UPDATE `$tabla` SET ".implode(',', $sets)." WHERE `$campoId`='$id'")) {
+			return array("ok"=>true, "message"=>"$etiqueta se eliminó. Como tiene movimientos registrados, su historial se conserva en los reportes.", "modo"=>"archivado");
+		}
+	}
+	if ($errno == 1451) {
+		return array("ok"=>false, "message"=>"$etiqueta no se puede eliminar porque tiene movimientos registrados");
+	}
+	return array("ok"=>false, "message"=>"No se pudo eliminar. Inténtalo nuevamente.");
+}
+
+// Filtro SQL para ocultar personas eliminadas. Devuelve "" si la migracion
+// 20260925_persona_condicion.sql aun no se aplico (la columna no existe).
+function sqlPersonaVisible($alias = ''){
+	global $conexion;
+	static $tieneCondicion = null;
+	if ($tieneCondicion === null) {
+		$rs = $conexion->query("SHOW COLUMNS FROM persona LIKE 'condicion'");
+		$tieneCondicion = $rs && $rs->num_rows > 0;
+	}
+	if (!$tieneCondicion) return "";
+	$pref = $alias !== '' ? $alias.'.' : '';
+	return " AND {$pref}condicion<>2";
+}
+
 // Precio base de un articulo: precio_venta propio, o el ultimo precio_venta de compra si no tiene
 function sqlPrecioBaseExpr($alias = 'a'){
 	return "COALESCE(NULLIF($alias.precio_venta,0),(SELECT di.precio_venta FROM detalle_ingreso di WHERE di.idarticulo=$alias.idarticulo ORDER BY di.iddetalle_ingreso DESC LIMIT 1),0)";

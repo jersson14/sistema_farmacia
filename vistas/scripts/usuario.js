@@ -139,15 +139,14 @@ function mostrar(idusuario){
     });
 }
 
-function desactivar(idusuario){
-    bootbox.confirm("¿Desactivar este usuario?", function(result){
-        if(result){
-            $.post("../ajax/usuario.php?op=desactivar", {idusuario: idusuario}, function(e){
-                bootbox.alert(e);
-                tabla.ajax.reload();
-            });
-        }
-    });
+function eliminar(idusuario){
+	appEliminar({
+		url: "../ajax/usuario.php?op=eliminar",
+		data: {idusuario: idusuario},
+		titulo: "Eliminar usuario",
+		mensaje: "¿Deseas eliminar este usuario? Ya no podrá ingresar al sistema. Sus ventas y cajas anteriores se conservan en los reportes.",
+		onSuccess: function(){ tabla.ajax.reload(null, false); }
+	});
 }
 
 function activar(idusuario){

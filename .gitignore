@@ -10,6 +10,7 @@ config/qz_private.key
 
 # Logo y archivos del cliente
 files/empresa/
+files/landing/
 
 # Archivos subidos por usuarios
 files/uploads/

@@ -31,6 +31,7 @@ $appCurrencySymbol = function_exists('obtenerSimboloMoneda') ? obtenerSimboloMon
 <script src="../public/js/bootbox.min.js"></script>
 <script src="../public/js/bootstrap-select.min.js"></script>
 <script src="../public/js/app-notify.js?v=20260321b"></script>
+<script src="../public/js/app-eliminar.js?v=20260925"></script>
 <script>
 window.appCurrencyCode = <?php echo json_encode($appCurrencyCode); ?>;
 window.appCurrencySymbol = <?php echo json_encode($appCurrencySymbol); ?>;

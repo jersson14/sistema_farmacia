@@ -101,6 +101,26 @@ function adjustCuentasTables() {
   if (dtPagar) fixCuentasTable("#tblpagar", dtPagar);
 }
 
+function eliminarCobrar(idcuenta) {
+  appEliminar({
+    url: "../ajax/cuentas.php?op=eliminarCobrar",
+    data: { idcuenta: idcuenta },
+    titulo: "Eliminar cuenta por cobrar",
+    mensaje: "Se eliminará la cuenta y todos sus abonos registrados. La venta de origen no se modifica. ¿Deseas continuar?",
+    onSuccess: recargarTablas
+  });
+}
+
+function eliminarPagar(idcuenta) {
+  appEliminar({
+    url: "../ajax/cuentas.php?op=eliminarPagar",
+    data: { idcuenta: idcuenta },
+    titulo: "Eliminar cuenta por pagar",
+    mensaje: "Se eliminará la cuenta y todos sus pagos registrados. La compra de origen no se modifica. ¿Deseas continuar?",
+    onSuccess: recargarTablas
+  });
+}
+
 function recargarTablas() {
   if (dtCobrar) dtCobrar.ajax.reload(null, false);
   if (dtPagar) dtPagar.ajax.reload(null, false);

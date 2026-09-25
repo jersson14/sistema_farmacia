@@ -12,26 +12,48 @@ $waNro     = preg_replace('/\D/', '', $telefono);
 $direccion = $empresa['direccion'] !== '' ? $empresa['direccion'] : 'Urb. Patibamba Baja, Av. Sinchi Roca Lote 1 – al Costado de la Iglesia Cristiana';
 $logoUrl   = $empresa['logo_url'] !== '' ? $empresa['logo_url'] : 'files/famacia.png';
 
-$productos = [];
-$sqlProd = "SELECT a.idarticulo AS id, a.nombre, a.imagen,
-                   IFNULL((SELECT di.precio_venta FROM detalle_ingreso di
-                            WHERE di.idarticulo=a.idarticulo
-                            ORDER BY di.iddetalle_ingreso DESC LIMIT 1),0) AS precio_venta,
-                   c.nombre AS categoria
-            FROM articulo a
-            LEFT JOIN categoria c ON a.idcategoria=c.idcategoria
-            WHERE a.condicion='1'
-            ORDER BY a.idarticulo DESC LIMIT 8";
-$rProd = $conexion->query($sqlProd);
-if ($rProd) while ($row = $rProd->fetch_assoc()) $productos[] = $row;
+// Todo el contenido restante se administra en Gestión Pro > Página web (modelos/Landing.php)
+require_once "modelos/Landing.php";
+$landingMdl = new Landing();
+$L = $landingMdl->obtener();
+$G = $L['general'];
+$productos = $L['productos']['visible'] ? $landingMdl->productosDestacados($L['productos']) : [];
+$simbolo = obtenerSimboloMoneda();
+
+function e($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
+// Datos de artículos: se guardan con entidades HTML (limpiarCadena), se decodifican antes de escapar
+function eDb($s) { return e(html_entity_decode((string)$s, ENT_QUOTES | ENT_HTML5, 'UTF-8')); }
+// {empresa} → nombre comercial
+function emp($s) { global $nombreEmp; return str_replace('{empresa}', $nombreEmp, (string)$s); }
+// Título con *palabra resaltada*
+function tit($s) { return preg_replace('/\*([^*]+)\*/', '<em>$1</em>', e(emp($s))); }
+// Texto multilínea
+function nl($s) { return nl2br(e(emp($s)), false); }
+// Imagen: enlace externo o archivo subido (files/landing/...), ya validado al guardar
+function img($s) { return e($s); }
+function cssUrl($s) { return $s === '' ? 'none' : 'url("' . str_replace(array('"', '\\', '<', '>'), '', $s) . '")'; }
+
+$waLink = 'https://wa.me/' . $waNro . ($G['wa_mensaje'] !== '' ? '?text=' . rawurlencode(emp($G['wa_mensaje'])) : '');
+
+// Menú: solo secciones visibles
+$menu = [['#inicio', 'Inicio', 'bi-house-heart-fill']];
+foreach ([['servicios', 'bi-capsule-pill'], ['productos', 'bi-grid-fill'], ['nosotros', 'bi-heart-pulse-fill'], ['contacto', 'bi-geo-alt-fill']] as [$sec, $ico]) {
+  if ($L[$sec]['visible']) $menu[] = ['#' . $sec, $L[$sec]['menu'], $ico];
+}
+$redes = [];
+foreach (['facebook' => 'Facebook', 'instagram' => 'Instagram', 'tiktok' => 'TikTok', 'youtube' => 'YouTube'] as $red => $nomRed) {
+  if ($L['pie'][$red] !== '') $redes[] = [$L['pie'][$red], $nomRed, 'bi-' . $red];
+}
+if ($L['pie']['whatsapp']) $redes[] = [$waLink, 'WhatsApp', 'bi-whatsapp'];
+$mapaEmbed = preg_match('#^https://(www\.)?google\.[a-z.]+/maps/embed#i', $L['contacto']['mapa_embed']) ? $L['contacto']['mapa_embed'] : '';
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title><?= htmlspecialchars($nombreEmp) ?> – Al Cuidado de Tu Salud</title>
-<meta name="description" content="<?= htmlspecialchars($nombreEmp) ?>, tu farmacia de confianza. Medicamentos de calidad, asesoría farmacéutica y venta online. Al cuidado de tu salud.">
+<title><?= e(emp($G['seo_titulo'])) ?></title>
+<meta name="description" content="<?= e(emp($G['seo_descripcion'])) ?>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
 <!-- Bootstrap Icons (moderno 2025) -->
@@ -556,6 +578,28 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
   .foot-bot{flex-direction:column;text-align:center}
   .cta-btns{flex-direction:column;align-items:center}
 }
+/* ═══ CONTENIDO ADMINISTRABLE (Gestión Pro > Página web) ═══ */
+.prod-price del{display:block;font-size:.72rem;color:var(--gray-500);font-weight:600}
+.prod-avail.oferta{background:var(--grad-red)}
+.cnt-map iframe{width:100%;height:100%;border:0;border-radius:var(--r-xl)}
+.cnt-map.con-mapa{padding:0;overflow:hidden}
+.nav-spacer{height:96px}
+</style>
+<style>
+:root{
+  --blue:<?= e($G['color_principal']) ?>;
+  --blue-dk:<?= e($G['color_oscuro']) ?>;
+  --blue-md:<?= e($G['color_principal']) ?>;
+  --cyan:<?= e($G['color_acento']) ?>;
+  --red:<?= e($G['color_alerta']) ?>;
+  --red-dk:color-mix(in srgb,var(--red) 80%,#000);
+  --grad-blue:linear-gradient(135deg,var(--blue-dk) 0%,var(--blue) 55%,var(--cyan) 100%);
+  --grad-red:linear-gradient(135deg,var(--red),var(--red-dk));
+  --grad-hero:linear-gradient(135deg,color-mix(in srgb,var(--blue-dk) 93%,transparent) 0%,color-mix(in srgb,var(--blue) 88%,transparent) 55%,color-mix(in srgb,var(--red-dk) 82%,transparent) 100%);
+  --shadow-blue:0 8px 28px color-mix(in srgb,var(--blue) 35%,transparent);
+}
+.hero-bg{background:var(--grad-hero),<?= cssUrl($L['hero']['imagen']) ?> center/cover no-repeat}
+.cta-bg{background:linear-gradient(135deg,color-mix(in srgb,var(--blue-dk) 94%,transparent) 0%,color-mix(in srgb,var(--blue) 90%,transparent) 60%,color-mix(in srgb,var(--red-dk) 88%,transparent) 100%),<?= cssUrl($L['banner']['imagen']) ?> center/cover no-repeat}
 </style>
 </head>
 <body>
@@ -564,22 +608,24 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
 <nav class="nav" id="mainNav">
   <div class="nav-inner">
     <a href="#inicio" class="nav-logo">
-      <img src="<?= htmlspecialchars($logoUrl) ?>" alt="<?= htmlspecialchars($nombreEmp) ?>">
+      <img src="<?= e($logoUrl) ?>" alt="<?= e($nombreEmp) ?>">
     </a>
     <ul class="nav-links">
-      <li><a href="#inicio">Inicio</a></li>
-      <li><a href="#servicios">Servicios</a></li>
-      <li><a href="#productos">Productos</a></li>
-      <li><a href="#nosotros">Nosotros</a></li>
-      <li><a href="#contacto">Contacto</a></li>
+      <?php foreach ($menu as [$href, $txt]): ?>
+      <li><a href="<?= $href ?>"><?= e($txt) ?></a></li>
+      <?php endforeach; ?>
     </ul>
     <div class="nav-actions">
+      <?php if ($G['btn_tienda']): ?>
       <a href="tienda/index.php" class="btn btn-blue">
-        <i class="bi bi-bag-heart-fill"></i> Tienda Online
+        <i class="bi bi-bag-heart-fill"></i> <?= e($G['btn_tienda_txt']) ?>
       </a>
+      <?php endif; ?>
+      <?php if ($G['btn_sistema']): ?>
       <a href="vistas/login.html" class="btn btn-ghost">
         <i class="bi bi-person-lock"></i> Sistema
       </a>
+      <?php endif; ?>
     </div>
     <div class="hamburger" id="hambBtn" onclick="toggleMenu()">
       <span></span><span></span><span></span>
@@ -589,21 +635,24 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
 
 <!-- Mobile Menu -->
 <div class="mob-menu" id="mobMenu">
-  <a href="#inicio"    onclick="closeMenu()"><i class="bi bi-house-heart-fill"></i> Inicio</a>
-  <a href="#servicios" onclick="closeMenu()"><i class="bi bi-capsule-pill"></i> Servicios</a>
-  <a href="#productos" onclick="closeMenu()"><i class="bi bi-grid-fill"></i> Productos</a>
-  <a href="#nosotros"  onclick="closeMenu()"><i class="bi bi-heart-pulse-fill"></i> Nosotros</a>
-  <a href="#contacto"  onclick="closeMenu()"><i class="bi bi-geo-alt-fill"></i> Contacto</a>
+  <?php foreach ($menu as [$href, $txt, $ico]): ?>
+  <a href="<?= $href ?>" onclick="closeMenu()"><i class="bi <?= $ico ?>"></i> <?= e($txt) ?></a>
+  <?php endforeach; ?>
   <div class="mob-actions">
+    <?php if ($G['btn_tienda']): ?>
     <a href="tienda/index.php" class="btn btn-blue" style="flex:1;justify-content:center">
-      <i class="bi bi-bag-heart-fill"></i> Tienda
+      <i class="bi bi-bag-heart-fill"></i> <?= e($G['btn_tienda_txt']) ?>
     </a>
+    <?php endif; ?>
+    <?php if ($G['btn_sistema']): ?>
     <a href="vistas/login.html" class="btn btn-ghost" style="flex:1;justify-content:center">
       <i class="bi bi-person-lock"></i> Sistema
     </a>
+    <?php endif; ?>
   </div>
 </div>
 
+<?php $H = $L['hero']; if ($H['visible']): ?>
 <!-- ── HERO ───────────────────────────────────────────────── -->
 <section id="inicio" class="hero">
   <div class="hero-bg"></div>
@@ -611,196 +660,129 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
   <div class="hero-inner">
 
     <div class="hero-left">
+      <?php if ($H['etiqueta'] !== ''): ?>
       <div class="hero-eyebrow rev">
         <i class="bi bi-heart-pulse-fill"></i>
-        Tu salud, nuestra razón de ser
+        <?= e(emp($H['etiqueta'])) ?>
       </div>
+      <?php endif; ?>
       <h1 class="rev d1">
-        <span class="brand-name"><?= htmlspecialchars($nombreEmp) ?></span>
-        Al cuidado de<br>tu salud
+        <?php if ($H['mostrar_nombre']): ?><span class="brand-name"><?= e($nombreEmp) ?></span><?php endif; ?>
+        <?= nl($H['titulo']) ?>
       </h1>
-      <p class="hero-tagline rev d2">
-        <span>Calidad · Confianza · Compromiso</span>
-      </p>
-      <p class="hero-sub rev d2">
-        Medicamentos certificados, asesoría farmacéutica personalizada
-        y venta online desde la comodidad de tu hogar.
-        Estamos cerca de ti para servirte.
-      </p>
+      <?php if ($H['lema'] !== ''): ?>
+      <p class="hero-tagline rev d2"><span><?= e(emp($H['lema'])) ?></span></p>
+      <?php endif; ?>
+      <?php if ($H['descripcion'] !== ''): ?>
+      <p class="hero-sub rev d2"><?= nl($H['descripcion']) ?></p>
+      <?php endif; ?>
       <div class="hero-btns rev d3">
-        <a href="tienda/index.php" class="btn-hero-w">
-          <i class="bi bi-bag-heart-fill"></i> Comprar Online
+        <?php if ($H['btn1_txt'] !== ''): ?>
+        <a href="<?= e($H['btn1_url']) ?>" class="btn-hero-w">
+          <i class="bi bi-bag-heart-fill"></i> <?= e($H['btn1_txt']) ?>
         </a>
-        <a href="#contacto" class="btn-hero-brd">
-          <i class="bi bi-geo-alt-fill"></i> Cómo Llegar
+        <?php endif; ?>
+        <?php if ($H['btn2_txt'] !== ''): ?>
+        <a href="<?= e($H['btn2_url']) ?>" class="btn-hero-brd">
+          <i class="bi bi-geo-alt-fill"></i> <?= e($H['btn2_txt']) ?>
         </a>
+        <?php endif; ?>
       </div>
+      <?php if ($H['cifras']): ?>
       <div class="hero-stats rev d4">
+        <?php foreach ($H['cifras'] as $c): ?>
         <div class="hs">
-          <div class="hs-icon"><i class="bi bi-capsule-pill"></i></div>
-          <div class="hs-text"><strong>1000+</strong><span>Productos</span></div>
+          <div class="hs-icon"><i class="bi <?= e($c['icono']) ?>"></i></div>
+          <div class="hs-text"><strong><?= e($c['valor']) ?></strong><span><?= e($c['texto']) ?></span></div>
         </div>
-        <div class="hs">
-          <div class="hs-icon"><i class="bi bi-shield-check-fill"></i></div>
-          <div class="hs-text"><strong>100%</strong><span>Garantía</span></div>
-        </div>
-        <div class="hs">
-          <div class="hs-icon"><i class="bi bi-award-fill"></i></div>
-          <div class="hs-text"><strong>Cert.</strong><span>DIGEMID</span></div>
-        </div>
+        <?php endforeach; ?>
       </div>
+      <?php endif; ?>
     </div>
 
+    <?php if ($H['tarjeta']): ?>
     <div class="hero-right rev-r d2">
       <div class="hero-float">
         <div class="hero-card">
-          <img src="<?= htmlspecialchars($logoUrl) ?>" alt="<?= htmlspecialchars($nombreEmp) ?>">
-          <div class="hero-card-tag">Botica · Farmacia · Salud</div>
+          <img src="<?= e($logoUrl) ?>" alt="<?= e($nombreEmp) ?>">
+          <?php if ($H['tarjeta_texto'] !== ''): ?><div class="hero-card-tag"><?= e($H['tarjeta_texto']) ?></div><?php endif; ?>
           <div class="hero-card-addr">
             <i class="bi bi-geo-alt-fill"></i>
-            <span><?= htmlspecialchars($direccion) ?></span>
+            <span><?= e($direccion) ?></span>
           </div>
         </div>
-        <div class="fb fb-tr">
-          <div class="fb-ic fb-ic-blue"><i class="bi bi-clipboard2-pulse-fill"></i></div>
+        <?php foreach ($H['insignias'] as $i => $b): ?>
+        <div class="fb <?= $i === 0 ? 'fb-tr' : 'fb-bl' ?>">
+          <div class="fb-ic <?= $i === 0 ? 'fb-ic-blue' : 'fb-ic-red' ?>"><i class="bi <?= e($b['icono']) ?>"></i></div>
           <div class="fb-txt">
-            <strong>Recetas Atendidas</strong>
-            <span>Control especializado</span>
+            <strong><?= e($b['titulo']) ?></strong>
+            <span><?= e($b['texto']) ?></span>
           </div>
         </div>
-        <div class="fb fb-bl">
-          <div class="fb-ic fb-ic-red"><i class="bi bi-patch-check-fill"></i></div>
-          <div class="fb-txt">
-            <strong>Calidad Garantizada</strong>
-            <span>Productos certificados</span>
-          </div>
-        </div>
+        <?php endforeach; ?>
       </div>
     </div>
+    <?php endif; ?>
 
   </div>
 </section>
+<?php else: ?>
+<div id="inicio" class="nav-spacer"></div>
+<?php endif; ?>
 
+<?php if ($L['beneficios']['visible'] && $L['beneficios']['items']): ?>
 <!-- ── STRIP ──────────────────────────────────────────────── -->
 <div class="strip">
-  <div class="strip-in">
+  <div class="strip-in" style="grid-template-columns:repeat(<?= count($L['beneficios']['items']) ?>,1fr)">
+    <?php foreach ($L['beneficios']['items'] as $b): ?>
     <div class="strip-item">
-      <div class="si-icon"><i class="bi bi-capsule-pill"></i></div>
+      <div class="si-icon"><i class="bi <?= e($b['icono']) ?>"></i></div>
       <div class="si-txt">
-        <strong>Medicamentos Garantizados</strong>
-        <span>Genéricos y de marca certificados</span>
+        <strong><?= e($b['titulo']) ?></strong>
+        <span><?= e($b['texto']) ?></span>
       </div>
     </div>
-    <div class="strip-item">
-      <div class="si-icon"><i class="bi bi-person-badge-fill"></i></div>
-      <div class="si-txt">
-        <strong>Asesoría Farmacéutica</strong>
-        <span>Orientación profesional gratuita</span>
-      </div>
-    </div>
-    <div class="strip-item">
-      <div class="si-icon"><i class="bi bi-bag-check-fill"></i></div>
-      <div class="si-txt">
-        <strong>Compra Online Segura</strong>
-        <span>Múltiples métodos de pago</span>
-      </div>
-    </div>
+    <?php endforeach; ?>
   </div>
 </div>
+<?php endif; ?>
 
+<?php $S = $L['servicios']; if ($S['visible']): ?>
 <!-- ── SERVICIOS ──────────────────────────────────────────── -->
 <section id="servicios" class="servicios">
   <div class="sec-in">
     <div class="sec-hd rev">
-      <div class="sec-tag"><i class="bi bi-grid-fill"></i> Nuestros Servicios</div>
-      <h2>Todo lo que <em>Necesitas</em> para tu Salud</h2>
-      <p>Atención integral con los más altos estándares farmacéuticos para cuidar a toda tu familia.</p>
+      <div class="sec-tag"><i class="bi bi-grid-fill"></i> <?= e($S['etiqueta']) ?></div>
+      <h2><?= tit($S['titulo']) ?></h2>
+      <?php if ($S['descripcion'] !== ''): ?><p><?= nl($S['descripcion']) ?></p><?php endif; ?>
     </div>
     <div class="srv-grid">
-
-      <div class="srv-card rev d1">
+      <?php foreach ($S['items'] as $i => $s): ?>
+      <div class="srv-card rev d<?= ($i % 3) + 1 ?>">
         <div class="srv-img">
-          <img src="https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&q=80" alt="Medicamentos">
+          <?php if ($s['imagen'] !== ''): ?><img src="<?= img($s['imagen']) ?>" alt="<?= e($s['titulo']) ?>" loading="lazy"><?php endif; ?>
           <div class="srv-img-overlay"></div>
-          <div class="srv-icon-badge"><i class="bi bi-capsule-pill"></i></div>
+          <div class="srv-icon-badge"><i class="bi <?= e($s['icono']) ?>"></i></div>
         </div>
         <div class="srv-body">
-          <h3>Medicamentos</h3>
-          <p>Gran variedad de medicamentos genéricos y de marca. Todos con garantía de calidad y trazabilidad DIGEMID.</p>
+          <h3><?= e($s['titulo']) ?></h3>
+          <p><?= nl($s['texto']) ?></p>
         </div>
       </div>
-
-      <div class="srv-card rev d2">
-        <div class="srv-img">
-          <img src="https://images.unsplash.com/photo-1587854692152-cbe660dbde88?w=600&q=80" alt="Venta Online">
-          <div class="srv-img-overlay"></div>
-          <div class="srv-icon-badge"><i class="bi bi-shop-window"></i></div>
-        </div>
-        <div class="srv-body">
-          <h3>Venta Online</h3>
-          <p>Catálogo digital disponible 24/7. Compra desde casa con total seguridad y recibe tu comprobante electrónico.</p>
-        </div>
-      </div>
-
-      <div class="srv-card rev d3">
-        <div class="srv-img">
-          <img src="https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=600&q=80" alt="Asesoría Farmacéutica">
-          <div class="srv-img-overlay"></div>
-          <div class="srv-icon-badge"><i class="bi bi-person-badge-fill"></i></div>
-        </div>
-        <div class="srv-body">
-          <h3>Asesoría Farmacéutica</h3>
-          <p>Farmacéuticos titulados te orientan sobre el uso correcto de medicamentos, interacciones y alternativas genéricas.</p>
-        </div>
-      </div>
-
-      <div class="srv-card rev d1">
-        <div class="srv-img">
-          <img src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=600&q=80" alt="Cuidado Personal">
-          <div class="srv-img-overlay"></div>
-          <div class="srv-icon-badge"><i class="bi bi-heart-pulse-fill"></i></div>
-        </div>
-        <div class="srv-body">
-          <h3>Cuidado Personal</h3>
-          <p>Amplia gama de productos para higiene personal, dermocosméticos y bienestar familiar a los mejores precios.</p>
-        </div>
-      </div>
-
-      <div class="srv-card rev d2">
-        <div class="srv-img">
-          <img src="https://images.unsplash.com/photo-1579154204601-01588f351e67?w=600&q=80" alt="Recetas Médicas">
-          <div class="srv-img-overlay"></div>
-          <div class="srv-icon-badge"><i class="bi bi-clipboard2-pulse-fill"></i></div>
-        </div>
-        <div class="srv-body">
-          <h3>Recetas Médicas</h3>
-          <p>Atendemos recetas con la responsabilidad que tu salud merece. Control especial de medicamentos regulados.</p>
-        </div>
-      </div>
-
-      <div class="srv-card rev d3">
-        <div class="srv-img">
-          <img src="https://images.unsplash.com/photo-1576602976047-174e57a47881?w=600&q=80" alt="Control de Calidad">
-          <div class="srv-img-overlay"></div>
-          <div class="srv-icon-badge"><i class="bi bi-thermometer-half"></i></div>
-        </div>
-        <div class="srv-body">
-          <h3>Cadena de Frío</h3>
-          <p>Control de temperatura en recepción y almacenamiento. Garantizamos la integridad de todos tus medicamentos.</p>
-        </div>
-      </div>
-
+      <?php endforeach; ?>
     </div>
   </div>
 </section>
+<?php endif; ?>
 
+<?php $P = $L['productos']; if ($P['visible']): ?>
 <!-- ── PRODUCTOS DESTACADOS ───────────────────────────────── -->
 <section id="productos">
   <div class="sec-in">
     <div class="sec-hd rev">
-      <div class="sec-tag"><i class="bi bi-stars"></i> Catálogo</div>
-      <h2>Productos <em>Destacados</em></h2>
-      <p>Selección de medicamentos y productos de salud disponibles en nuestra botica.</p>
+      <div class="sec-tag"><i class="bi bi-stars"></i> <?= e($P['etiqueta']) ?></div>
+      <h2><?= tit($P['titulo']) ?></h2>
+      <?php if ($P['descripcion'] !== ''): ?><p><?= nl($P['descripcion']) ?></p><?php endif; ?>
     </div>
 
     <?php if (!empty($productos)): ?>
@@ -809,20 +791,27 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
       <div class="prod-card rev d<?= $d ?>">
         <div class="prod-img-w">
           <?php if (!empty($p['imagen']) && file_exists("files/articulos/".$p['imagen'])): ?>
-            <img src="files/articulos/<?= htmlspecialchars($p['imagen']) ?>" alt="<?= htmlspecialchars($p['nombre']) ?>">
+            <img src="files/articulos/<?= e(rawurlencode($p['imagen'])) ?>" alt="<?= eDb($p['nombre']) ?>" loading="lazy">
           <?php else: ?>
             <div class="no-img"><i class="bi bi-capsule-pill" style="font-size:52px;opacity:.22;color:var(--blue)"></i></div>
           <?php endif; ?>
-          <div class="prod-avail">Disponible</div>
+          <?php if ($p['en_oferta']): ?>
+            <div class="prod-avail oferta">-<?= e(rtrim(rtrim(number_format((float)$p['descuento_porcentaje'], 2), '0'), '.')) ?>%</div>
+          <?php elseif ($P['etiqueta_producto'] !== ''): ?>
+            <div class="prod-avail"><?= e($P['etiqueta_producto']) ?></div>
+          <?php endif; ?>
         </div>
         <div class="prod-body">
-          <div class="prod-cat"><?= htmlspecialchars($p['categoria'] ?? 'General') ?></div>
-          <div class="prod-name"><?= htmlspecialchars($p['nombre']) ?></div>
+          <div class="prod-cat"><?= eDb($p['categoria'] ?? 'General') ?></div>
+          <div class="prod-name"><?= eDb($p['nombre']) ?></div>
           <div class="prod-footer">
+            <?php if ($P['mostrar_precio'] && (float)$p['precio_venta'] > 0): ?>
             <div class="prod-price">
-              S/ <?= number_format($p['precio_venta'], 2) ?>
+              <?php if ($p['en_oferta']): ?><del><?= e($simbolo) ?> <?= number_format((float)$p['precio_original'], 2) ?></del><?php endif; ?>
+              <?= e($simbolo) ?> <?= number_format((float)$p['precio_venta'], 2) ?>
               <sub>c/u</sub>
             </div>
+            <?php else: ?><span></span><?php endif; ?>
             <a href="tienda/index.php" class="prod-add" title="Ver en tienda">
               <i class="bi bi-bag-plus-fill"></i>
             </a>
@@ -841,118 +830,110 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
     </div>
     <?php endif; ?>
 
+    <?php if ($P['btn_txt'] !== ''): ?>
     <div class="ver-mas rev">
-      <a href="tienda/index.php" class="btn btn-blue" style="font-size:.95rem;padding:14px 36px">
-        <i class="bi bi-grid-fill"></i> Ver Catálogo Completo
+      <a href="<?= e($P['btn_url']) ?>" class="btn btn-blue" style="font-size:.95rem;padding:14px 36px">
+        <i class="bi bi-grid-fill"></i> <?= e($P['btn_txt']) ?>
       </a>
     </div>
+    <?php endif; ?>
   </div>
 </section>
+<?php endif; ?>
 
+<?php $B = $L['banner']; if ($B['visible']): ?>
 <!-- ── CTA BANNER ─────────────────────────────────────────── -->
 <div class="cta-sec">
   <div class="cta-bg"></div>
   <div class="sec-in rev">
-    <h2>¿Necesitas orientación sobre tu medicamento?</h2>
-    <p>Nuestros farmacéuticos están listos para ayudarte. Visítanos o contáctanos ahora mismo.</p>
+    <h2><?= e(emp($B['titulo'])) ?></h2>
+    <?php if ($B['texto'] !== ''): ?><p><?= nl($B['texto']) ?></p><?php endif; ?>
     <div class="cta-btns">
-      <a href="tienda/index.php" class="btn-cta-w">
-        <i class="bi bi-bag-heart-fill"></i> Ir a la Tienda Online
+      <?php if ($B['btn1_txt'] !== ''): ?>
+      <a href="<?= e($B['btn1_url']) ?>" class="btn-cta-w">
+        <i class="bi bi-bag-heart-fill"></i> <?= e($B['btn1_txt']) ?>
       </a>
-      <a href="https://wa.me/<?= $waNro ?>" target="_blank" class="btn-cta-brd">
-        <i class="bi bi-whatsapp"></i> Escribir por WhatsApp
+      <?php endif; ?>
+      <?php if ($B['btn_wa']): ?>
+      <a href="<?= e($waLink) ?>" target="_blank" rel="noopener" class="btn-cta-brd">
+        <i class="bi bi-whatsapp"></i> <?= e($B['btn_wa_txt']) ?>
       </a>
+      <?php endif; ?>
     </div>
   </div>
 </div>
+<?php endif; ?>
 
+<?php $N = $L['nosotros']; if ($N['visible']): ?>
 <!-- ── NOSOTROS ───────────────────────────────────────────── -->
 <section id="nosotros" class="nosotros">
   <div class="sec-in">
     <div class="nos-grid">
       <div class="nos-img-wrap rev-l">
-        <img src="https://images.unsplash.com/photo-1576602976047-174e57a47881?w=800&q=80"
-             alt="Interior <?= htmlspecialchars($nombreEmp) ?>" class="nos-main-img">
+        <?php if ($N['imagen'] !== ''): ?>
+        <img src="<?= img($N['imagen']) ?>" alt="<?= e($nombreEmp) ?>" class="nos-main-img" loading="lazy">
+        <?php endif; ?>
+        <?php if ($N['insignia_valor'] !== ''): ?>
         <div class="nos-badge">
-          <strong>+5</strong>
-          <span>Años al<br>servicio</span>
+          <strong><?= e($N['insignia_valor']) ?></strong>
+          <span><?= e($N['insignia_texto']) ?></span>
         </div>
+        <?php endif; ?>
       </div>
       <div class="nos-content rev-r">
-        <div class="sec-tag"><i class="bi bi-info-circle-fill"></i> ¿Quiénes Somos?</div>
-        <h2>Tu salud es <em>nuestra misión</em></h2>
-        <p>
-          <?= htmlspecialchars($nombreEmp) ?> nació con el compromiso de brindar acceso a medicamentos
-          de calidad a toda la comunidad.
-          Contamos con farmacéuticos titulados, sistema digital de gestión y
-          una plataforma de venta online para servirte mejor.
-        </p>
+        <div class="sec-tag"><i class="bi bi-info-circle-fill"></i> <?= e($N['etiqueta']) ?></div>
+        <h2><?= tit($N['titulo']) ?></h2>
+        <p><?= nl($N['texto']) ?></p>
         <div class="nos-feats">
+          <?php foreach ($N['puntos'] as $f): ?>
           <div class="nos-feat">
-            <div class="nf-ico"><i class="bi bi-patch-check-fill"></i></div>
+            <div class="nf-ico"><i class="bi <?= e($f['icono']) ?>"></i></div>
             <div class="nf-tx">
-              <strong>Calidad Certificada</strong>
-              <span>Proveedores autorizados por DIGEMID. Trazabilidad completa.</span>
+              <strong><?= e($f['titulo']) ?></strong>
+              <span><?= e($f['texto']) ?></span>
             </div>
           </div>
-          <div class="nos-feat">
-            <div class="nf-ico"><i class="bi bi-thermometer-half"></i></div>
-            <div class="nf-tx">
-              <strong>Cadena de Frío Controlada</strong>
-              <span>Monitoreo de temperatura en recepción y almacenamiento.</span>
-            </div>
-          </div>
-          <div class="nos-feat">
-            <div class="nf-ico"><i class="bi bi-lock-fill"></i></div>
-            <div class="nf-tx">
-              <strong>Compra 100% Segura</strong>
-              <span>Sistema de ventas con comprobantes electrónicos y seguimiento.</span>
-            </div>
-          </div>
+          <?php endforeach; ?>
         </div>
       </div>
     </div>
   </div>
 </section>
+<?php endif; ?>
 
+<?php $M = $L['mision']; if ($M['visible']): ?>
 <!-- ── MISIÓN Y VISIÓN ────────────────────────────────────── -->
 <section id="mision-vision" class="mision-vision">
   <div class="sec-in">
     <div class="sec-hd rev">
-      <div class="sec-tag"><i class="bi bi-flag-fill"></i> Nuestro Compromiso</div>
-      <h2>Misión y <em>Visión</em></h2>
-      <p>Los principios que guían cada atención y cada medicamento que entregamos.</p>
+      <div class="sec-tag"><i class="bi bi-flag-fill"></i> <?= e($M['etiqueta']) ?></div>
+      <h2><?= tit($M['titulo']) ?></h2>
+      <?php if ($M['descripcion'] !== ''): ?><p><?= nl($M['descripcion']) ?></p><?php endif; ?>
     </div>
     <div class="mv-grid">
       <div class="mv-card rev-l">
         <div class="mv-ico"><i class="bi bi-bullseye"></i></div>
         <h3>Misión</h3>
-        <p>
-          Brindar acceso a medicamentos de calidad y asesoría farmacéutica confiable a la
-          comunidad, con atención cercana, profesionales
-          titulados y precios justos, cuidando la salud de cada familia como si fuera la nuestra.
-        </p>
+        <p><?= nl($M['mision']) ?></p>
       </div>
       <div class="mv-card red rev-r">
         <div class="mv-ico"><i class="bi bi-binoculars-fill"></i></div>
         <h3>Visión</h3>
-        <p>
-          Ser la botica de referencia de la región por su calidad de servicio, innovación
-          digital y compromiso con la salud pública, expandiendo nuestra plataforma online
-          para acercar medicamentos certificados a más comunidades cada año.
-        </p>
+        <p><?= nl($M['vision']) ?></p>
       </div>
     </div>
   </div>
 </section>
+<?php endif; ?>
 
+<?php $C = $L['contacto']; if ($C['visible']): ?>
 <!-- ── CONTACTO ───────────────────────────────────────────── -->
 <section id="contacto" class="contacto">
   <div class="sec-in">
     <div class="sec-hd rev">
-      <div class="sec-tag"><i class="bi bi-geo-alt-fill"></i> Contáctanos</div>
-      <h2>Estamos Aquí para <em>Ayudarte</em></h2>
-      <p>Visítanos, llámanos o escríbenos. Siempre hay un farmacéutico listo para atenderte.</p>
+      <div class="sec-tag"><i class="bi bi-geo-alt-fill"></i> <?= e($C['etiqueta']) ?></div>
+      <h2><?= tit($C['titulo']) ?></h2>
+      <?php if ($C['descripcion'] !== ''): ?><p><?= nl($C['descripcion']) ?></p><?php endif; ?>
     </div>
     <div class="cnt-grid">
       <div class="rev-l">
@@ -961,72 +942,82 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
           <div class="ci-ico"><i class="bi bi-geo-alt-fill"></i></div>
           <div class="ci-tx">
             <strong>Dirección</strong>
-            <span><?= htmlspecialchars($direccion) ?></span>
+            <span><?= e($direccion) ?></span>
           </div>
         </div>
         <div class="cnt-item">
           <div class="ci-ico"><i class="bi bi-telephone-fill"></i></div>
           <div class="ci-tx">
             <strong>Teléfono / WhatsApp</strong>
-            <span><?= htmlspecialchars($telefono) ?></span>
+            <span><?= e($telefono) ?></span>
           </div>
         </div>
         <div class="cnt-item">
           <div class="ci-ico"><i class="bi bi-envelope-fill"></i></div>
           <div class="ci-tx">
             <strong>Correo Electrónico</strong>
-            <span><?= htmlspecialchars($correo) ?></span>
+            <span><?= e($correo) ?></span>
           </div>
         </div>
+        <?php if ($C['horario'] !== ''): ?>
         <div class="cnt-item">
           <div class="ci-ico"><i class="bi bi-clock-fill"></i></div>
           <div class="ci-tx">
             <strong>Horario de Atención</strong>
-            <span>Lunes – Sábado: 8:00 am – 10:00 pm<br>Domingo: 9:00 am – 8:00 pm</span>
+            <span><?= nl($C['horario']) ?></span>
           </div>
         </div>
-        <a href="https://wa.me/<?= $waNro ?>" target="_blank" class="wa-btn">
+        <?php endif; ?>
+        <?php if ($C['btn_wa_txt'] !== ''): ?>
+        <a href="<?= e($waLink) ?>" target="_blank" rel="noopener" class="wa-btn">
           <i class="bi bi-whatsapp" style="font-size:20px"></i>
-          Escribir por WhatsApp
+          <?= e($C['btn_wa_txt']) ?>
         </a>
+        <?php endif; ?>
       </div>
       <div class="rev-r">
+        <?php if ($mapaEmbed !== ''): ?>
+        <div class="cnt-map con-mapa">
+          <iframe src="<?= e($mapaEmbed) ?>" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen title="Ubicación de <?= e($nombreEmp) ?>"></iframe>
+        </div>
+        <?php else: ?>
         <div class="cnt-map">
           <i class="bi bi-geo-alt-fill"></i>
-          <h4><?= htmlspecialchars($nombreEmp) ?></h4>
-          <p><?= htmlspecialchars($direccion) ?></p>
+          <h4><?= e($nombreEmp) ?></h4>
+          <p><?= e($direccion) ?></p>
           <a href="https://maps.google.com/?q=<?= urlencode($direccion) ?>"
-             target="_blank" class="btn btn-blue" style="font-size:.8rem;padding:10px 22px;margin-top:6px">
+             target="_blank" rel="noopener" class="btn btn-blue" style="font-size:.8rem;padding:10px 22px;margin-top:6px">
             <i class="bi bi-map-fill"></i> Abrir en Google Maps
           </a>
         </div>
+        <?php endif; ?>
       </div>
     </div>
   </div>
 </section>
+<?php endif; ?>
 
 <!-- ── FOOTER ─────────────────────────────────────────────── -->
 <footer>
   <div class="foot-in">
     <div class="foot-top">
       <div class="foot-brand">
-        <img src="<?= htmlspecialchars($logoUrl) ?>" alt="<?= htmlspecialchars($nombreEmp) ?>">
-        <p>Tu botica de confianza. Al cuidado de tu salud y de toda tu familia con calidad, responsabilidad y el más alto estándar farmacéutico.</p>
+        <img src="<?= e($logoUrl) ?>" alt="<?= e($nombreEmp) ?>">
+        <p><?= nl($L['pie']['descripcion']) ?></p>
+        <?php if ($redes): ?>
         <div class="foot-social">
-          <a href="#" title="Facebook"><i class="bi bi-facebook"></i></a>
-          <a href="#" title="Instagram"><i class="bi bi-instagram"></i></a>
-          <a href="https://wa.me/<?= $waNro ?>" title="WhatsApp" target="_blank"><i class="bi bi-whatsapp"></i></a>
-          <a href="#" title="TikTok"><i class="bi bi-tiktok"></i></a>
+          <?php foreach ($redes as [$url, $nomRed, $ico]): ?>
+          <a href="<?= e($url) ?>" title="<?= $nomRed ?>" target="_blank" rel="noopener"><i class="bi <?= $ico ?>"></i></a>
+          <?php endforeach; ?>
         </div>
+        <?php endif; ?>
       </div>
       <div class="foot-col">
         <h5>Navegación</h5>
         <ul>
-          <li><a href="#inicio"><i class="bi bi-chevron-right"></i> Inicio</a></li>
-          <li><a href="#servicios"><i class="bi bi-chevron-right"></i> Servicios</a></li>
-          <li><a href="#productos"><i class="bi bi-chevron-right"></i> Productos</a></li>
-          <li><a href="#nosotros"><i class="bi bi-chevron-right"></i> Nosotros</a></li>
-          <li><a href="#contacto"><i class="bi bi-chevron-right"></i> Contacto</a></li>
+          <?php foreach ($menu as [$href, $txt]): ?>
+          <li><a href="<?= $href ?>"><i class="bi bi-chevron-right"></i> <?= e($txt) ?></a></li>
+          <?php endforeach; ?>
         </ul>
       </div>
       <div class="foot-col">
@@ -1034,46 +1025,54 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
         <ul>
           <li><a href="tienda/index.php"><i class="bi bi-bag-heart-fill"></i> Tienda Online</a></li>
           <li><a href="tienda/login.php"><i class="bi bi-person-circle"></i> Mi Cuenta</a></li>
+          <?php if ($G['btn_sistema']): ?>
           <li><a href="vistas/login.html"><i class="bi bi-gear-fill"></i> Sistema Admin</a></li>
+          <?php endif; ?>
+          <?php if ($C['visible']): ?>
           <li><a href="#contacto"><i class="bi bi-headset"></i> Soporte</a></li>
+          <?php endif; ?>
         </ul>
       </div>
       <div class="foot-col">
         <h5>Contacto</h5>
         <ul>
           <li>
-            <a href="https://maps.google.com/?q=<?= urlencode($direccion) ?>" target="_blank">
-              <i class="bi bi-geo-alt-fill"></i> <?= htmlspecialchars($direccion) ?>
+            <a href="https://maps.google.com/?q=<?= urlencode($direccion) ?>" target="_blank" rel="noopener">
+              <i class="bi bi-geo-alt-fill"></i> <?= e($direccion) ?>
             </a>
           </li>
           <li>
             <a href="tel:<?= $waNro ?>">
-              <i class="bi bi-telephone-fill"></i> <?= htmlspecialchars($telefono) ?>
+              <i class="bi bi-telephone-fill"></i> <?= e($telefono) ?>
             </a>
           </li>
           <li>
-            <a href="mailto:<?= htmlspecialchars($correo) ?>">
-              <i class="bi bi-envelope-fill"></i> <?= htmlspecialchars($correo) ?>
+            <a href="mailto:<?= e($correo) ?>">
+              <i class="bi bi-envelope-fill"></i> <?= e($correo) ?>
             </a>
           </li>
           <?php if ($ruc): ?>
-          <li><a href="#"><i class="bi bi-card-text"></i> RUC: <?= htmlspecialchars($ruc) ?></a></li>
+          <li><a href="#"><i class="bi bi-card-text"></i> RUC: <?= e($ruc) ?></a></li>
           <?php endif; ?>
         </ul>
       </div>
     </div>
     <hr class="foot-hr">
     <div class="foot-bot">
-      <p>&copy; <?= date('Y') ?> <a href="#inicio"><?= htmlspecialchars($nombreEmp) ?></a> – Al cuidado de tu salud. Todos los derechos reservados.</p>
-      <p style="color:#334155;font-size:.78rem">Desarrollado con <i class="bi bi-heart-fill" style="color:var(--red)"></i> para la salud de tu familia</p>
+      <p>&copy; <?= date('Y') ?> <a href="#inicio"><?= e($nombreEmp) ?></a> <?= e(emp($L['pie']['copyright'])) ?></p>
+      <?php if ($L['pie']['firma'] !== ''): ?>
+      <p style="color:#334155;font-size:.78rem"><?= e(emp($L['pie']['firma'])) ?></p>
+      <?php endif; ?>
     </div>
   </div>
 </footer>
 
+<?php if ($G['wa_flotante']): ?>
 <!-- WhatsApp flotante -->
-<a href="https://wa.me/<?= $waNro ?>" target="_blank" class="wa-fab" title="WhatsApp">
+<a href="<?= e($waLink) ?>" target="_blank" rel="noopener" class="wa-fab" title="WhatsApp">
   <i class="bi bi-whatsapp"></i>
 </a>
+<?php endif; ?>
 
 <script>
 window.addEventListener('scroll',()=>{

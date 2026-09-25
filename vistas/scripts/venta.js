@@ -161,6 +161,7 @@ function cargarProductosGrid() {
 		}
 		posProductos = r.data;
 		renderGrid();
+		recalcularPorPaginaPOS();
 	}).fail(function() {
 		$("#posProductGrid").html('<div class="pos-grid-empty">Error al cargar productos.</div>');
 	});
@@ -357,7 +358,7 @@ function renderCarritoVisual() {
 		html += '<div class="pos-item" id="posItem' + idx + '">' +
 			'<div class="pos-item-info">' +
 				'<div class="pos-item-nombre" title="' + $('<span>').text(nombre).html() + '">' + $('<span>').text(nombre).html() + '</div>' +
-				(unidad ? '<div class="pos-item-generico">' + $('<span>').text(unidad).html() + '</div>' : '') +
+				'<div class="pos-item-generico">' + (unidad ? $('<span>').text(unidad).html() + ' · ' : '') + sym + ' ' + precio.toFixed(2) + ' c/u</div>' +
 			'</div>' +
 			'<div class="pos-item-controls">' +
 				'<button type="button" class="pos-item-qty-btn" onclick="posItemDecrement(' + idx + ',' + stockMax + ')">&#8722;</button>' +
@@ -369,6 +370,22 @@ function renderCarritoVisual() {
 		'</div>';
 	}
 	$cont.html(html);
+}
+
+// Confirmación visual al agregar: la fila del carrito destella (sin notificaciones que tapen
+// el carrito). En móvil, el botón flotante hace un pulso porque el carrito está oculto.
+function resaltarItemCarrito(idx) {
+	var $item = $("#posItem" + idx);
+	if ($item.length) {
+		$item[0].scrollIntoView({ block: "nearest" });
+		$item.removeClass("pos-item-flash");
+		void $item[0].offsetWidth;
+		$item.addClass("pos-item-flash");
+	}
+	var $btn = $("#posFloatCartBtn");
+	$btn.removeClass("pos-float-pulse");
+	void ($btn[0] && $btn[0].offsetWidth);
+	$btn.addClass("pos-float-pulse");
 }
 
 function posItemDecrement(idx, stockMax) {
@@ -596,6 +613,9 @@ function init(){
    		e.preventDefault();
    		$('#myModal').modal('show');
    	}
+   	if (e.key === "Escape" && $("#posCarritoPanel").hasClass("carrito-open")) {
+   		cerrarCarritoMobile();
+   	}
    	if (e.key === "F10") {
    		e.preventDefault();
    		if (!cajaCerrada && $("#btnGuardar").is(":visible")) {
@@ -672,8 +692,9 @@ function guardarClienteRapido(e){
 }
 
 /* ── Carrito móvil (bottom-sheet) ────────────────────────── */
+var POS_BREAK_MOVIL = 767;
 function esMobil(){
-	return window.innerWidth <= 599;
+	return window.innerWidth <= POS_BREAK_MOVIL;
 }
 
 function abrirCarritoMobile(){
@@ -690,14 +711,17 @@ function cerrarCarritoMobile(){
 }
 
 function actualizarFloatCartBtn(){
-	if (!esMobil()) return;
+	if (!esMobil() || !$("body").hasClass("pos-activo")) {
+		$("#posFloatCartBtn").hide();
+		return;
+	}
 	var count = document.querySelectorAll('#detalles .filas').length;
 	var total = $("#posTotalFinal").text() || "S/ 0.00";
 	$("#posFloatBadge").text(count);
 	$("#posFloatTotal").text(total);
 	// Mostrar/ocultar según si hay productos
 	if (count > 0) {
-		$("#posFloatCartBtn").fadeIn(150);
+		$("#posFloatCartBtn").css("display", "flex");
 	} else {
 		$("#posFloatCartBtn").hide();
 		cerrarCarritoMobile();
@@ -828,16 +852,74 @@ function limpiar(){
 
 }
 
-// Calcula la altura exacta del pos-wrapper en píxeles y la aplica.
-// Usa window.innerHeight (no 100vh) para evitar ambigüedad CSS.
+// Calcula la altura exacta del pos-wrapper: desde su borde superior real
+// (debajo del header, sea de 50px, 54px o 80px) hasta el fondo de la ventana.
+// visualViewport evita que la barra del navegador móvil tape el botón COBRAR.
 function ajustarAlturaPOS() {
 	var wrapper = document.getElementById('formularioregistros');
-	if (!wrapper) return;
-	var headerH = 80;
-	var statsEl = document.getElementById('resumenPagosVenta');
-	var statsH  = statsEl ? statsEl.getBoundingClientRect().height : 0;
-	var h = Math.max(window.innerHeight - headerH - statsH, 300);
-	wrapper.style.height = h + 'px';
+	var cw = document.getElementById('mainCW');
+	if (!wrapper || !cw || wrapper.style.display === 'none') return;
+	// El alto lo calcula el CSS (100dvh - --pos-top), así se adapta solo al zoom del
+	// navegador aunque no llegue ningún evento; aquí solo se mide dónde empieza el POS.
+	var top = Math.max(0, Math.round(cw.getBoundingClientRect().top + (window.scrollY || 0)));
+	document.documentElement.style.setProperty('--pos-top', top + 'px');
+	if (window.scrollY) window.scrollTo(0, 0);
+	if (!esMobil()) cerrarCarritoMobile();
+	actualizarFloatCartBtn();
+	recalcularPorPaginaPOS();
+}
+
+// Cuántas tarjetas caben: columnas reales del grid × filas visibles.
+// En móvil se hace scroll, así que se muestran más filas por página.
+function recalcularPorPaginaPOS() {
+	var grid = document.getElementById('posProductGrid');
+	if (!grid || !grid.clientWidth) return;
+	var cols = (getComputedStyle(grid).gridTemplateColumns || '').split(' ').filter(Boolean).length || 4;
+	var card = grid.querySelector('.pos-card');
+	var cardH = card ? card.getBoundingClientRect().height + 8 : 150;
+	// Si sobra más del 60% de una fila se incluye (queda un leve scroll) para no dejar hueco
+	var filas = esMobil() ? 6 : Math.max(2, Math.floor((grid.clientHeight - 16 + cardH * 0.4) / cardH));
+	var nuevo = Math.min(Math.max(cols * filas, 8), 60);
+	if (nuevo !== posPorPagina) {
+		var primero = (posCurrentPage - 1) * posPorPagina;
+		posPorPagina = nuevo;
+		posCurrentPage = Math.floor(primero / posPorPagina) + 1;
+		if (posProductos.length) renderGrid();
+	}
+}
+
+// Si cambia el alto disponible del grid (aparece/desaparece un aviso, se abre el
+// teclado en tablet...) se recalcula cuántos productos caben por página.
+var posGridObserver = null;
+if (window.ResizeObserver) {
+	posGridObserver = new ResizeObserver(function(){
+		clearTimeout(posGridTimer);
+		posGridTimer = setTimeout(recalcularPorPaginaPOS, 120);
+	});
+}
+
+// Temporizadores separados: el del grid no debe cancelar el ajuste de altura
+var posGridTimer = null;
+var posResizeTimer = null;
+function onResizePOS() {
+	clearTimeout(posResizeTimer);
+	posResizeTimer = setTimeout(ajustarAlturaPOS, 120);
+}
+
+// En modo POS se colapsa el menú lateral para ganar ancho (salvo en monitores grandes);
+// al salir se restaura como estaba.
+var posColapsoSidebar = false;
+function colapsarSidebarPOS(activar) {
+	var $b = $("body");
+	if (activar) {
+		if (window.innerWidth > POS_BREAK_MOVIL && window.innerWidth < 1600 && !$b.hasClass("sidebar-collapse")) {
+			$b.addClass("sidebar-collapse");
+			posColapsoSidebar = true;
+		}
+	} else if (posColapsoSidebar) {
+		$b.removeClass("sidebar-collapse");
+		posColapsoSidebar = false;
+	}
 }
 
 //funcion mostrar formulario
@@ -850,12 +932,17 @@ function mostrarform(flag, esNuevo){
 		}
 		$("body").addClass("pos-activo");
 		$("html").css("overflow", "hidden");
+		colapsarSidebarPOS(true);
 		// scroll al tope antes de mostrar el POS para garantizar posición correcta
 		window.scrollTo(0, 0);
-		$("#listadoregistros").hide();
+		$("#listadoregistros, #resumenPagosVenta").hide();
 		$("#formularioregistros").show();
 		ajustarAlturaPOS();
-		$(window).on('resize.pos', ajustarAlturaPOS);
+		$(window).on('resize.pos orientationchange.pos', onResizePOS);
+		if (window.visualViewport) window.visualViewport.addEventListener('resize', onResizePOS);
+		if (posGridObserver) posGridObserver.observe(document.getElementById('posProductGrid'));
+		// El menú lateral anima su ancho: recalcular cuando termina
+		setTimeout(ajustarAlturaPOS, 350);
 		$("#btnagregar").hide();
 		$("#btnGuardar").hide();
 		$("#btnCancelar").show();
@@ -874,12 +961,17 @@ function mostrarform(flag, esNuevo){
 			restaurarBorradorVenta();
 		}
 	}else{
-		$(window).off('resize.pos');
+		$(window).off('resize.pos orientationchange.pos');
+		if (window.visualViewport) window.visualViewport.removeEventListener('resize', onResizePOS);
+		if (posGridObserver) posGridObserver.disconnect();
+		cerrarCarritoMobile();
+		$("#posFloatCartBtn").hide();
 		$("body").removeClass("pos-activo");
 		$("html").css("overflow", "");
-		$("#listadoregistros").show();
+		colapsarSidebarPOS(false);
+		$("#listadoregistros, #resumenPagosVenta").show();
 		$("#formularioregistros").hide();
-		document.getElementById('formularioregistros').style.height = '';
+		document.documentElement.style.removeProperty('--pos-top');
 		$("#btnagregar").show();
 	}
 }
@@ -1212,9 +1304,18 @@ function mostrar(idventa){
 }
 
 
-//funcion para desactivar
+function eliminarVenta(idventa){
+	appEliminar({
+		url: "../ajax/venta.php?op=eliminarDefinitivo",
+		data: {idventa: idventa},
+		titulo: "Eliminar venta anulada",
+		mensaje: "La venta anulada y su detalle se borrarán definitivamente. Esta acción no se puede deshacer.",
+		onSuccess: function(){ tabla.ajax.reload(null, false); }
+	});
+}
+
 function anular(idventa){
-	bootbox.confirm("Â¿Esta seguro de desactivar este dato?", function(result){
+	bootbox.confirm("¿Seguro que deseas anular esta venta?", function(result){
 		if (result) {
 			$.post("../ajax/venta.php?op=anular", {idventa : idventa}, function(e){
 				notifyVenta("warning", e);
@@ -1335,7 +1436,7 @@ function agregarDetalle(idarticulo,articulo,precio_venta,unidad,stockDisponible,
 				modificarSubtotales();
 				renderCarritoVisual();
 				$('#myModal').modal('hide');
-				notifyVenta("info", "El articulo ya estaba agregado. Se incremento la cantidad.");
+				resaltarItemCarrito(articulos[i].closest('tr').id.replace('fila', ''));
 				guardarBorradorVenta();
 				return;
 			}
@@ -1358,7 +1459,7 @@ function agregarDetalle(idarticulo,articulo,precio_venta,unidad,stockDisponible,
 		actualizarContadorItems();
 		renderCarritoVisual();
 		$('#myModal').modal('hide');
-		notifyVenta("success", "Articulo agregado a la venta.");
+		resaltarItemCarrito(cont - 1);
 		guardarBorradorVenta();
 	}else{
 		notifyVenta("warning", "No se pudo agregar el articulo. Revisa la informacion del producto.");

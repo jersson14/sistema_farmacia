@@ -105,17 +105,14 @@ function mostrar(idpersona){
 }
 
 
-//funcion para desactivar
 function eliminar(idpersona){
-	bootbox.confirm("¿Esta seguro de eliminar este dato?", function(result){
-		if (result) {
-
-			$.post("../ajax/persona.php?op=eliminar", {idpersona : idpersona }, function(e){
-				bootbox.alert(e);
-				tabla.ajax.reload();
-			});
-		}
-	})
+	appEliminar({
+		url: "../ajax/persona.php?op=eliminar",
+		data: {idpersona: idpersona},
+		titulo: "Eliminar proveedor",
+		mensaje: "¿Deseas eliminar este proveedor? Si tiene compras registradas, se quitará de las listas pero su historial se conserva en los reportes.",
+		onSuccess: function(){ tabla.ajax.reload(null, false); }
+	});
 }
 
 

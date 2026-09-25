@@ -368,6 +368,40 @@ public function anular($idventa, $idusuario = null){
 	return $ok;
 }
 
+// Elimina definitivamente una venta ANULADA (no toca stock: la anulacion ya se registro).
+// Las ventas aceptadas no se eliminan: son comprobantes emitidos con correlativo.
+public function eliminarDefinitivo($idventa){
+	global $conexion;
+	$idventa = (int)$idventa;
+	$cab = ejecutarConsultaSimpleFila("SELECT estado, tipo_comprobante, serie_comprobante, num_comprobante FROM venta WHERE idventa='$idventa' LIMIT 1");
+	if (!$cab) {
+		return array("ok"=>false, "message"=>"La venta ya no existe");
+	}
+	if ($cab['estado'] !== 'Anulado') {
+		return array("ok"=>false, "message"=>"Primero anula la venta. Solo se pueden eliminar ventas anuladas.");
+	}
+	$legal = ejecutarConsultaSimpleFila("SELECT
+		(SELECT COUNT(*) FROM control_especial WHERE idventa='$idventa') AS ce,
+		(SELECT COUNT(*) FROM receta_medica WHERE idventa='$idventa') AS rx");
+	if ($legal && ((int)$legal['ce'] > 0 || (int)$legal['rx'] > 0)) {
+		return array("ok"=>false, "message"=>"Esta venta tiene receta o registro de control especial (DIGEMID) y debe conservarse");
+	}
+
+	$conexion->begin_transaction();
+	try {
+		$ok = $conexion->query("UPDATE cuenta_cobrar SET idventa=NULL WHERE idventa='$idventa'")
+		   && $conexion->query("UPDATE pedido_online SET idventa_pos=NULL WHERE idventa_pos='$idventa'")
+		   && $conexion->query("DELETE FROM detalle_venta WHERE idventa='$idventa'")
+		   && $conexion->query("DELETE FROM venta WHERE idventa='$idventa'");
+		if (!$ok) throw new Exception($conexion->error);
+		$conexion->commit();
+	} catch (Throwable $e) {
+		$conexion->rollback();
+		return array("ok"=>false, "message"=>"No se pudo eliminar la venta. Inténtalo nuevamente.");
+	}
+	$doc = $cab['tipo_comprobante'].' '.$cab['serie_comprobante'].'-'.$cab['num_comprobante'];
+	return array("ok"=>true, "message"=>"Venta $doc eliminada definitivamente");
+}
 
 //implementar un metodopara mostrar los datos de unregistro a modificar
 public function mostrar($idventa){

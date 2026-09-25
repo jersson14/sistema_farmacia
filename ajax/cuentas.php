@@ -51,7 +51,8 @@ switch ($_GET['op']) {
         while ($reg = $rspta->fetch_object()) {
             $vencida = ($reg->estado !== 'PAGADO' && strtotime($reg->fecha_vencimiento) < strtotime(date('Y-m-d')));
             $badge = $reg->estado === 'PAGADO' ? '<span class="label bg-green">PAGADO</span>' : ($vencida ? '<span class="label bg-red">VENCIDA</span>' : '<span class="label bg-yellow">PENDIENTE</span>');
-            $btn = $reg->estado === 'PAGADO' ? '-' : '<button class="btn btn-success btn-xs" onclick="abrirPagoCobrar(' . $reg->idcuenta_cobrar . ',' . $reg->saldo . ')"><i class="fa fa-money"></i> Abonar</button>';
+            $btn = ($reg->estado === 'PAGADO' ? '' : '<button class="btn btn-success btn-xs" onclick="abrirPagoCobrar(' . $reg->idcuenta_cobrar . ',' . $reg->saldo . ')"><i class="fa fa-money"></i> Abonar</button> ')
+                 . '<button class="btn btn-danger btn-xs" title="Eliminar" onclick="eliminarCobrar(' . $reg->idcuenta_cobrar . ')"><i class="fa fa-trash"></i></button>';
             $data[] = array(
                 '0' => $btn,
                 '1' => $reg->fecha_emision,
@@ -79,7 +80,8 @@ switch ($_GET['op']) {
         while ($reg = $rspta->fetch_object()) {
             $vencida = ($reg->estado !== 'PAGADO' && strtotime($reg->fecha_vencimiento) < strtotime(date('Y-m-d')));
             $badge = $reg->estado === 'PAGADO' ? '<span class="label bg-green">PAGADO</span>' : ($vencida ? '<span class="label bg-red">VENCIDA</span>' : '<span class="label bg-yellow">PENDIENTE</span>');
-            $btn = $reg->estado === 'PAGADO' ? '-' : '<button class="btn btn-info btn-xs" onclick="abrirPagoPagar(' . $reg->idcuenta_pagar . ',' . $reg->saldo . ')"><i class="fa fa-money"></i> Pagar</button>';
+            $btn = ($reg->estado === 'PAGADO' ? '' : '<button class="btn btn-info btn-xs" onclick="abrirPagoPagar(' . $reg->idcuenta_pagar . ',' . $reg->saldo . ')"><i class="fa fa-money"></i> Pagar</button> ')
+                 . '<button class="btn btn-danger btn-xs" title="Eliminar" onclick="eliminarPagar(' . $reg->idcuenta_pagar . ')"><i class="fa fa-trash"></i></button>';
             $data[] = array(
                 '0' => $btn,
                 '1' => $reg->fecha_emision,
@@ -121,6 +123,16 @@ switch ($_GET['op']) {
 
         $rspta = $cuentas->registrarPagoPagar($idcuenta, $idusuario, $monto, $medio_pago, $observacion);
         echo $rspta ? 'Pago registrado correctamente' : 'No se pudo registrar el pago (verifica el monto)';
+        break;
+
+    case 'eliminarCobrar':
+    case 'eliminarPagar':
+        if (empty($_SESSION['idusuario']) || empty($_SESSION['cuentas'])) {
+            echo json_encode(array('ok' => false, 'message' => 'No tienes permiso para eliminar cuentas'));
+            break;
+        }
+        $idcuenta = isset($_POST['idcuenta']) ? (int)$_POST['idcuenta'] : 0;
+        echo json_encode($_GET['op'] === 'eliminarCobrar' ? $cuentas->eliminarCobrar($idcuenta) : $cuentas->eliminarPagar($idcuenta));
         break;
 }
 ?>

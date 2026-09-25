@@ -91,7 +91,7 @@ if (!function_exists('darkenHexColor')) {
   <link rel="stylesheet" href="../public/css/AdminLTE.min.css">
   <link rel="stylesheet" href="../public/css/_all-skins.min.css">
   <link rel="stylesheet" href="../public/css/custom-theme.css?v=20260527d">
-  <link rel="stylesheet" href="../public/css/pos.css?v=20260531h">
+  <link rel="stylesheet" href="../public/css/pos.css?v=20260925b">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="icon" href="<?php echo htmlspecialchars($brandLogo); ?>" type="image/png">
@@ -686,6 +686,7 @@ if ($_sEmpresa || $_sKardex || $_sCuentas || $_sBackup) {
           </a>
           <ul class="treeview-menu">';
   if ($_sEmpresa) echo '<li><a href="empresa.php"><i class="bi bi-building"></i> Empresa</a></li>';
+  if ($_sEmpresa) echo '<li><a href="landing.php"><i class="bi bi-globe2"></i> Página web</a></li>';
   if ($_sKardex)  echo '<li><a href="procenter.php"><i class="bi bi-graph-up-arrow"></i> Kardex y Alertas</a></li>';
   if ($_sCuentas) echo '<li><a href="cuentas.php"><i class="bi bi-credit-card-2-front"></i> CxC y CxP</a></li>';
   if ($_sBackup)  echo '<li><a href="backup.php"><i class="bi bi-cloud-arrow-up"></i> Backup</a></li>';

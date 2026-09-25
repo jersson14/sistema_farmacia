@@ -29,8 +29,16 @@ public function editar($idpersona,$tipo_persona,$nombre,$tipo_documento,$num_doc
 }
 //funcion para eliminar datos
 public function eliminar($idpersona){
-	$sql="DELETE FROM persona WHERE idpersona='$idpersona'";
-	return ejecutarConsulta($sql);
+	$idpersona = (int)$idpersona;
+	$cf = ejecutarConsultaSimpleFila("SELECT nombre, tipo_persona FROM persona WHERE idpersona='$idpersona' LIMIT 1");
+	if ($cf && strtoupper(trim($cf['nombre'])) === 'CONSUMIDOR FINAL') {
+		return array("ok"=>false, "message"=>"\"Consumidor Final\" lo usa el sistema para las boletas sin cliente y no se puede eliminar");
+	}
+	$etiqueta = ($cf && $cf['tipo_persona'] === 'Proveedor') ? 'El proveedor' : 'El cliente';
+	return eliminarRegistro('persona', 'idpersona', $idpersona, $etiqueta, array(
+		'previos'    => array("DELETE FROM paciente_perfil WHERE idpersona='$idpersona'"),
+		'archivable' => sqlPersonaVisible() !== ''
+	));
 }
 
 //metodo para mostrar registros
@@ -41,16 +49,16 @@ public function mostrar($idpersona){
 
 //listar registros
 public function listarp(){
-	$sql="SELECT * FROM persona WHERE tipo_persona='Proveedor'";
+	$sql="SELECT * FROM persona WHERE tipo_persona='Proveedor'".sqlPersonaVisible()." ORDER BY nombre ASC";
 	return ejecutarConsulta($sql);
 }
 public function listarc(){
-	$sql="SELECT * FROM persona WHERE tipo_persona='Cliente'";
+	$sql="SELECT * FROM persona WHERE tipo_persona='Cliente'".sqlPersonaVisible()." ORDER BY nombre ASC";
 	return ejecutarConsulta($sql);
 }
 
 public function buscarPorDocumento($num){
-	$sql="SELECT idpersona, nombre, num_documento FROM persona WHERE tipo_persona='Cliente' AND num_documento='$num' LIMIT 1";
+	$sql="SELECT idpersona, nombre, num_documento FROM persona WHERE tipo_persona='Cliente' AND num_documento='$num'".sqlPersonaVisible()." LIMIT 1";
 	$r = ejecutarConsulta($sql);
 	if ($r && $r->num_rows > 0) return $r->fetch_assoc();
 	return null;

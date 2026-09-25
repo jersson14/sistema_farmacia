@@ -177,5 +177,20 @@ class PedidoOnline
         while ($row = $rs->fetch_assoc()) $r[$row['estado']] = (int)$row['total'];
         return $r;
     }
+
+    // Borra el pedido y su detalle. Si ya se convirtio en venta, la venta del POS se conserva.
+    public function eliminar($idpedido) {
+        $idpedido = (int)$idpedido;
+        $ped = ejecutarConsultaSimpleFila("SELECT comprobante_pago FROM pedido_online WHERE idpedido='$idpedido' LIMIT 1");
+        $r = eliminarRegistro('pedido_online', 'idpedido', $idpedido, 'El pedido #'.$idpedido, array(
+            'previos'    => array("DELETE FROM detalle_pedido_online WHERE idpedido='$idpedido'"),
+            'archivable' => false
+        ));
+        if ($r['ok'] && $ped && $ped['comprobante_pago'] !== '') {
+            $archivo = __DIR__ . '/../files/tienda/' . basename($ped['comprobante_pago']);
+            if (is_file($archivo)) @unlink($archivo);
+        }
+        return $r;
+    }
 }
 ?>

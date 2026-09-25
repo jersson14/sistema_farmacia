@@ -235,7 +235,8 @@ Usar `obtenerSimboloMoneda()` y `formatearMoneda()` en todo lugar donde se muest
 - No usar `SELECT *` en queries de producción con tablas grandes — seleccionar solo columnas necesarias
 - No hacer lógica de negocio en las vistas (solo presentación)
 - No duplicar código de sanitización — usar siempre `limpiarCadena()`
-- No eliminar registros físicamente si tienen relaciones — usar campo `condicion` (1=activo, 0=inactivo)
+- Los módulos ofrecen **Eliminar** (no "desactivar"). Usar `eliminarRegistro()` de `config/Conexion.php`: borra físicamente si no hay historial; si una llave foránea lo impide, marca `condicion=2` (eliminado) y el registro desaparece de listas y selects sin romper reportes. Convención de `condicion`: 1=activo, 0=inactivo (legado), 2=eliminado. Los listados de administración filtran `condicion<>2`; los selects ya usan `condicion=1`
+- En el frontend, confirmar eliminaciones con `appEliminar({url, data, titulo, mensaje, onSuccess})` (`public/js/app-eliminar.js`); el backend responde `{ok, message}`
 - No cambiar el esquema de respuesta JSON sin actualizar el JS consumidor
 - No instalar dependencias sin documentarlo aquí
 

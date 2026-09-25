@@ -224,7 +224,7 @@ if ($_SESSION['compras']==1 || $_SESSION['ventas']==1) {
             </div>
             <div class="box-body table-responsive">
               <table id="tblmovcaja" class="table table-striped table-bordered table-condensed table-hover" style="width:100%">
-                <thead><th>Fecha</th><th>Tipo</th><th>Concepto</th><th>Monto</th><th>Usuario</th></thead>
+                <thead><th>Fecha</th><th>Tipo</th><th>Concepto</th><th>Monto</th><th>Usuario</th><th>Opc.</th></thead>
                 <tbody></tbody>
               </table>
             </div>

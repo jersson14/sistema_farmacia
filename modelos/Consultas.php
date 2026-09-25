@@ -35,7 +35,7 @@ public function ventasfechacliente($fecha_inicio, $fecha_fin, $idcliente = 0) {
 
 public function listarClientesSelect() {
 	$sql="SELECT idpersona, nombre FROM persona
-		WHERE tipo_persona='Cliente' AND condicion=1
+		WHERE tipo_persona='Cliente'".sqlPersonaVisible()."
 		ORDER BY nombre ASC";
 	return ejecutarConsulta($sql);
 }
@@ -86,8 +86,8 @@ public function kpisgenerales(){
 	$sql="SELECT
 	(SELECT COUNT(*) FROM articulo WHERE condicion=1) AS articulos_activos,
 	(SELECT COUNT(*) FROM categoria WHERE condicion=1) AS categorias_activas,
-	(SELECT COUNT(*) FROM persona WHERE tipo_persona='Cliente') AS clientes,
-	(SELECT COUNT(*) FROM persona WHERE tipo_persona='Proveedor') AS proveedores,
+	(SELECT COUNT(*) FROM persona WHERE tipo_persona='Cliente'".sqlPersonaVisible().") AS clientes,
+	(SELECT COUNT(*) FROM persona WHERE tipo_persona='Proveedor'".sqlPersonaVisible().") AS proveedores,
 	(SELECT IFNULL(SUM(stock),0) FROM articulo WHERE condicion=1) AS stock_total";
 	return ejecutarConsulta($sql);
 }

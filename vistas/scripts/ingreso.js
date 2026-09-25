@@ -736,9 +736,8 @@ function mostrar(idingreso){
 }
 
 
-//funcion para desactivar
 function anular(idingreso){
-	bootbox.confirm("¿Esta seguro de desactivar este dato?", function(result){
+	bootbox.confirm("¿Seguro que deseas anular esta compra?", function(result){
 		if (result) {
 			$.post("../ajax/ingreso.php?op=anular", {idingreso : idingreso}, function(e){
 				notifyIngreso("warning", e);

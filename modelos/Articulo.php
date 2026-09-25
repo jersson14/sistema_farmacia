@@ -73,6 +73,9 @@ public function desactivar($idarticulo){
 	$sql="UPDATE articulo SET condicion='0' WHERE idarticulo='$idarticulo'";
 	return ejecutarConsulta($sql);
 }
+public function eliminar($idarticulo){
+	return eliminarRegistro('articulo', 'idarticulo', $idarticulo, 'El producto', array('liberar'=>array('nombre')));
+}
 public function activar($idarticulo){
 	$sql="UPDATE articulo SET condicion='1' WHERE idarticulo='$idarticulo'";
 	return ejecutarConsulta($sql);
@@ -102,7 +105,8 @@ public function listar(){
 		 ORDER BY la2.fecha_vencimiento ASC LIMIT 1) AS dias_para_vencer
 	FROM articulo a
 	INNER JOIN categoria c ON a.idcategoria=c.idcategoria
-	LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad";
+	LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad
+	WHERE a.condicion<>2";
 	return ejecutarConsulta($sql);
 }
 

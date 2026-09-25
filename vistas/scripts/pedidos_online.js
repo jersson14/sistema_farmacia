@@ -182,6 +182,19 @@ function cambiarEstado(id, estado){
     });
 }
 
+function eliminarPedido(id){
+    appEliminar({
+        url: "../ajax/pedidos_online.php?op=eliminar",
+        data: {idpedido: id},
+        titulo: "Eliminar pedido #" + id,
+        mensaje: "El pedido y su detalle se borrarán definitivamente. Si ya se registró como venta, la venta se conserva. ¿Deseas continuar?",
+        onSuccess: function(){
+            cargarKPIs();
+            if (tblPO) tblPO.ajax.reload(null, false);
+        }
+    });
+}
+
 function aplicarCambioEstado(){
     var estado = $("#nuevoEstado").val();
     $.post("../ajax/pedidos_online.php?op=cambiarEstado", {idpedido: pedidoActivo, estado: estado}, function(resp){
