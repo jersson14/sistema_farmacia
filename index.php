@@ -86,7 +86,9 @@ $mapaEmbed = preg_match('#^https://(www\.)?google\.[a-z.]+/maps/embed#i', $L['co
   --r:14px; --r-lg:20px; --r-xl:28px;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;overflow-x:hidden}
+/* iOS ignora overflow-x:hidden en body: clip evita que las animaciones laterales permitan deslizar de lado */
+@supports (overflow:clip){html,body{overflow-x:clip}}
 body{font-family:'Inter',system-ui,sans-serif;color:var(--gray-900);background:#fff;overflow-x:hidden}
 a{text-decoration:none;color:inherit}
 img{max-width:100%;display:block}
@@ -143,12 +145,14 @@ img{max-width:100%;display:block}
 }
 .mob-menu a i{color:var(--blue);font-size:16px;width:20px}
 .mob-menu a:hover{color:var(--blue);background:var(--gray-50)}
-.mob-actions{display:flex;gap:10px;padding:14px 5%}
+.mob-actions{display:flex;gap:10px;padding:14px 5%;background:#fff}
+.mob-menu .mob-actions a{border-bottom:0;padding:12px 16px;text-transform:uppercase}
+.mob-menu .mob-actions a.btn-blue,.mob-menu .mob-actions a.btn-blue i{color:#fff}
 
 /* ═══ HERO ════════════════════════════════════════════════ */
 .hero{
   min-height:100vh;position:relative;overflow:hidden;
-  display:flex;align-items:center;padding:88px 5% 60px;
+  display:flex;align-items:center;padding:120px 5% 60px;
 }
 .hero-bg{
   position:absolute;inset:0;z-index:0;
@@ -269,7 +273,7 @@ img{max-width:100%;display:block}
 .strip{background:var(--grad-blue);padding:0}
 .strip-in{
   max-width:1280px;margin:0 auto;
-  display:grid;grid-template-columns:repeat(3,1fr);
+  display:grid;grid-template-columns:repeat(var(--strip-cols,3),1fr);
 }
 .strip-item{
   display:flex;align-items:center;gap:14px;
@@ -558,7 +562,7 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
   .nav-links,.nav-actions{display:none}
   .hamburger{display:flex}
   .hero-inner{grid-template-columns:1fr}
-  .hero-card{display:none}
+  .hero-card,.hero-right{display:none}
   .srv-grid{grid-template-columns:repeat(2,1fr)}
   .prod-grid{grid-template-columns:repeat(2,1fr)}
   .nos-grid{grid-template-columns:1fr}
@@ -570,10 +574,47 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
   .strip-item:last-child{border-bottom:none}
   .foot-top{grid-template-columns:1fr 1fr}
 }
+@media(max-width:980px){
+  .nav-inner{height:64px;gap:12px}
+  .nav-logo img{height:48px}
+  .mob-menu{top:64px;max-height:calc(100dvh - 64px);overflow-y:auto}
+  .nav-spacer{height:64px}
+  .hero{min-height:auto;padding:96px 5% 56px}
+  section[id]{scroll-margin-top:64px}
+}
 @media(max-width:600px){
-  section{padding:64px 4%}
-  .srv-grid,.prod-grid{grid-template-columns:1fr}
-  .hero-stats{flex-direction:column;gap:10px}
+  section{padding:56px 5%}
+  .srv-grid{grid-template-columns:1fr}
+  .prod-grid{grid-template-columns:repeat(2,1fr);gap:12px}
+  .prod-img-w{height:120px}
+  .prod-img-w img{max-height:110px}
+  .prod-body{padding:10px 12px 14px}
+  .prod-name{font-size:.8rem}
+  .prod-price{font-size:.98rem}
+  .prod-add{width:32px;height:32px;font-size:14px}
+  .hero{padding:88px 5% 48px}
+  .hero-eyebrow{font-size:.64rem;padding:5px 12px;margin-bottom:14px}
+  .hero h1{font-size:2rem}
+  .hero-tagline{font-size:.95rem;margin-bottom:16px}
+  .hero-sub{font-size:.9rem;margin-bottom:24px}
+  .hero-btns{flex-direction:column;align-items:stretch;margin-bottom:24px}
+  .hero-btns a{justify-content:center}
+  .hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .hs{flex-direction:column;align-items:flex-start;gap:6px;padding:10px}
+  .hs-icon{width:32px;height:32px;font-size:15px}
+  .hs-text strong{font-size:1rem}
+  .hs-text span{font-size:.6rem}
+  .strip-item{padding:14px 5%}
+  .sec-hd{margin-bottom:32px}
+  .nos-grid{gap:40px}
+  .nos-main-img{height:260px}
+  .nos-badge{right:8px;bottom:-14px;padding:12px 16px;min-width:0}
+  .nos-badge strong{font-size:1.8rem}
+  .mv-card{padding:28px 22px}
+  .cnt-map{height:280px}
+  .cta-sec{padding:64px 5%}
+  .cta-btns a{width:100%;justify-content:center}
+  .wa-fab{width:52px;height:52px;font-size:24px;bottom:16px;right:16px}
   .foot-top{grid-template-columns:1fr}
   .foot-bot{flex-direction:column;text-align:center}
   .cta-btns{flex-direction:column;align-items:center}
@@ -733,7 +774,7 @@ footer{background:#060E24;color:#94A3B8;padding:64px 5% 32px}
 <?php if ($L['beneficios']['visible'] && $L['beneficios']['items']): ?>
 <!-- ── STRIP ──────────────────────────────────────────────── -->
 <div class="strip">
-  <div class="strip-in" style="grid-template-columns:repeat(<?= count($L['beneficios']['items']) ?>,1fr)">
+  <div class="strip-in" style="--strip-cols:<?= count($L['beneficios']['items']) ?>">
     <?php foreach ($L['beneficios']['items'] as $b): ?>
     <div class="strip-item">
       <div class="si-icon"><i class="bi <?= e($b['icono']) ?>"></i></div>

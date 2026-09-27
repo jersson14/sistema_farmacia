@@ -473,18 +473,18 @@ if (!function_exists('darkenHexColor')) {
           }
           ?>
           <li>
-            <a href="caja.php" title="Estado de caja" style="padding-top:18px;padding-bottom:18px;">
+            <a href="caja.php" title="Estado de caja" class="caja-badge-link">
               <?php if ($cajaBadgeAbierta): ?>
                 <span class="caja-badge caja-badge-open">
                   <span class="caja-dot"></span>
                   <i class="bi bi-unlock-fill" style="font-size:12px;"></i>
-                  CAJA ABIERTA
+                  <span class="caja-txt-pre">CAJA </span>ABIERTA
                 </span>
               <?php else: ?>
                 <span class="caja-badge caja-badge-closed">
                   <span class="caja-dot"></span>
                   <i class="bi bi-lock-fill" style="font-size:12px;"></i>
-                  CAJA CERRADA
+                  <span class="caja-txt-pre">CAJA </span>CERRADA
                 </span>
               <?php endif; ?>
             </a>
