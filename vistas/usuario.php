@@ -141,7 +141,7 @@ require 'footer.php';
  window.appPerfilMode = <?php echo $perfilPropio ? 'true' : 'false'; ?>;
  window.appPerfilId = <?php echo $perfilPropio ? $idSesion : 'null'; ?>;
  </script>
- <script src="scripts/usuario.js"></script>
+ <script src="<?= assetV('scripts/usuario.js') ?>"></script>
  <?php 
 }
 

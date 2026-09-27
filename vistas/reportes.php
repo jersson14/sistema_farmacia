@@ -304,7 +304,7 @@ if ($_SESSION['consultac']==1 || $_SESSION['consultav']==1) {
 
 require 'footer.php';
 ?>
-<script src="scripts/reportes.js?v=20260325c"></script>
+<script src="<?= assetV('scripts/reportes.js') ?>"></script>
 <?php
 }
 ob_end_flush();

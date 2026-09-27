@@ -269,7 +269,7 @@ if ($_SESSION['compras']==1 || $_SESSION['ventas']==1) {
 }
 require 'footer.php';
 ?>
-<script src="scripts/caja.js"></script>
+<script src="<?= assetV('scripts/caja.js') ?>"></script>
 <?php
 }
 ob_end_flush();

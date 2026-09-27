@@ -298,7 +298,7 @@ if ($_SESSION['compras']==1) {
 
 require 'footer.php';
  ?>
- <script src="scripts/ingreso.js?v=20260914a"></script>
+ <script src="<?= assetV('scripts/ingreso.js') ?>"></script>
  <?php 
 }
 

@@ -168,7 +168,7 @@ if ($_SESSION['almacen']==1 || $_SESSION['consultac']==1 || $_SESSION['consultav
 }
 require 'footer.php';
 ?>
-<script src="scripts/procenter.js?v=20260321b"></script>
+<script src="<?= assetV('scripts/procenter.js') ?>"></script>
 <?php
 }
 ob_end_flush();

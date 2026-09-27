@@ -74,7 +74,7 @@ if ($_SESSION['compras']==1 || $_SESSION['ventas']==1) {
 }
 require 'footer.php';
 ?>
-<script src="scripts/cuentas.js?v=20260321b"></script>
+<script src="<?= assetV('scripts/cuentas.js') ?>"></script>
 <?php
 }
 ob_end_flush();

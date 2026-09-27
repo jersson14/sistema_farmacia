@@ -67,7 +67,7 @@ if ($_SESSION['ventas'] == 1 || $_SESSION['acceso'] == 1) {
 </div><!-- /.content-wrapper -->
 
 <?php require 'footer.php'; ?>
-<script src="scripts/control_especial.js"></script>
+<script src="<?= assetV('scripts/control_especial.js') ?>"></script>
 
 <?php
 } else {

@@ -80,7 +80,7 @@ if ($_SESSION['almacen']==1) {
 
 require 'footer.php';
  ?>
- <script src="scripts/categoria.js"></script>
+ <script src="<?= assetV('scripts/categoria.js') ?>"></script>
  <?php 
 }
 

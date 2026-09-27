@@ -1,4 +1,14 @@
 <?php
+// Versión automática de archivos propios (fecha de modificación): el navegador,
+// sobre todo el del celular, descarga el archivo nuevo apenas cambia.
+if (!function_exists('assetV')) {
+  function assetV($ruta) {
+    $fs = __DIR__ . '/' . $ruta;
+    return $ruta . (is_file($fs) ? '?v=' . filemtime($fs) : '');
+  }
+}
+?>
+<?php
 $appCurrencyCode = function_exists('obtenerMonedaEmpresaCodigo') ? obtenerMonedaEmpresaCodigo() : 'PEN';
 $appCurrencySymbol = function_exists('obtenerSimboloMoneda') ? obtenerSimboloMoneda($appCurrencyCode) : 'S/';
 ?>
@@ -27,11 +37,11 @@ $appCurrencySymbol = function_exists('obtenerSimboloMoneda') ? obtenerSimboloMon
 <script src="../public/datatables/dataTables.buttons.min.js"></script>
 <script src="../public/datatables/buttons.html5.min.js"></script>
 <script src="../public/datatables/buttons.colVis.min.js"></script>
-<script src="../public/js/app-datatable.js?v=20260321b"></script>
+<script src="<?= assetV('../public/js/app-datatable.js') ?>"></script>
 <script src="../public/js/bootbox.min.js"></script>
 <script src="../public/js/bootstrap-select.min.js"></script>
-<script src="../public/js/app-notify.js?v=20260321b"></script>
-<script src="../public/js/app-eliminar.js?v=20260925"></script>
+<script src="<?= assetV('../public/js/app-notify.js') ?>"></script>
+<script src="<?= assetV('../public/js/app-eliminar.js') ?>"></script>
 <script>
 window.appCurrencyCode = <?php echo json_encode($appCurrencyCode); ?>;
 window.appCurrencySymbol = <?php echo json_encode($appCurrencySymbol); ?>;

@@ -112,7 +112,7 @@ if ($_SESSION['almacen'] == 1) {
 
 require 'footer.php';
 ?>
-<script src="scripts/vencimientos.js"></script>
+<script src="<?= assetV('scripts/vencimientos.js') ?>"></script>
 <?php
 }
 

@@ -13,19 +13,19 @@ if ($_SESSION['ventas']==1) {
 
     <!-- ══════════════ RESUMEN DE PAGOS ══════════════ -->
     <div class="row" id="resumenPagosVenta" style="padding:10px 15px 0">
-      <div class="col-md-3 col-sm-6 col-xs-12">
+      <div class="col-md-3 col-sm-6 col-xs-6">
         <div class="info-box"><span class="info-box-icon bg-green"><i class="fa fa-money"></i></span>
           <div class="info-box-content"><span class="info-box-text">Efectivo</span>
             <span class="info-box-number" id="vResEfectivo">S/ 0.00</span></div></div></div>
-      <div class="col-md-3 col-sm-6 col-xs-12">
+      <div class="col-md-3 col-sm-6 col-xs-6">
         <div class="info-box"><span class="info-box-icon bg-purple"><i class="fa fa-mobile"></i></span>
           <div class="info-box-content"><span class="info-box-text">Yape / Plin</span>
             <span class="info-box-number" id="vResYape">S/ 0.00</span></div></div></div>
-      <div class="col-md-3 col-sm-6 col-xs-12">
+      <div class="col-md-3 col-sm-6 col-xs-6">
         <div class="info-box"><span class="info-box-icon bg-light-blue"><i class="fa fa-credit-card"></i></span>
           <div class="info-box-content"><span class="info-box-text">Tarjeta</span>
             <span class="info-box-number" id="vResTarjeta">S/ 0.00</span></div></div></div>
-      <div class="col-md-3 col-sm-6 col-xs-12">
+      <div class="col-md-3 col-sm-6 col-xs-6">
         <div class="info-box"><span class="info-box-icon bg-yellow"><i class="fa fa-bar-chart"></i></span>
           <div class="info-box-content"><span class="info-box-text">Total ventas</span>
             <span class="info-box-number" id="vResTotal">S/ 0.00</span></div></div></div>
@@ -46,11 +46,11 @@ if ($_SESSION['ventas']==1) {
             </div>
             <div class="box-body">
               <div class="row" style="margin-bottom:10px">
-                <div class="col-md-3 col-sm-6 col-xs-12">
+                <div class="col-md-3 col-sm-6 col-xs-6">
                   <label>Desde</label>
                   <input type="date" id="filtro_venta_inicio" class="form-control">
                 </div>
-                <div class="col-md-3 col-sm-6 col-xs-12">
+                <div class="col-md-3 col-sm-6 col-xs-6">
                   <label>Hasta</label>
                   <input type="date" id="filtro_venta_fin" class="form-control">
                 </div>
@@ -518,7 +518,7 @@ if ($_SESSION['ventas']==1) {
 require 'footer.php';
  ?>
  <script src="../public/js/qz-tray.js"></script>
- <script src="scripts/venta.js?v=20260925b"></script>
+ <script src="<?= assetV('scripts/venta.js') ?>"></script>
  <?php
 }
 ob_end_flush();

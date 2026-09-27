@@ -51,7 +51,7 @@ if ($_SESSION['acceso']==1) {
 }
 require 'footer.php';
 ?>
-<script src="scripts/backup.js"></script>
+<script src="<?= assetV('scripts/backup.js') ?>"></script>
 <?php
 }
 ob_end_flush();

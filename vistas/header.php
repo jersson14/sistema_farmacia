@@ -2,6 +2,15 @@
 if (strlen(session_id())<1) 
   session_start();
 
+// Versión automática de archivos propios (fecha de modificación): el navegador,
+// sobre todo el del celular, descarga el archivo nuevo apenas cambia.
+if (!function_exists('assetV')) {
+  function assetV($ruta) {
+    $fs = __DIR__ . '/' . $ruta;
+    return $ruta . (is_file($fs) ? '?v=' . filemtime($fs) : '');
+  }
+}
+
 $brandNombre = "FARMASUYANA";
 $brandSub = "AL CUIDADO DE TU SALUD";
 $brandLogo = "../files/famacia.png";
@@ -90,8 +99,8 @@ if (!function_exists('darkenHexColor')) {
 
   <link rel="stylesheet" href="../public/css/AdminLTE.min.css">
   <link rel="stylesheet" href="../public/css/_all-skins.min.css">
-  <link rel="stylesheet" href="../public/css/custom-theme.css?v=20260527d">
-  <link rel="stylesheet" href="../public/css/pos.css?v=20260925b">
+  <link rel="stylesheet" href="<?= assetV('../public/css/custom-theme.css') ?>">
+  <link rel="stylesheet" href="<?= assetV('../public/css/pos.css') ?>">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="icon" href="<?php echo htmlspecialchars($brandLogo); ?>" type="image/png">

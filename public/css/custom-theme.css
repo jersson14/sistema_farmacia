@@ -1682,17 +1682,98 @@ input, select, textarea {
   /* ── Filtros de fecha: full width en móvil ───────────────── */
   .col-md-3, .col-sm-6 { margin-bottom: 6px; }
 
-  /* ── Modal: full screen en móvil ────────────────────────── */
+  /* ── Modal: ventana con margen (antes era pantalla completa en blanco,
+        y las confirmaciones parecían una página rota) ─────────────── */
   .modal-dialog {
-    margin: 0;
-    width: 100%;
-    max-width: 100%;
+    margin: 12px auto;
+    width: auto;
+    max-width: calc(100% - 20px);
   }
-  .modal-content {
-    border-radius: 0;
-    min-height: 100dvh;
+  .modal-content { border-radius: 14px; }
+  .modal-body { padding: 14px; }
+  .modal-footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+  .modal-footer .btn { margin: 0 !important; min-height: 42px; flex: 1 1 auto; }
+  .bootbox.modal .modal-dialog { margin-top: 18vh; }
+
+  /* ── Cuadros de resumen (info-box) compactos, de a dos por fila ──── */
+  .info-box { min-height: 64px; margin-bottom: 10px; }
+  .info-box-icon { width: 48px; height: 64px; line-height: 64px; font-size: 22px; }
+  .info-box-icon > i, .info-box-icon > .fa, .info-box-icon > .bi { font-size: 22px; line-height: 64px; }
+  .info-box-content { margin-left: 48px; padding: 8px 8px; }
+  .info-box-text { font-size: 10px; }
+  .info-box-number { font-size: 14px; white-space: normal; }
+  #resumenPagosVenta > [class*="col-"] { padding-left: 5px; padding-right: 5px; }
+
+  /* ── Tablas como tarjetas (app-datatable.js marca .dt-cards) ─────── */
+  .dt-cards-wrap .dataTables_scrollHead,
+  table.dt-cards thead,
+  table.dt-cards tfoot { display: none !important; }
+  .dt-cards-wrap .dataTables_scrollBody { overflow: visible !important; height: auto !important; max-height: none !important; }
+  .table-responsive:has(> .dt-cards-wrap),
+  .table-responsive:has(> table.dt-cards) { overflow-x: visible !important; }
+  table.dt-cards,
+  table.dt-cards tbody,
+  table.dt-cards tr,
+  table.dt-cards td {
+    display: block;
+    width: 100% !important;
+    min-width: 0 !important;
   }
-  .modal-body { padding: 12px; }
+  table.dt-cards { border: 0 !important; background: transparent !important; margin: 0 !important; }
+  table.dt-cards tbody tr {
+    background: #fff;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 12px;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+    padding: 8px 12px;
+    margin-bottom: 10px;
+  }
+  table.dt-cards.table-striped > tbody > tr:nth-of-type(odd) { background: #fff; }
+  table.dt-cards tbody td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    border: 0 !important;
+    border-bottom: 1px dashed #eef2f7 !important;
+    padding: 6px 0 !important;
+    white-space: normal !important;
+    word-break: break-word;
+    text-align: right;
+    font-size: 13px;
+    background: transparent !important;
+  }
+  table.dt-cards tbody td:last-child { border-bottom: 0 !important; }
+  table.dt-cards tbody td::before {
+    content: attr(data-label);
+    flex: 0 0 40%;
+    text-align: left;
+    font-weight: 700;
+    font-size: 11px;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    padding-top: 2px;
+  }
+  table.dt-cards tbody td.dt-vacia { display: none; }
+  table.dt-cards tbody td.dataTables_empty { display: block; text-align: center; border: 0 !important; }
+  table.dt-cards tbody td.dataTables_empty::before { content: none; }
+  /* Botones de la fila: arriba, grandes y fáciles de tocar */
+  table.dt-cards tbody td.dt-acciones {
+    order: -1;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 2px 0 8px !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+  }
+  table.dt-cards tbody td.dt-acciones::before { content: none; }
+  table.dt-cards tbody td.dt-acciones .btn { min-width: 44px; min-height: 40px; font-size: 15px; margin: 0 !important; }
+  table.dt-cards tbody td.dt-acciones a { margin: 0 !important; }
+  table.dt-cards tbody tr { display: flex; flex-direction: column; }
+  table.dt-cards tbody td img { max-height: 56px; width: auto !important; }
+  .dataTables_wrapper .dataTables_filter label { display: flex; align-items: center; gap: 8px; width: 100%; }
+  .dataTables_wrapper .dataTables_filter input { flex: 1; max-width: none !important; margin: 0 !important; height: 40px; }
 
   /* ── Sidebar: oculto por defecto, AdminLTE lo maneja ──────── */
   .main-sidebar { z-index: 1050; }

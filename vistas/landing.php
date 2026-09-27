@@ -115,7 +115,7 @@ if ($_SESSION['acceso']==1) {
 }
 require 'footer.php';
 ?>
-<script src="scripts/landing.js?v=20260925a"></script>
+<script src="<?= assetV('scripts/landing.js') ?>"></script>
 <?php
 }
 ob_end_flush();

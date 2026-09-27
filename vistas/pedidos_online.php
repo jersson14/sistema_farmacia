@@ -152,7 +152,7 @@ if ($_SESSION['ventas'] == 1 || $_SESSION['acceso'] == 1) {
 </div>
 
 <?php require 'footer.php'; ?>
-<script src="scripts/pedidos_online.js"></script>
+<script src="<?= assetV('scripts/pedidos_online.js') ?>"></script>
 
 <?php
 } else {

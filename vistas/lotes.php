@@ -75,7 +75,7 @@ if ($_SESSION['almacen'] == 1) {
 
 require 'footer.php';
 ?>
-<script src="scripts/lotes.js"></script>
+<script src="<?= assetV('scripts/lotes.js') ?>"></script>
 <?php
 }
 ob_end_flush();

@@ -34,7 +34,7 @@ public function eliminar($idpersona){
 	if ($cf && strtoupper(trim($cf['nombre'])) === 'CONSUMIDOR FINAL') {
 		return array("ok"=>false, "message"=>"\"Consumidor Final\" lo usa el sistema para las boletas sin cliente y no se puede eliminar");
 	}
-	$etiqueta = ($cf && $cf['tipo_persona'] === 'Proveedor') ? 'El proveedor' : 'El cliente';
+	$etiqueta = ($cf && strtoupper(trim($cf['tipo_persona'])) === 'PROVEEDOR') ? 'El proveedor' : 'El cliente';
 	return eliminarRegistro('persona', 'idpersona', $idpersona, $etiqueta, array(
 		'previos'    => array("DELETE FROM paciente_perfil WHERE idpersona='$idpersona'"),
 		'archivable' => sqlPersonaVisible() !== ''
