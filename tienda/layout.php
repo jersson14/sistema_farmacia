@@ -11,7 +11,7 @@ $cfgTienda = new ConfigTienda();
 // Si la tienda está en mantenimiento solo admin puede verla
 if (!$cfgTienda->estaActiva() && !isset($_SESSION['nombre'])) {
     ?><!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Tienda en mantenimiento</title>
-    <link rel="stylesheet" href="css/tienda.css"></head>
+    <link rel="stylesheet" href="css/tienda.css?v=<?php echo @filemtime(__DIR__ . '/css/tienda.css'); ?>"></head>
     <body style="display:flex;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:16px;text-align:center;padding:40px">
     <div style="font-size:56px">🔧</div>
     <h2 style="font-size:24px;font-weight:800">Tienda temporalmente cerrada</h2>
@@ -46,7 +46,7 @@ $nombreCliente = $clienteLogado ? $_SESSION['tienda_cliente']['nombre'] : '';
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?php echo htmlspecialchars(($GLOBALS['pageTitulo'] ?? 'Tienda') . ' — ' . $nombreEmp); ?></title>
-  <link rel="stylesheet" href="css/tienda.css">
+  <link rel="stylesheet" href="css/tienda.css?v=<?php echo @filemtime(__DIR__ . '/css/tienda.css'); ?>">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <?php if (!empty($GLOBALS['pageHead'])) echo $GLOBALS['pageHead']; ?>
 </head>

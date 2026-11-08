@@ -161,7 +161,7 @@ if ($_SESSION['almacen']==1) {
 
         <div class="row">
           <div class="form-group col-md-4 col-xs-6">
-            <label>Stock</label>
+            <label>Stock <small class="text-muted" id="stockUnidadHint">(en unidad base)</small></label>
             <input class="form-control" type="number" step="1" min="0" name="stock" id="stock" placeholder="0" value="0">
           </div>
           <div class="form-group col-md-4 col-xs-6">
@@ -251,6 +251,54 @@ if ($_SESSION['almacen']==1) {
       </div><!-- /col derecha -->
 
     </div><!-- /row principal -->
+
+    <!-- Presentaciones de venta: un producto, varias formas de venderlo -->
+    <div class="col-lg-12 col-md-12 col-xs-12" style="margin-top:10px;">
+      <div class="box box-primary box-solid pres-box">
+        <div class="box-header with-border">
+          <h4 class="box-title"><i class="fa fa-cubes"></i> Presentaciones de venta</h4>
+          <div class="box-tools pull-right">
+            <button type="button" class="btn btn-box-tool" data-widget="collapse"><i class="fa fa-minus"></i></button>
+          </div>
+        </div>
+        <div class="box-body">
+          <p class="pres-ayuda">
+            Registra el producto <b>una sola vez</b> y véndelo como lo pida el cliente. Ejemplo: Paracetamol por
+            <b>Tableta</b> (unidad base), <b>Blíster x10</b> y <b>Caja x100</b>. El stock se cuenta siempre en la unidad base.
+          </p>
+          <input type="hidden" name="presentaciones_json" id="presentaciones_json">
+          <div class="table-responsive">
+            <table class="table pres-tabla">
+              <thead>
+                <tr>
+                  <th>Presentación</th>
+                  <th>Contiene</th>
+                  <th>Precio de venta</th>
+                  <th>Código de barras <small class="text-muted">(opcional)</small></th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="presTbody"></tbody>
+            </table>
+          </div>
+          <button type="button" class="btn btn-default btn-sm" id="btnAgregarPres" onclick="agregarPresentacionFila()">
+            <i class="fa fa-plus"></i> Agregar presentación
+          </button>
+          <div id="presStockInfo" class="pres-stock-info" style="display:none"></div>
+          <div id="presConvertir" class="pres-convertir" style="display:none">
+            <div>
+              <b><i class="fa fa-exchange"></i> ¿Hoy cuentas este producto por caja y quieres venderlo también por tableta?</b><br>
+              <span class="text-muted">Convierte la unidad base: el stock, los lotes y el historial se recalculan solos y la caja sigue a la venta.</span>
+            </div>
+            <button type="button" class="btn btn-warning btn-sm" onclick="abrirConvertirUnidad()"><i class="fa fa-scissors"></i> Vender por unidad más pequeña</button>
+          </div>
+          <div id="presSinMigracion" class="alert alert-warning" style="display:none;margin:10px 0 0">
+            <i class="fa fa-exclamation-triangle"></i> Falta ejecutar la migración <b>20261108_presentaciones_venta.sql</b> para usar presentaciones.
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Datos farmacéuticos -->
     <div class="col-lg-12 col-md-12 col-xs-12" style="margin-top:10px;">
       <div class="box box-info box-solid">
@@ -390,6 +438,43 @@ if ($_SESSION['almacen']==1) {
       <button class="btn btn-danger" onclick="cancelarform()" type="button"><i class="fa fa-arrow-circle-left"></i> Cancelar</button>
     </div>
   </form>
+</div>
+
+<!-- Modal: pasar a una unidad base más pequeña (ej. de Caja a Tableta) -->
+<div class="modal fade" id="modalConvertirUnidad" tabindex="-1" role="dialog" aria-labelledby="convTitulo">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="convTitulo"><i class="fa fa-scissors"></i> Vender por unidad más pequeña</h4>
+      </div>
+      <div class="modal-body">
+        <p id="convIntro" class="conv-intro"></p>
+        <div class="row">
+          <div class="form-group col-sm-6">
+            <label for="convUnidad">Unidad más pequeña</label>
+            <select id="convUnidad" class="form-control"></select>
+          </div>
+          <div class="form-group col-sm-6">
+            <label for="convFactor" id="convFactorLabel">¿Cuántas trae 1 caja?</label>
+            <input type="number" id="convFactor" class="form-control" min="2" step="1" placeholder="Ej. 100">
+          </div>
+          <div class="form-group col-sm-6">
+            <label for="convPrecio" id="convPrecioLabel">Precio de venta de 1 unidad</label>
+            <div class="input-group">
+              <span class="input-group-addon">S/</span>
+              <input type="number" id="convPrecio" class="form-control" min="0.01" step="0.01" placeholder="0.00">
+            </div>
+          </div>
+        </div>
+        <div id="convPreview" class="conv-preview" style="display:none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-warning" id="btnConvertir" onclick="confirmarConvertirUnidad()"><i class="fa fa-check"></i> Convertir</button>
+      </div>
+    </div>
+  </div>
 </div>
 <!--fin centro-->
       </div>

@@ -51,7 +51,7 @@ if (!empty($lote['idingreso'])) {
 $ventas = ejecutarConsulta(
     "SELECT DATE_FORMAT(v.fecha_hora,'%d/%m/%Y %H:%i') AS fecha_venta,
             v.tipo_comprobante, v.serie_comprobante, v.num_comprobante,
-            p.nombre AS cliente, dv.cantidad, dv.precio_venta
+            p.nombre AS cliente, (dv.cantidad*dv.factor) AS cantidad, (dv.precio_venta/dv.factor) AS precio_venta
      FROM detalle_venta dv
      INNER JOIN venta v ON dv.idventa = v.idventa
      INNER JOIN persona p ON v.idcliente = p.idpersona

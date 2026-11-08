@@ -398,7 +398,7 @@ class Landing
                 $where .= " AND $oferta";
                 break;
             case 'vendidos':
-                $join  = "INNER JOIN (SELECT dv.idarticulo, SUM(dv.cantidad) AS vendidos
+                $join  = "INNER JOIN (SELECT dv.idarticulo, SUM(dv.cantidad*dv.factor) AS vendidos
                                       FROM detalle_venta dv INNER JOIN venta v ON v.idventa=dv.idventa
                                       WHERE v.estado='Aceptado' AND v.fecha_hora >= DATE_SUB(NOW(), INTERVAL 90 DAY)
                                       GROUP BY dv.idarticulo) top ON top.idarticulo=a.idarticulo";

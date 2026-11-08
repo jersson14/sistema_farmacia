@@ -736,50 +736,75 @@ function mostrar(idingreso){
 }
 
 
-function anular(idingreso){
-	bootbox.confirm("¿Seguro que deseas anular esta compra?", function(result){
-		if (result) {
-			$.post("../ajax/ingreso.php?op=anular", {idingreso : idingreso}, function(e){
-				notifyIngreso("warning", e);
-				tabla.ajax.reload();
-			});
-		}
-	});
+// ── Acciones sobre compras ya registradas ─────────────────────────
+// Registrar compras es libre. Anular, recuperar, eliminar o modificar una compra
+// registrada requiere el permiso "Editar y anular compras" o la autorización de
+// un administrador (ver public/js/app-autorizar.js).
+function autCompra(idingreso, titulo, comprobante, mensaje, boton, peligro){
+	return {
+		recurso: "ingreso:" + idingreso,
+		titulo: titulo,
+		detalle: comprobante || "",
+		mensaje: mensaje,
+		boton: boton,
+		peligro: !!peligro
+	};
+}
+
+// POST + manejo estándar de la respuesta (incluye pedir autorización si venció)
+function accionCompra(url, datos, aut, alTerminar){
+	var enviar = function(){
+		$.post(url, datos, function(raw){
+			var r = appAutorizar.parse(raw);
+			if (appAutorizar.manejar(r, aut, enviar)) return;
+			notifyIngreso(r.ok ? "success" : "error", r.message || (r.ok ? "Listo" : "No se pudo completar la acción"));
+			if (r.ok && typeof alTerminar === "function") alTerminar(r);
+		}).fail(function(){
+			notifyIngreso("error", "No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.");
+		});
+	};
+	return enviar;
+}
+
+function confirmarAccionCompra(aut, pregunta, botonConfirmar, enviar){
+	appAutorizar($.extend({}, aut, { onAutorizado: function(yaConfirmado){
+		if (yaConfirmado) { enviar(); return; }
+		bootbox.confirm({
+			title: aut.titulo,
+			message: pregunta,
+			buttons: {
+				confirm: { label: botonConfirmar, className: aut.peligro ? "btn-danger" : "btn-primary" },
+				cancel: { label: "Cancelar", className: "btn-default" }
+			},
+			callback: function(ok){ if (ok) enviar(); }
+		});
+	}}));
+}
+
+function anular(idingreso, comprobante){
+	var aut = autCompra(idingreso, "Anular compra", comprobante,
+		"La compra quedará anulada y se descontará del stock lo que había ingresado.", "Autorizar y anular", true);
+	var enviar = accionCompra("../ajax/ingreso.php?op=anular", {idingreso: idingreso}, aut,
+		function(){ tabla.ajax.reload(null, false); });
+	confirmarAccionCompra(aut, "¿Seguro que deseas anular esta compra?", "Sí, anular", enviar);
 }
 
 //funcion para recuperar / reactivar una compra anulada
-function recuperarIngreso(idingreso){
-	bootbox.confirm("¿Deseas recuperar esta compra? Volverá al estado Aceptado.", function(result){
-		if (result) {
-			$.post("../ajax/ingreso.php?op=activar", {idingreso : idingreso}, function(e){
-				notifyIngreso("success", e);
-				tabla.ajax.reload();
-			});
-		}
-	});
+function recuperarIngreso(idingreso, comprobante){
+	var aut = autCompra(idingreso, "Recuperar compra anulada", comprobante,
+		"La compra volverá al estado Aceptado y su stock se sumará otra vez.", "Autorizar y recuperar", false);
+	var enviar = accionCompra("../ajax/ingreso.php?op=activar", {idingreso: idingreso}, aut,
+		function(){ tabla.ajax.reload(null, false); });
+	confirmarAccionCompra(aut, "¿Deseas recuperar esta compra? Volverá al estado Aceptado.", "Sí, recuperar", enviar);
 }
 
 //funcion para eliminar definitivamente una compra anulada (no se puede deshacer)
-function eliminarDefinitivoIngreso(idingreso){
-	bootbox.confirm({
-		title: "Eliminar compra definitivamente",
-		message: "Esta acción no se puede deshacer. Se eliminará la compra, su detalle y se descontará el stock que había ingresado. ¿Deseas continuar?",
-		buttons: {
-			confirm: { label: "Sí, eliminar definitivo", className: "btn-danger" },
-			cancel: { label: "Cancelar", className: "btn-default" }
-		},
-		callback: function(result){
-			if (result) {
-				$.post("../ajax/ingreso.php?op=eliminarDefinitivo", {idingreso : idingreso}, function(data){
-					var r = parseJsonIngreso(data);
-					notifyIngreso(r.ok ? "success" : "error", r.message || (r.ok ? "Compra eliminada" : "No se pudo eliminar la compra"));
-					if (r.ok) {
-						tabla.ajax.reload();
-					}
-				});
-			}
-		}
-	});
+function eliminarDefinitivoIngreso(idingreso, comprobante){
+	var aut = autCompra(idingreso, "Eliminar compra definitivamente", comprobante,
+		"Se eliminará la compra y su detalle, y se descontará el stock que había ingresado. No se puede deshacer.", "Autorizar y eliminar", true);
+	var enviar = accionCompra("../ajax/ingreso.php?op=eliminarDefinitivo", {idingreso: idingreso}, aut,
+		function(){ tabla.ajax.reload(null, false); });
+	confirmarAccionCompra(aut, "Esta acción no se puede deshacer. Se eliminará la compra, su detalle y se descontará el stock que había ingresado. ¿Deseas continuar?", "Sí, eliminar definitivo", enviar);
 }
 
 // Descartar un borrador desde el listado
@@ -908,6 +933,7 @@ function leerFila($fila){
 	return {
 		iddetalle:         parseInt($fila.attr("data-iddetalle"), 10) || 0,
 		idarticulo:        $fila.find('input[name="idarticulo[]"]').val(),
+		idpresentacion:    $fila.find('input[name="idpresentacion[]"]').val() || 0,
 		cantidad:          $fila.find('input[name="cantidad[]"]').val(),
 		precio_compra:     $fila.find('input[name="precio_compra[]"]').val(),
 		precio_venta:      $fila.find('input[name="precio_venta[]"]').val(),
@@ -1028,6 +1054,76 @@ function actualizarResumenGuardado(){
 	setAutoguardadoEstado(texto, guardadas === total ? "text-success" : "text-warning");
 }
 
+// ── Presentaciones de compra (Caja x100, Blíster x10, Tableta...) ──
+// La cantidad y los precios de la fila son por presentación; el stock y el
+// lote se registran en la unidad base (cantidad x factor).
+var presCacheIng = {};
+
+function obtenerPresentacionesIng(idarticulo){
+	var id = parseInt(idarticulo, 10) || 0;
+	if (presCacheIng[id]) return $.Deferred().resolve(presCacheIng[id]).promise();
+	return $.getJSON("../ajax/ingreso.php?op=presentaciones&id=" + id).then(function(r){
+		var lista = (r && r.ok && r.data) ? r.data : [];
+		presCacheIng[id] = lista;
+		return lista;
+	}, function(){ return $.Deferred().resolve([]).promise(); });
+}
+
+function etiquetaPresIng(p){
+	return (p.unidad || p.abrev || 'und') + (p.factor > 1 ? ' x' + (+p.factor) : '');
+}
+
+function presBaseIng(lista){
+	for (var i = 0; i < lista.length; i++) { if (lista[i].es_base) return lista[i]; }
+	return lista[0] || null;
+}
+
+function equivalenciaPresIng(lista, id){
+	var base = presBaseIng(lista);
+	for (var i = 0; i < lista.length; i++) {
+		if (String(lista[i].id) === String(id) && lista[i].factor > 1 && base) {
+			return '= ' + (+lista[i].factor) + ' ' + escHtml(base.abrev);
+		}
+	}
+	return '';
+}
+
+/** Celda de presentación: selector si el producto tiene varias, texto si tiene una */
+function celdaPresentacionHtml(lista, idpres, unidad){
+	lista = lista || [];
+	if (lista.length <= 1) {
+		var u = lista.length ? lista[0].abrev : (unidad || 'und');
+		var id = lista.length ? lista[0].id : (idpres || 0);
+		return '<input type="hidden" name="idpresentacion[]" value="' + escHtml(id) + '">' + escHtml(u);
+	}
+	var opts = '';
+	for (var i = 0; i < lista.length; i++) {
+		opts += '<option value="' + lista[i].id + '"' + (String(lista[i].id) === String(idpres) ? ' selected' : '') + '>' + escHtml(etiquetaPresIng(lista[i])) + '</option>';
+	}
+	return '<input type="hidden" name="idpresentacion[]" value="' + escHtml(idpres) + '">' +
+		'<select class="form-control input-sm sel-pres-ing" style="min-width:105px" onchange="cambiarPresentacionIngreso(this)" title="¿En qué presentación viene en la factura?">' + opts + '</select>' +
+		'<small class="pres-equiv text-muted">' + equivalenciaPresIng(lista, idpres) + '</small>';
+}
+
+function cambiarPresentacionIngreso(sel){
+	var $fila = $(sel).closest("tr.filas");
+	var idart = $fila.find('input[name="idarticulo[]"]').val();
+	var lista = presCacheIng[parseInt(idart, 10)] || [];
+	var id = $(sel).val();
+	$fila.find('input[name="idpresentacion[]"]').val(id);
+	$fila.find('.pres-equiv').html(equivalenciaPresIng(lista, id));
+	for (var i = 0; i < lista.length; i++) {
+		if (String(lista[i].id) === String(id)) {
+			$fila.find('.td-pres').attr('data-unidad', lista[i].abrev);
+			if (lista[i].precio_lista > 0) $fila.find('input[name="precio_venta[]"]').val(parseFloat(lista[i].precio_lista).toFixed(2));
+		}
+	}
+	modificarSubtotales();
+	marcarFilaSucia($fila);
+	programarAutoguardado($fila, 400);
+	guardarBorradorIngreso();
+}
+
 // ── Construcción de filas del carrito ─────────────────────────────
 function filaCarritoHtml(it, idx){
 	var cant = normalizarCantidadEntera(it.cantidad || 1, 1);
@@ -1040,7 +1136,7 @@ function filaCarritoHtml(it, idx){
 	return '<tr class="filas" id="fila' + idx + '" data-idx="' + idx + '" data-iddetalle="' + iddet + '" data-guardado="' + (iddet > 0 ? '1' : '0') + '" data-estado="' + (iddet > 0 ? 'guardado' : 'pendiente') + '">' +
 		'<td><button type="button" class="btn btn-danger" onclick="eliminarDetalle(' + idx + ')" title="Quitar de la compra">X</button></td>' +
 		'<td><input type="hidden" name="idarticulo[]" value="' + escHtml(it.idarticulo) + '">' + escHtml(it.nombre) + '</td>' +
-		'<td>' + escHtml(it.unidad || 'und') + '</td>' +
+		'<td class="td-pres" data-unidad="' + escHtml(it.unidad || 'und') + '">' + celdaPresentacionHtml(it.presentaciones, it.idpresentacion || 0, it.unidad) + '</td>' +
 		'<td><input type="number" step="1" min="1" name="cantidad[]" value="' + cant + '" oninput="modificarSubtotales()"></td>' +
 		'<td><input type="number" step="0.01" min="0.01" name="precio_compra[]" value="' + pc.toFixed(2) + '" oninput="modificarSubtotales()"></td>' +
 		'<td><input type="number" step="0.01" min="0.01" name="precio_venta[]" value="' + pv.toFixed(2) + '"></td>' +
@@ -1058,18 +1154,38 @@ function agregarFilaCarrito(it){
 	detalles++;
 	var $tbody = $("#detalles tbody");
 	if ($tbody.length) { $tbody.append(html); } else { $("#detalles").append(html); }
-	return $("#fila" + idx);
+	var $fila = $("#fila" + idx);
+	// Filas restauradas (borrador): cargar el selector de presentaciones
+	if (!it.presentaciones) {
+		obtenerPresentacionesIng(it.idarticulo).done(function(lista){
+			if (!lista.length || !$.contains(document, $fila[0])) return;
+			var actual = $fila.find('input[name="idpresentacion[]"]').val();
+			if (!(parseInt(actual, 10) > 0)) { var b = presBaseIng(lista); actual = b ? b.id : 0; }
+			$fila.find('.td-pres').html(celdaPresentacionHtml(lista, actual, it.unidad));
+		});
+	}
+	return $fila;
 }
 
 function agregarDetalle(idarticulo,articulo,unidad,precio_compra_ref){
 	if (modoVer) return;
+	if (idarticulo != "" && !presCacheIng[parseInt(idarticulo, 10)]) {
+		obtenerPresentacionesIng(idarticulo).always(function(){ agregarDetalle(idarticulo, articulo, unidad, precio_compra_ref); });
+		return;
+	}
+	var listaPres = presCacheIng[parseInt(idarticulo, 10)] || [];
+	// Lo usual es comprar por la presentación más grande (caja)
+	var presSug = null;
+	for (var ps = 0; ps < listaPres.length; ps++) { if (!presSug || listaPres[ps].factor > presSug.factor) presSug = listaPres[ps]; }
+	var idPresSug = presSug ? presSug.id : 0;
 	var precio_compra=(precio_compra_ref && parseFloat(precio_compra_ref) > 0) ? parseFloat(precio_compra_ref) : 1;
 	var articulos = document.getElementsByName("idarticulo[]");
 	var cantidades = document.getElementsByName("cantidad[]");
 
 	if (idarticulo!="") {
 		for (var i = 0; i < articulos.length; i++) {
-			if (parseInt(articulos[i].value, 10) === parseInt(idarticulo, 10)) {
+			var presFilaI = $(articulos[i]).closest("tr.filas").find('input[name="idpresentacion[]"]').val() || 0;
+			if (parseInt(articulos[i].value, 10) === parseInt(idarticulo, 10) && String(presFilaI) === String(idPresSug)) {
 				var nuevaCantidad = normalizarCantidadEntera(parseFloat(cantidades[i].value || 0) + 1, 1);
 				cantidades[i].value = nuevaCantidad;
 				modificarSubtotales();
@@ -1084,8 +1200,11 @@ function agregarDetalle(idarticulo,articulo,unidad,precio_compra_ref){
 		}
 
 		var $fila = agregarFilaCarrito({
-			idarticulo: idarticulo, nombre: articulo, unidad: unidad || "und",
-			cantidad: 1, precio_compra: precio_compra, precio_venta: 1, numero_lote: '', fecha_vencimiento: ''
+			idarticulo: idarticulo, nombre: articulo, unidad: presSug ? presSug.abrev : (unidad || "und"),
+			presentaciones: listaPres, idpresentacion: idPresSug,
+			cantidad: 1, precio_compra: precio_compra,
+			precio_venta: (presSug && presSug.precio_lista > 0) ? presSug.precio_lista : 1,
+			numero_lote: '', fecha_vencimiento: ''
 		});
 		setEstadoFila($fila, "incompleta", "Falta: vencimiento");
 		modificarSubtotales();
@@ -1328,7 +1447,8 @@ function itemsCarritoLocal(){
 			iddetalle:         d.iddetalle,
 			idarticulo:        d.idarticulo,
 			nombre:            nombreFila($f),
-			unidad:            $f.find('td').eq(2).text().trim(),
+			unidad:            $f.find('.td-pres').attr('data-unidad') || $f.find('td').eq(2).text().trim(),
+			idpresentacion:    d.idpresentacion,
 			cantidad:          d.cantidad,
 			precio_compra:     d.precio_compra,
 			precio_venta:      d.precio_venta,
@@ -1500,7 +1620,18 @@ function descartarBorradorAmpliar() {
 }
 
 // ── Ampliar ingreso existente (Aceptado) ──────────────────────────
-function abrirAmpliarIngreso(idingreso) {
+function abrirAmpliarIngreso(idingreso, comprobante) {
+	appAutorizar({
+		recurso: "ingreso:" + idingreso,
+		titulo: "Agregar productos a una compra registrada",
+		detalle: comprobante || "",
+		mensaje: "Podrás agregar o corregir productos de esta compra durante los próximos minutos.",
+		boton: "Autorizar",
+		onAutorizado: function(){ abrirAmpliarIngresoAutorizado(idingreso); }
+	});
+}
+
+function abrirAmpliarIngresoAutorizado(idingreso) {
 	modoAmpliar = true;
 	modoVer = false;
 	mostrarform(true);
@@ -1576,7 +1707,22 @@ function recalcFilaDetalle(input) {
 	$fila.find('.det-subtotal').text((cant * pcom).toFixed(2));
 }
 
+// Editar o quitar productos de una compra registrada pide autorización si no hay permiso
+function autDetalleCompra(titulo, mensaje, peligro){
+	var idingreso = parseInt($("#idingreso").val(), 10) || 0;
+	var $c = $("#serie_comprobante"), $n = $("#num_comprobante");
+	var comp = $.trim(($("#tipo_comprobante").val() || "") + " " + ($c.val() || "") + ($n.val() ? "-" + $n.val() : ""));
+	return { recurso: "ingreso:" + idingreso, titulo: titulo, detalle: comp, mensaje: mensaje,
+		boton: peligro ? "Autorizar y quitar" : "Autorizar y guardar", peligro: !!peligro };
+}
+
 function guardarFilaDetalle(iddetalle) {
+	var aut = autDetalleCompra("Modificar producto de una compra registrada",
+		"Se actualizarán la cantidad, precios, lote o vencimiento de este producto.", false);
+	appAutorizar($.extend({}, aut, { onAutorizado: function(){ guardarFilaDetalleAutorizado(iddetalle, aut); } }));
+}
+
+function guardarFilaDetalleAutorizado(iddetalle, aut) {
 	var $fila = $('[data-iddetalle="' + iddetalle + '"]').filter(function(){ return $(this).find('input[name="det_cantidad"]').length > 0; }).first();
 	var cantidad          = $fila.find('input[name="det_cantidad"]').val();
 	var precio_compra     = $fila.find('input[name="det_precio_compra"]').val();
@@ -1612,6 +1758,7 @@ function guardarFilaDetalle(iddetalle) {
 		fecha_vencimiento: fecha_vencimiento
 	}, function(resp) {
 		var r = parseJsonIngreso(resp);
+		if (appAutorizar.manejar(r, aut, function(){ guardarFilaDetalleAutorizado(iddetalle, aut); })) { $btn.prop("disabled", false); return; }
 		if (r.ok) {
 			notifyIngreso("success", r.message || "Detalle actualizado.");
 			if (typeof r.nuevo_total !== "undefined") {
@@ -1641,15 +1788,24 @@ function guardarFilaDetalle(iddetalle) {
 }
 
 function eliminarFilaDetalle(iddetalle) {
-	if (!confirm("¿Eliminar este artículo de la compra? Esta acción no se puede deshacer.")) {
-		return;
-	}
+	var aut = autDetalleCompra("Quitar producto de una compra registrada",
+		"El producto se quitará de la compra y se descontará su stock. No se puede deshacer.", true);
+	appAutorizar($.extend({}, aut, { onAutorizado: function(yaConfirmado){
+		if (yaConfirmado) { eliminarFilaDetalleAutorizado(iddetalle, aut); return; }
+		bootbox.confirm("¿Quitar este producto de la compra? Esta acción no se puede deshacer.", function(ok){
+			if (ok) eliminarFilaDetalleAutorizado(iddetalle, aut);
+		});
+	}}));
+}
+
+function eliminarFilaDetalleAutorizado(iddetalle, aut) {
 	var $fila = $('[data-iddetalle="' + iddetalle + '"]').filter(function(){ return $(this).find('input[name="det_cantidad"]').length > 0; }).first();
 	var $btn = $fila.find('.btn-danger');
 	$btn.prop("disabled", true);
 
 	$.post("../ajax/ingreso.php?op=eliminarDetalle", { iddetalle: iddetalle }, function(resp) {
 		var r = parseJsonIngreso(resp);
+		if (appAutorizar.manejar(r, aut, function(){ eliminarFilaDetalleAutorizado(iddetalle, aut); })) { $btn.prop("disabled", false); return; }
 		if (r.ok) {
 			notifyIngreso("success", r.message || "Artículo eliminado de la compra.");
 			if (typeof r.nuevo_total !== "undefined") {

@@ -5,8 +5,17 @@ if (!isset($_SESSION['idusuario'])) {
     exit;
 }
 require_once "../modelos/Articulo.php";
+require_once "../modelos/Presentacion.php";
 
 $articulo=new Articulo();
+$presMdl = new Presentacion();
+
+// Presentaciones adicionales enviadas por el formulario (JSON): [{idunidad, factor, precio, codigo}]
+function presentacionesDelFormulario(){
+	$raw = isset($_POST['presentaciones_json']) ? (string)$_POST['presentaciones_json'] : '';
+	$lista = json_decode($raw, true);
+	return is_array($lista) ? $lista : array();
+}
 
 // Máximo de imágenes que admite un artículo (imagen, imagen2, imagen3)
 define('ART_MAX_IMAGENES', 3);
@@ -80,6 +89,14 @@ switch ($_GET["op"]) {
 		echo "Sin permiso para modificar artículos";
 		break;
 	}
+	// Las presentaciones se revisan antes de guardar el producto: si algo no tiene sentido no se guarda nada.
+	if (Presentacion::disponible()) {
+		$problemaPres = $presMdl->validar($idunidad, $precio_venta, $forma_farmaceutica, presentacionesDelFormulario());
+		if ($problemaPres !== '') {
+			echo "No se guardó: " . $problemaPres;
+			break;
+		}
+	}
 	// Resolver los 3 slots de imagen y compactarlos: la galería nunca queda con huecos,
 	// así la primera imagen siempre es la principal (la que usan venta, reportes y tickets).
 	$imagenes = array();
@@ -100,15 +117,39 @@ switch ($_GET["op"]) {
 			$laboratorio,$registro_sanitario,$requiere_frio,$tipo_venta,
 			$en_oferta,$descuento_porcentaje,$oferta_fecha_inicio,$oferta_fecha_fin,
 			$imagen2,$imagen3);
-		echo $rspta ? "Datos registrados correctamente" : "No se pudo registrar los datos";
+		if ($rspta) {
+			$rp = $presMdl->sincronizar((int)$rspta, presentacionesDelFormulario());
+			echo $rp['ok'] ? "Datos registrados correctamente" : "Producto registrado, pero las presentaciones no se guardaron: ".$rp['message'];
+		} else {
+			echo "No se pudo registrar los datos";
+		}
 	}else{
 		$rspta=$articulo->editar($idarticulo,$idcategoria,$idunidad,$codigo,$nombre,$stock,$stock_minimo,$precio_venta,$descripcion,$imagen,
 			$principio_activo,$concentracion,$forma_farmaceutica,$via_administracion,
 			$laboratorio,$registro_sanitario,$requiere_frio,$tipo_venta,
 			$en_oferta,$descuento_porcentaje,$oferta_fecha_inicio,$oferta_fecha_fin,
 			$imagen2,$imagen3);
-		echo $rspta ? "Datos actualizados correctamente" : "No se pudo actualizar los datos";
+		if ($rspta) {
+			$rp = $presMdl->sincronizar((int)$idarticulo, presentacionesDelFormulario());
+			echo $rp['ok'] ? "Datos actualizados correctamente" : "Producto actualizado, pero las presentaciones no se guardaron: ".$rp['message'];
+		} else {
+			echo "No se pudo actualizar los datos";
+		}
 	}
+		break;
+
+	// Pasar un producto contado por caja (u otra unidad grande) a una unidad más pequeña
+	case 'convertirUnidadBase':
+		if (!isset($_SESSION['almacen']) || $_SESSION['almacen'] != 1) {
+			echo json_encode(array("ok"=>false, "message"=>"No tienes permiso para modificar productos"));
+			break;
+		}
+		echo json_encode($presMdl->convertirUnidadBase(
+			(int)$idarticulo,
+			isset($_POST['idunidad_nueva']) ? (int)$_POST['idunidad_nueva'] : 0,
+			isset($_POST['factor']) ? (float)$_POST['factor'] : 0,
+			isset($_POST['precio_base']) ? (float)$_POST['precio_base'] : 0
+		));
 		break;
 	
 
@@ -130,6 +171,9 @@ switch ($_GET["op"]) {
 		if (is_array($rspta)) {
 			$rspta["stock"] = (int)round((float)$rspta["stock"]);
 			$rspta["stock_minimo"] = (int)round((float)$rspta["stock_minimo"]);
+			$rspta["presentaciones"] = $presMdl->listarPorArticulo((int)$rspta["idarticulo"]);
+			$rspta["presentaciones_disponible"] = Presentacion::disponible();
+			$rspta["stock_desglose"] = Presentacion::desglosarStock($rspta["stock"], $rspta["presentaciones"]);
 		}
 		echo json_encode($rspta);
 		break;
@@ -137,9 +181,20 @@ switch ($_GET["op"]) {
     case 'listar':
 		$rspta=$articulo->listar();
 		$data=Array();
+		$filasArt = array();
+		while ($r0 = $rspta->fetch_object()) { $filasArt[] = $r0; }
+		$mapaPres = $presMdl->mapaPorArticulos(array_map(function($r){ return (int)$r->idarticulo; }, $filasArt));
+		$rspta = new ArrayIterator($filasArt);
 
-		while ($reg=$rspta->fetch_object()) {
+		foreach ($rspta as $reg) {
 			$dias = ($reg->dias_para_vencer !== null) ? (int)$reg->dias_para_vencer : null;
+			$presArt = isset($mapaPres[(int)$reg->idarticulo]) ? $mapaPres[(int)$reg->idarticulo] : array();
+			$unidadCol = htmlspecialchars((string)$reg->abreviatura);
+			if (count($presArt) > 1) {
+				$partes = array();
+				foreach ($presArt as $pa) { $partes[] = htmlspecialchars($pa['abrev']).($pa['factor'] > 1 ? ' x'.(0 + $pa['factor']) : ''); }
+				$unidadCol = '<span title="Se vende por: '.implode(', ', $partes).'"><i class="fa fa-cubes text-primary"></i> '.implode(' · ', $partes).'</span>';
+			}
 			if ($reg->prox_vencimiento === null) {
 				$vencCol = '<span class="text-muted">Sin lotes</span>';
 			} elseif ($dias < 0) {
@@ -173,7 +228,7 @@ switch ($_GET["op"]) {
             "0"=>'<button class="btn btn-warning btn-xs" title="Editar" onclick="mostrar('.$reg->idarticulo.')"><i class="fa fa-pencil"></i></button>'.' <button class="btn btn-danger btn-xs" title="Eliminar" onclick="eliminar('.$reg->idarticulo.')"><i class="fa fa-trash"></i></button>'.($reg->condicion ? '' : ' <button class="btn btn-primary btn-xs" title="Activar" onclick="activar('.$reg->idarticulo.')"><i class="fa fa-check"></i></button>'),
             "1"=>$reg->nombre,
             "2"=>$reg->categoria,
-            "3"=>$reg->abreviatura,
+            "3"=>$unidadCol,
             "4"=>$reg->codigo,
             "5"=>(int)round((float)$reg->stock),
             "6"=>(int)round((float)$reg->stock_minimo),

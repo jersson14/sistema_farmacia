@@ -2014,3 +2014,42 @@ body {
   box-shadow: 0 0 0 3px rgba(239,68,68,.15);
 }
 .fgroup .err-text { font-size: 12.5px; color: #b91c1c; margin-top: 5px; font-weight: 600; }
+
+/* ── Presentaciones de venta (Tableta, Blíster x10, Caja x100...) ── */
+.pc-pres {
+  margin: 4px 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pc-desde { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.pm-pres { margin: 0 0 16px; }
+.pm-pres-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+.pm-pres-opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.pm-pres-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+.pm-pres-opt:hover:not(:disabled) { border-color: var(--primary-light); background: var(--primary-xlight); }
+.pm-pres-opt.activa { border-color: var(--primary); background: var(--primary-xlight); box-shadow: 0 0 0 3px rgba(29, 78, 216, .12); }
+.pm-pres-opt:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.pm-pres-opt:disabled { opacity: .5; cursor: not-allowed; }
+.pm-pres-nombre { font-size: 14px; font-weight: 700; color: var(--text); }
+.pm-pres-precio { font-size: 15px; font-weight: 800; color: var(--primary); }
+.pm-pres-equiv { font-size: 11.5px; color: var(--text-secondary); }
+.ci-pres { font-size: 12.5px; font-weight: 600; color: var(--primary); margin: 2px 0; }

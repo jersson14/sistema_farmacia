@@ -32,7 +32,7 @@ $sym   = obtenerSimboloMoneda(!empty($emp['moneda']) ? $emp['moneda'] : 'PEN');
 // Datos
 $sql = "SELECT a.codigo, a.nombre,
                IFNULL(a.principio_activo,'') AS principio_activo,
-               SUM(dv.cantidad) AS total_vendido,
+               SUM(dv.cantidad*dv.factor) AS total_vendido,
                SUM(dv.cantidad * dv.precio_venta - dv.descuento) AS total_importe,
                COUNT(DISTINCT dv.idventa) AS num_ventas
         FROM detalle_venta dv

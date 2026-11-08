@@ -33,7 +33,8 @@ switch ($op) {
         foreach ($_SESSION['carrito_tienda'] as $id => $item) {
             $sub      = round($item['precio'] * $item['cantidad'], 2);
             $subtotal += $sub;
-            $items[]  = array('idarticulo'=>$item['idarticulo'],'cantidad'=>$item['cantidad']);
+            $items[]  = array('idarticulo'=>$item['idarticulo'],'cantidad'=>$item['cantidad'],
+                              'idpresentacion'=>isset($item['idpresentacion']) ? (int)$item['idpresentacion'] : 0);
         }
         $tipoEntrega   = in_array($_POST['tipo_entrega'] ?? '', array('ENVIO','RECOJO'), true) ? $_POST['tipo_entrega'] : 'ENVIO';
         $envioGratis   = (float)$cfgTienda->obtener('envio_gratis_desde', 80);

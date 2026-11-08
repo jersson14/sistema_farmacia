@@ -1,5 +1,6 @@
 <?php 
 require_once "../modelos/Venta.php";
+require_once "../config/Autorizacion.php";
 if (strlen(session_id())<1) 
 	session_start();
 
@@ -77,7 +78,7 @@ switch ($_GET["op"]) {
 		$seguro_nombre           = isset($_POST['seguro_nombre'])           ? limpiarCadena($_POST['seguro_nombre'])           : '';
 		$seguro_copago           = isset($_POST['seguro_copago'])           ? (float)$_POST['seguro_copago']                   : 0;
 		$seguro_nro_autorizacion = isset($_POST['seguro_nro_autorizacion']) ? limpiarCadena($_POST['seguro_nro_autorizacion']) : '';
-		$rspta=$venta->insertar($idcliente,$idusuario,$tipo_comprobante,$serie_comprobante,$num_comprobante,$fecha_hora,$impuesto,$total_venta,$_POST["idarticulo"],$_POST["cantidad"],$_POST["precio_venta"],$_POST["descuento"],$metodo_pago,$monto_efectivo,$monto_tarjeta,$monto_digital,$seguro_nombre,$seguro_copago,$seguro_nro_autorizacion);
+		$rspta=$venta->insertar($idcliente,$idusuario,$tipo_comprobante,$serie_comprobante,$num_comprobante,$fecha_hora,$impuesto,$total_venta,$_POST["idarticulo"],$_POST["cantidad"],$_POST["precio_venta"],$_POST["descuento"],$metodo_pago,$monto_efectivo,$monto_tarjeta,$monto_digital,$seguro_nombre,$seguro_copago,$seguro_nro_autorizacion,isset($_POST["idpresentacion"]) && is_array($_POST["idpresentacion"]) ? $_POST["idpresentacion"] : array());
 		if (is_array($rspta)) {
 			if (!empty($rspta["ok"])) {
 				echo json_encode(array(
@@ -115,20 +116,23 @@ switch ($_GET["op"]) {
 	
 
 	case 'anular':
-		if (!isset($_SESSION['acceso']) || $_SESSION['acceso'] != 1) {
-			echo "Sin permiso: solo administradores pueden anular ventas";
+		if (!autPuede('venta', $idventa)) {
+			echo json_encode(autRespuestaRequerida('Para anular una venta necesitas la autorización de un administrador.'));
 			break;
 		}
 		$rspta=$venta->anular($idventa, $idusuario);
-		echo $rspta ? "Venta anulada correctamente" : "No se pudo anular la venta";
+		if ($rspta) autConsumir('venta', $idventa);
+		echo json_encode(array("ok"=>(bool)$rspta, "message"=>$rspta ? "Venta anulada correctamente" : "No se pudo anular la venta. Inténtalo de nuevo."));
 		break;
 	
 	case 'eliminarDefinitivo':
-		if (!isset($_SESSION['acceso']) || $_SESSION['acceso'] != 1) {
-			echo json_encode(array("ok"=>false, "message"=>"Solo un administrador puede eliminar ventas"));
+		if (!autPuede('venta', $idventa)) {
+			echo json_encode(autRespuestaRequerida('Para eliminar una venta necesitas la autorización de un administrador.'));
 			break;
 		}
-		echo json_encode($venta->eliminarDefinitivo($idventa));
+		$rspta = $venta->eliminarDefinitivo($idventa);
+		if (!empty($rspta['ok'])) autConsumir('venta', $idventa);
+		echo json_encode($rspta);
 		break;
 
 	case 'mostrar':
@@ -219,8 +223,10 @@ switch ($_GET["op"]) {
                 'MIXTO'         => 'bg-orange',
             );
             $metodoBadge = '<span class="label '.($metodoBadgeColors[$metodo] ?? 'bg-gray').'">'.$metodo.'</span>';
+            $compArg = htmlspecialchars(json_encode($reg->tipo_comprobante.' '.$reg->serie_comprobante.'-'.$reg->num_comprobante), ENT_QUOTES);
+            $lock = autCandado('venta', $reg->idventa);
 			$data[]=array(
-            "0"=>(($reg->estado=='Aceptado')?'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idventa.')"><i class="fa fa-eye"></i></button>'.' '.'<button class="btn btn-danger btn-xs" onclick="anular('.$reg->idventa.')"><i class="fa fa-close"></i></button>':'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idventa.')"><i class="fa fa-eye"></i></button> <button class="btn btn-danger btn-xs" title="Eliminar venta anulada" onclick="eliminarVenta('.$reg->idventa.')"><i class="fa fa-trash"></i></button>').
+            "0"=>(($reg->estado=='Aceptado')?'<button class="btn btn-warning btn-xs" title="Ver venta" onclick="mostrar('.$reg->idventa.')"><i class="fa fa-eye"></i></button>'.' '.'<button class="btn btn-danger btn-xs" title="Anular venta" onclick="anular('.$reg->idventa.','.$compArg.')"><i class="fa fa-close"></i>'.$lock.'</button>':'<button class="btn btn-warning btn-xs" title="Ver venta" onclick="mostrar('.$reg->idventa.')"><i class="fa fa-eye"></i></button> <button class="btn btn-danger btn-xs" title="Eliminar venta anulada" onclick="eliminarVenta('.$reg->idventa.','.$compArg.')"><i class="fa fa-trash"></i>'.$lock.'</button>').
             '<a target="_blank" href="'.$url.$reg->idventa.'"> <button class="btn btn-info btn-xs"><i class="fa fa-file"></i></button></a>',
             "1"=>$reg->fecha,
             "2"=>$reg->cliente,
@@ -367,7 +373,13 @@ switch ($_GET["op"]) {
 			$art = new Articulo();
 			$resultado = $art->listarActivosVenta();
 			$items = array();
-			while ($reg = $resultado->fetch_object()) {
+			$filasGrid = array();
+			while ($reg = $resultado->fetch_object()) { $filasGrid[] = $reg; }
+			// Presentaciones de venta (Tableta, Blíster, Caja...) de todos los productos en una sola consulta
+			require_once "../modelos/Presentacion.php";
+			$presMdl = new Presentacion();
+			$mapaPres = $presMdl->mapaPorArticulos(array_map(function($r){ return (int)$r->idarticulo; }, $filasGrid));
+			foreach ($filasGrid as $reg) {
 				$precio = is_null($reg->precio_venta) ? 0 : (float)$reg->precio_venta;
 				$stock  = (int)round((float)$reg->stock);
 				$items[] = array(
@@ -386,7 +398,8 @@ switch ($_GET["op"]) {
 					'en_oferta'      => !empty($reg->en_oferta) ? 1 : 0,
 					'descuento_porcentaje' => isset($reg->descuento_porcentaje) ? (float)$reg->descuento_porcentaje : 0,
 					'tipo_venta'     => !empty($reg->tipo_venta) ? $reg->tipo_venta : 'OTC',
-					'imagen'         => !empty($reg->imagen) ? $reg->imagen : ''
+					'imagen'         => !empty($reg->imagen) ? $reg->imagen : '',
+					'presentaciones' => isset($mapaPres[(int)$reg->idarticulo]) ? $mapaPres[(int)$reg->idarticulo] : array()
 				);
 			}
 			echo json_encode(array('ok' => true, 'data' => $items));
@@ -406,8 +419,18 @@ switch ($_GET["op"]) {
 		case 'buscarArticuloCodigo':
 			$codigo = isset($_POST['codigo']) ? limpiarCadena($_POST['codigo']) : '';
 			require_once "../modelos/Articulo.php";
+			require_once "../modelos/Presentacion.php";
 			$articulo=new Articulo();
-			$reg = $articulo->buscarActivoPorCodigo($codigo);
+			$presMdl = new Presentacion();
+			// Primero: ¿es el código de barras de una presentación (caja, blíster)?
+			$idpresCodigo = 0;
+			$porPres = $presMdl->buscarPorCodigo($codigo);
+			if ($porPres) {
+				$idpresCodigo = (int)$porPres[1];
+				$reg = $articulo->buscarActivoPorId((int)$porPres[0]);
+			} else {
+				$reg = $articulo->buscarActivoPorCodigo($codigo);
+			}
 			if (!$reg) {
 				echo json_encode(array("ok"=>false,"message"=>"No se encontro un articulo con ese codigo"));
 				break;
@@ -425,7 +448,9 @@ switch ($_GET["op"]) {
 				"en_oferta"=>!empty($reg['en_oferta']) ? 1 : 0,
 				"unidad"=>$reg['abreviatura'],
 				"stock"=>(int)round((float)$reg['stock']),
-				"tipo_venta"=>(!empty($reg['tipo_venta']) ? $reg['tipo_venta'] : 'OTC')
+				"tipo_venta"=>(!empty($reg['tipo_venta']) ? $reg['tipo_venta'] : 'OTC'),
+				"presentaciones"=>$presMdl->listarPorArticulo((int)$reg['idarticulo']),
+				"idpresentacion"=>$idpresCodigo
 			));
 			break;
 }

@@ -123,7 +123,7 @@ public function topproductosvendidos($limit=7){
 	$limit=(int)$limit;
 	if ($limit<=0) $limit=7;
 	$sql="SELECT a.nombre AS producto,
-	IFNULL(SUM(dv.cantidad),0) AS cantidad,
+	IFNULL(SUM(dv.cantidad*dv.factor),0) AS cantidad,
 	IFNULL(SUM((dv.cantidad*dv.precio_venta)-dv.descuento),0) AS total
 	FROM detalle_venta dv
 	INNER JOIN articulo a ON a.idarticulo=dv.idarticulo
@@ -176,16 +176,16 @@ public function utilidadPorPeriodo($fecha_inicio,$fecha_fin){
 	a.codigo,
 	a.nombre AS articulo,
 	IFNULL(c.nombre,'SIN CATEGORIA') AS categoria,
-	IFNULL(SUM(dv.cantidad),0) AS cantidad_vendida,
+	IFNULL(SUM(dv.cantidad*dv.factor),0) AS cantidad_vendida,
 	IFNULL(SUM((dv.cantidad*dv.precio_venta)-dv.descuento),0) AS venta_total,
-	IFNULL(SUM(dv.cantidad*IFNULL(cp.costo_unitario,0)),0) AS costo_estimado
+	IFNULL(SUM(dv.cantidad*dv.factor*IFNULL(cp.costo_unitario,0)),0) AS costo_estimado
 	FROM detalle_venta dv
 	INNER JOIN venta v ON v.idventa=dv.idventa
 	INNER JOIN articulo a ON a.idarticulo=dv.idarticulo
 	LEFT JOIN categoria c ON c.idcategoria=a.idcategoria
 	LEFT JOIN (
 		SELECT di.idarticulo,
-		CASE WHEN SUM(di.cantidad)>0 THEN SUM(di.cantidad*di.precio_compra)/SUM(di.cantidad) ELSE 0 END AS costo_unitario
+		CASE WHEN SUM(di.cantidad*di.factor)>0 THEN SUM(di.cantidad*di.precio_compra)/SUM(di.cantidad*di.factor) ELSE 0 END AS costo_unitario
 		FROM detalle_ingreso di
 		INNER JOIN ingreso i ON i.idingreso=di.idingreso
 		WHERE DATE(i.fecha_hora)>='$fecha_inicio' AND DATE(i.fecha_hora)<='$fecha_fin'
@@ -209,7 +209,7 @@ public function topProductosPeriodo($fecha_inicio,$fecha_fin,$limit=20,$modo='MA
 	a.nombre AS articulo,
 	IFNULL(c.nombre,'SIN CATEGORIA') AS categoria,
 	IFNULL(u.abreviatura,'und') AS unidad,
-	IFNULL(SUM(CASE WHEN v.idventa IS NOT NULL THEN dv.cantidad ELSE 0 END),0) AS cantidad,
+	IFNULL(SUM(CASE WHEN v.idventa IS NOT NULL THEN dv.cantidad*dv.factor ELSE 0 END),0) AS cantidad,
 	IFNULL(SUM(CASE WHEN v.idventa IS NOT NULL THEN ((dv.cantidad*dv.precio_venta)-dv.descuento) ELSE 0 END),0) AS total
 	FROM articulo a
 	LEFT JOIN categoria c ON c.idcategoria=a.idcategoria
@@ -288,8 +288,8 @@ public function kardexValorizado($fecha_inicio,$fecha_fin){
 	LEFT JOIN (
 		SELECT
 		di.idarticulo,
-		IFNULL(SUM(di.cantidad),0) AS entrada,
-		CASE WHEN SUM(di.cantidad)>0 THEN SUM(di.cantidad*di.precio_compra)/SUM(di.cantidad) ELSE 0 END AS costo_promedio
+		IFNULL(SUM(di.cantidad*di.factor),0) AS entrada,
+		CASE WHEN SUM(di.cantidad*di.factor)>0 THEN SUM(di.cantidad*di.precio_compra)/SUM(di.cantidad*di.factor) ELSE 0 END AS costo_promedio
 		FROM detalle_ingreso di
 		INNER JOIN ingreso i ON i.idingreso=di.idingreso
 		WHERE DATE(i.fecha_hora)>='$fecha_inicio' AND DATE(i.fecha_hora)<='$fecha_fin'
@@ -299,7 +299,7 @@ public function kardexValorizado($fecha_inicio,$fecha_fin){
 	LEFT JOIN (
 		SELECT
 		dv.idarticulo,
-		IFNULL(SUM(dv.cantidad),0) AS salida
+		IFNULL(SUM(dv.cantidad*dv.factor),0) AS salida
 		FROM detalle_venta dv
 		INNER JOIN venta v ON v.idventa=dv.idventa
 		WHERE DATE(v.fecha_hora)>='$fecha_inicio' AND DATE(v.fecha_hora)<='$fecha_fin'
@@ -472,7 +472,7 @@ public function topproductosvendidosrango($fecha_inicio,$fecha_fin,$limit=7){
 	$limit=(int)$limit;
 	if ($limit<=0) $limit=7;
 	$sql="SELECT a.nombre AS producto,
-	IFNULL(SUM(dv.cantidad),0) AS cantidad,
+	IFNULL(SUM(dv.cantidad*dv.factor),0) AS cantidad,
 	IFNULL(SUM((dv.cantidad*dv.precio_venta)-dv.descuento),0) AS total
 	FROM detalle_venta dv
 	INNER JOIN articulo a ON a.idarticulo=dv.idarticulo

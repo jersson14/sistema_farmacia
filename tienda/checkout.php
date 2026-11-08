@@ -277,7 +277,7 @@ function cargarResumen(){
       var html = '';
       d.items.forEach(function(i){
         html += '<div class="order-summary-item">'
-              + '<span class="osi-name">' + esc(i.nombre) + ' × ' + i.cantidad + '</span>'
+              + '<span class="osi-name">' + esc(i.nombre) + (i.mostrar_presentacion ? ' (' + esc(i.presentacion) + ')' : '') + ' × ' + i.cantidad + '</span>'
               + '<span class="osi-price">S/ ' + i.subtotal.toFixed(2) + '</span></div>';
       });
       document.getElementById('resumenItems').innerHTML = html;

@@ -43,7 +43,7 @@ public function insertar($idcategoria,$idunidad,$codigo,$nombre,$stock,$stock_mi
 	 		 '$principio_activo','$concentracion','$forma_farmaceutica','$via_administracion',
 	 		 '$laboratorio','$registro_sanitario','$requiere_frio','$tipo_venta',
 	 		 '{$o['en_oferta']}','{$o['descuento_porcentaje']}',{$o['oferta_fecha_inicio']},{$o['oferta_fecha_fin']})";
-	return ejecutarConsulta($sql);
+	return ejecutarConsulta_retornarID($sql); // id nuevo (0 si falló)
 }
 
 public function editar($idarticulo,$idcategoria,$idunidad,$codigo,$nombre,$stock,$stock_minimo,$precio_venta,$descripcion,$imagen,
@@ -142,6 +142,20 @@ public function listarActivosVenta(){
 	LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad
 	WHERE a.condicion='1'";
 	return ejecutarConsulta($sql);
+}
+
+// Producto activo por id (mismas columnas que buscarActivoPorCodigo)
+public function buscarActivoPorId($idarticulo){
+	$idarticulo = (int)$idarticulo;
+	$precioFinal = sqlPrecioFinalExpr('a');
+	$precioBase  = sqlPrecioBaseExpr('a');
+	$vigente     = sqlOfertaVigenteExpr('a');
+	return ejecutarConsultaSimpleFila("SELECT a.idarticulo,a.codigo,a.nombre,a.stock,a.tipo_venta,
+		IFNULL(a.principio_activo,'') as principio_activo,
+		IFNULL(u.abreviatura,'und') as abreviatura,
+		$precioFinal AS precio_venta, $precioBase AS precio_venta_original, $vigente AS en_oferta, a.descuento_porcentaje
+	FROM articulo a LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad
+	WHERE a.condicion='1' AND a.idarticulo='$idarticulo' LIMIT 1");
 }
 
 public function buscarActivoPorCodigo($codigo){

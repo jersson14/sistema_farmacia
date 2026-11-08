@@ -110,6 +110,14 @@ if ($_SESSION['acceso']==1 || $perfilPropio) {
     <div id="permisosContainer" style="display:none">
       <ul id="permisos" style="list-style:none;margin:0;padding:0;"></ul>
     </div>
+    <!-- Permisos especiales del vendedor: visibles y configurables por el administrador -->
+    <div class="form-group col-lg-12 col-md-12 col-xs-12">
+      <div class="perm-especiales" id="permEspeciales">
+        <div class="perm-especiales-head"><i class="fa fa-shield"></i> Permisos del vendedor</div>
+        <p class="perm-especiales-nota" id="permEspecialesNota">El vendedor siempre puede vender. Lo que esté apagado aquí lo debe autorizar un administrador con su usuario y clave.</p>
+        <div id="permEspecialesLista"></div>
+      </div>
+    </div>
         <div class="form-group col-lg-6 col-md-6 col-xs-12">
       <label for="">Imagen:</label>
       <input class="form-control" type="file" name="imagen" id="imagen">

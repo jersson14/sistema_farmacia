@@ -218,8 +218,9 @@ switch ($op) {
                 if (!$idpersona) throw new Exception('No se pudo identificar el cliente');
 
                 // Arrays para Venta::insertar()
-                $arrArt = array(); $arrCant = array(); $arrPrecio = array(); $arrDesc = array();
+                $arrArt = array(); $arrCant = array(); $arrPrecio = array(); $arrDesc = array(); $arrPres = array();
                 foreach ($items as $it) {
+                    $arrPres[]   = isset($it['idpresentacion']) ? (int)$it['idpresentacion'] : 0; // Caja, Blíster...
                     $arrArt[]    = (int)$it['idarticulo'];
                     $arrCant[]   = (float)$it['cantidad'];
                     $arrPrecio[] = (float)$it['precio_unitario'];
@@ -246,7 +247,7 @@ switch ($op) {
                     $tipoComp, '', '', '',
                     $impuesto, $mTotal,
                     $arrArt, $arrCant, $arrPrecio, $arrDesc,
-                    $mPago, 0, 0, 0
+                    $mPago, 0, 0, 0, '', 0, '', $arrPres
                 );
 
                 if (!$result['ok']) throw new Exception($result['message']);

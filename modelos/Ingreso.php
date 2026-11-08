@@ -1,6 +1,7 @@
 <?php 
 //incluir la conexion de base de datos
 require_once __DIR__ . "/../config/Conexion.php";
+require_once __DIR__ . "/Presentacion.php";
 class Ingreso{
 
 
@@ -304,7 +305,7 @@ public function anular($idingreso){
 	if ($cab['estado'] === 'Anulado') return true;
 	if ($cab['estado'] === 'Borrador') return false;
 
-	$detalles = ejecutarConsulta("SELECT idarticulo, cantidad FROM detalle_ingreso WHERE idingreso='$idingreso'");
+	$detalles = ejecutarConsulta("SELECT idarticulo, ".Presentacion::sqlCantidadBase('detalle_ingreso')." AS cantidad FROM detalle_ingreso WHERE idingreso='$idingreso'");
 	$filas = array();
 	while ($d = $detalles->fetch_object()) { $filas[] = $d; }
 
@@ -335,7 +336,7 @@ public function activar($idingreso){
 	try {
 		ejecutarConsulta("UPDATE ingreso SET estado='Aceptado', stock_ajustado=0 WHERE idingreso='$idingreso'");
 		if ((int)$cab['stock_ajustado'] === 1) {
-			$detalles = ejecutarConsulta("SELECT idarticulo, cantidad FROM detalle_ingreso WHERE idingreso='$idingreso'");
+			$detalles = ejecutarConsulta("SELECT idarticulo, ".Presentacion::sqlCantidadBase('detalle_ingreso')." AS cantidad FROM detalle_ingreso WHERE idingreso='$idingreso'");
 			while ($d = $detalles->fetch_object()) {
 				ejecutarConsulta("UPDATE articulo SET stock = stock + '".(float)$d->cantidad."' WHERE idarticulo='".(int)$d->idarticulo."'");
 			}
@@ -365,7 +366,7 @@ public function eliminarDefinitivo($idingreso){
 	}
 	$stockYaAjustado = (int)$cab['stock_ajustado'] === 1;
 
-	$rspta = ejecutarConsulta("SELECT iddetalle_ingreso, idarticulo, cantidad, IFNULL(idlote,0) AS idlote FROM detalle_ingreso WHERE idingreso='$idingreso'");
+	$rspta = ejecutarConsulta("SELECT iddetalle_ingreso, idarticulo, ".Presentacion::sqlCantidadBase('detalle_ingreso')." AS cantidad, IFNULL(idlote,0) AS idlote FROM detalle_ingreso WHERE idingreso='$idingreso'");
 	$filas = array();
 	while ($d = $rspta->fetch_object()) {
 		if ((int)$d->idlote > 0) {
@@ -520,26 +521,41 @@ private function recalcularTotal($idingreso){
 }
 
 /** Inserta una fila de detalle (+ lote si corresponde). Devuelve iddetalle o false. No maneja transacción. */
-private function insertarDetalleFila($idingreso, $idarticulo, $cantidad, $precio_compra, $precio_venta, $numero_lote, $fecha_vencimiento, $fecha_fabricacion = ''){
+private function insertarDetalleFila($idingreso, $idarticulo, $cantidad, $precio_compra, $precio_venta, $numero_lote, $fecha_vencimiento, $fecha_fabricacion = '', $idpresentacion = 0){
 	$idingreso  = (int)$idingreso;
 	$idarticulo = (int)$idarticulo;
 	$nLoteEsc   = limpiarCadena($numero_lote);
 	$fVencSQL   = $fecha_vencimiento !== '' ? "'".$fecha_vencimiento."'" : 'NULL';
-	$sqlDet = "INSERT INTO detalle_ingreso
-		(idingreso,idarticulo,cantidad,precio_compra,precio_venta,numero_lote,fecha_vencimiento)
-		VALUES('$idingreso','$idarticulo','$cantidad','$precio_compra','$precio_venta','$nLoteEsc',$fVencSQL)";
+	// Presentación comprada (Caja x100...): stock y lote se registran en unidades base
+	$presMdl = new Presentacion();
+	$pres = $presMdl->resolver($idarticulo, $idpresentacion);
+	if (!$pres) {
+		return false;
+	}
+	$factor = (float)$pres['factor'];
+	$cantidadBase = $cantidad * $factor;
+	if (Presentacion::disponible()) {
+		$idpresSql = $pres['idpresentacion'] ? "'".(int)$pres['idpresentacion']."'" : 'NULL';
+		$sqlDet = "INSERT INTO detalle_ingreso
+			(idingreso,idarticulo,idpresentacion,cantidad,factor,precio_compra,precio_venta,numero_lote,fecha_vencimiento)
+			VALUES('$idingreso','$idarticulo',$idpresSql,'$cantidad','$factor','$precio_compra','$precio_venta','$nLoteEsc',$fVencSQL)";
+	} else {
+		$sqlDet = "INSERT INTO detalle_ingreso
+			(idingreso,idarticulo,cantidad,precio_compra,precio_venta,numero_lote,fecha_vencimiento)
+			VALUES('$idingreso','$idarticulo','$cantidad','$precio_compra','$precio_venta','$nLoteEsc',$fVencSQL)";
+	}
 	$iddet = ejecutarConsulta_retornarID($sqlDet);
 	if (!$iddet) {
 		return false;
 	}
 	if ($precio_venta > 0) {
-		ejecutarConsulta("UPDATE articulo SET precio_venta='$precio_venta' WHERE idarticulo='$idarticulo'");
+		$presMdl->actualizarPrecio($idarticulo, $pres['idpresentacion'], $precio_venta);
 	}
 	if ($numero_lote !== '' && $fecha_vencimiento !== '') {
 		$fFabSQL = ($fecha_fabricacion !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha_fabricacion)) ? "'".$fecha_fabricacion."'" : 'NULL';
 		$sqlLote = "INSERT INTO lote_articulo
 			(idarticulo,numero_lote,fecha_vencimiento,fecha_fabricacion,cantidad_inicial,cantidad_actual,idingreso,condicion)
-			VALUES('$idarticulo','$nLoteEsc','$fecha_vencimiento',$fFabSQL,'$cantidad','$cantidad','$idingreso',1)";
+			VALUES('$idarticulo','$nLoteEsc','$fecha_vencimiento',$fFabSQL,'$cantidadBase','$cantidadBase','$idingreso',1)";
 		$idlote = ejecutarConsulta_retornarID($sqlLote);
 		if ($idlote) {
 			ejecutarConsulta("UPDATE detalle_ingreso SET idlote='$idlote' WHERE iddetalle_ingreso='$iddet'");
@@ -631,7 +647,7 @@ public function crearBorrador($idproveedor, $idusuario, $tipo_comprobante, $seri
  * Guarda (inserta o actualiza) UNA fila del detalle de una compra en Borrador o Aceptada.
  * Devuelve ok, iddetalle y nuevo_total.
  */
-public function guardarFilaDetalle($idingreso, $iddetalle, $idarticulo, $cantidad, $precio_compra, $precio_venta, $numero_lote, $fecha_vencimiento){
+public function guardarFilaDetalle($idingreso, $iddetalle, $idarticulo, $cantidad, $precio_compra, $precio_venta, $numero_lote, $fecha_vencimiento, $idpresentacion = 0){
 	global $conexion;
 	$idingreso  = (int)$idingreso;
 	$iddetalle  = (int)$iddetalle;
@@ -667,13 +683,18 @@ public function guardarFilaDetalle($idingreso, $iddetalle, $idarticulo, $cantida
 	if ($errFecha !== '') {
 		return array("ok"=>false, "message"=>$errFecha." ($nombreArt)");
 	}
+	$presMdl = new Presentacion();
+	$presChk = $presMdl->resolver($idarticulo, $idpresentacion);
+	if (!$presChk || (isset($presChk['activa']) && !$presChk['activa'])) {
+		return array("ok"=>false, "message"=>"La presentación elegida para $nombreArt ya no está disponible. Elige otra");
+	}
 
 	if ($iddetalle > 0) {
 		$det = ejecutarConsultaSimpleFila("SELECT iddetalle_ingreso FROM detalle_ingreso WHERE iddetalle_ingreso='$iddetalle' AND idingreso='$idingreso' LIMIT 1");
 		if (!$det) {
 			return array("ok"=>false, "message"=>"La fila de $nombreArt ya no existe en esta compra. Vuelve a agregarla");
 		}
-		$r = $this->actualizarDetalle($iddetalle, $cantidad, $precio_compra, $precio_venta, $numero_lote, $fecha_vencimiento);
+		$r = $this->actualizarDetalle($iddetalle, $cantidad, $precio_compra, $precio_venta, $numero_lote, $fecha_vencimiento, $idpresentacion);
 		if (!empty($r["ok"])) {
 			$r["iddetalle"] = $iddetalle;
 			$r["idingreso"] = $idingreso;
@@ -684,7 +705,7 @@ public function guardarFilaDetalle($idingreso, $iddetalle, $idarticulo, $cantida
 
 	$conexion->autocommit(false);
 	try {
-		$iddetNuevo = $this->insertarDetalleFila($idingreso, $idarticulo, $cantidad, $precio_compra, $precio_venta, $numero_lote, $fecha_vencimiento, '');
+		$iddetNuevo = $this->insertarDetalleFila($idingreso, $idarticulo, $cantidad, $precio_compra, $precio_venta, $numero_lote, $fecha_vencimiento, '', $idpresentacion);
 		if (!$iddetNuevo) {
 			$conexion->rollback(); $conexion->autocommit(true);
 			return array("ok"=>false, "message"=>"No se pudo guardar la fila de $nombreArt. Intenta de nuevo");
@@ -810,7 +831,7 @@ public function descartarBorrador($idingreso){
 	if ($cab["estado"] !== 'Borrador') {
 		return array("ok"=>false, "message"=>"Solo se pueden descartar compras en borrador");
 	}
-	$rs = ejecutarConsulta("SELECT iddetalle_ingreso, idarticulo, cantidad, IFNULL(idlote,0) AS idlote FROM detalle_ingreso WHERE idingreso='$idingreso'");
+	$rs = ejecutarConsulta("SELECT iddetalle_ingreso, idarticulo, ".Presentacion::sqlCantidadBase('detalle_ingreso')." AS cantidad, IFNULL(idlote,0) AS idlote FROM detalle_ingreso WHERE idingreso='$idingreso'");
 	$filas = array();
 	while ($d = $rs->fetch_object()) {
 		if ((int)$d->idlote > 0) {
@@ -866,6 +887,8 @@ public function listarDetalleArray($idingreso){
 				"idarticulo"        => (int)$r["idarticulo"],
 				"nombre"            => $r["nombre"],
 				"unidad"            => $r["unidad"],
+				"idpresentacion"    => (int)$r["idpresentacion"],
+				"factor"            => (float)$r["factor"],
 				"cantidad"          => (float)$r["cantidad"],
 				"precio_compra"     => (float)$r["precio_compra"],
 				"precio_venta"      => (float)$r["precio_venta"],
@@ -884,20 +907,24 @@ public function mostrar($idingreso){
 }
 
 public function listarDetalle($idingreso){
-	$sql="SELECT di.iddetalle_ingreso,di.idingreso,di.idarticulo,a.nombre,IFNULL(u.abreviatura,'und') as unidad,di.cantidad,di.precio_compra,di.precio_venta,di.numero_lote,di.fecha_vencimiento
+	list($uniSel, $uniJoin) = Presentacion::sqlUnidadDetalle('di', 'u');
+	$presCols = Presentacion::disponible() ? "IFNULL(di.idpresentacion,0) AS idpresentacion, di.factor" : "0 AS idpresentacion, 1 AS factor";
+	$sql="SELECT di.iddetalle_ingreso,di.idingreso,di.idarticulo,a.nombre,$uniSel as unidad,di.cantidad,di.precio_compra,di.precio_venta,di.numero_lote,di.fecha_vencimiento,$presCols
 	FROM detalle_ingreso di
 	INNER JOIN articulo a ON di.idarticulo=a.idarticulo
-	LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad
+	LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad $uniJoin
 	WHERE di.idingreso='$idingreso'";
 	return ejecutarConsulta($sql);
 }
 
-public function actualizarDetalle($iddetalle, $cantidad, $precio_compra, $precio_venta, $numero_lote, $fecha_vencimiento){
+public function actualizarDetalle($iddetalle, $cantidad, $precio_compra, $precio_venta, $numero_lote, $fecha_vencimiento, $idpresentacion = null){
 	$iddetalle = (int)$iddetalle;
 	if ($iddetalle <= 0) {
 		return array("ok"=>false, "message"=>"ID de detalle inválido");
 	}
-	$rowDet = ejecutarConsultaSimpleFila("SELECT idarticulo, idingreso, cantidad, IFNULL(idlote,0) AS idlote FROM detalle_ingreso WHERE iddetalle_ingreso='$iddetalle' LIMIT 1");
+	$conPres = Presentacion::disponible();
+	$colsPres = $conPres ? ", IFNULL(idpresentacion,0) AS idpresentacion, factor" : ", 0 AS idpresentacion, 1 AS factor";
+	$rowDet = ejecutarConsultaSimpleFila("SELECT idarticulo, idingreso, cantidad, IFNULL(idlote,0) AS idlote $colsPres FROM detalle_ingreso WHERE iddetalle_ingreso='$iddetalle' LIMIT 1");
 	if (!$rowDet) {
 		return array("ok"=>false, "message"=>"No se encontró el detalle");
 	}
@@ -912,21 +939,31 @@ public function actualizarDetalle($iddetalle, $cantidad, $precio_compra, $precio
 	if ($cantidad <= 0) {
 		return array("ok"=>false, "message"=>"La cantidad debe ser mayor que cero");
 	}
+	// Presentación: la que se envía, o la que ya tenía la fila
+	$presMdl = new Presentacion();
+	$idpresUsar = ($idpresentacion === null || (int)$idpresentacion <= 0) ? (int)$rowDet['idpresentacion'] : (int)$idpresentacion;
+	$pres = $presMdl->resolver((int)$rowDet['idarticulo'], $idpresUsar);
+	if (!$pres) {
+		return array("ok"=>false, "message"=>"La presentación elegida no pertenece a este producto");
+	}
+	$factorNuevo = (float)$pres['factor'];
 	$fvSQL = $fecha_vencimiento !== '' ? "'$fecha_vencimiento'" : 'NULL';
-	$sql = "UPDATE detalle_ingreso SET cantidad='$cantidad', precio_compra='$precio_compra', precio_venta='$precio_venta', numero_lote='$numero_lote', fecha_vencimiento=$fvSQL WHERE iddetalle_ingreso='$iddetalle'";
+	$setPres = $conPres ? ", idpresentacion=".($pres['idpresentacion'] ? "'".(int)$pres['idpresentacion']."'" : "NULL").", factor='$factorNuevo'" : "";
+	$sql = "UPDATE detalle_ingreso SET cantidad='$cantidad', precio_compra='$precio_compra', precio_venta='$precio_venta', numero_lote='$numero_lote', fecha_vencimiento=$fvSQL $setPres WHERE iddetalle_ingreso='$iddetalle'";
 	$ok = ejecutarConsulta($sql);
 	if (!$ok) {
 		return array("ok"=>false, "message"=>"No se pudo actualizar el detalle");
 	}
-	// Ajustar stock por diferencia de cantidad
-	$oldCantidad = isset($rowDet['cantidad']) ? (float)$rowDet['cantidad'] : 0;
-	$diferencia = $cantidad - $oldCantidad;
+	// Ajustar stock por diferencia en unidades base
+	$oldBase = (float)$rowDet['cantidad'] * (float)$rowDet['factor'];
+	$cantidadBase = $cantidad * $factorNuevo;
+	$diferencia = $cantidadBase - $oldBase;
 	if (abs($diferencia) > 0.0001) {
 		ejecutarConsulta("UPDATE articulo SET stock = stock + '$diferencia' WHERE idarticulo='".(int)$rowDet['idarticulo']."'");
 	}
-	// Actualizar precio_venta en artículo si cambió
+	// Actualizar el precio de venta de la presentación comprada
 	if ($precio_venta > 0) {
-		ejecutarConsulta("UPDATE articulo SET precio_venta='$precio_venta' WHERE idarticulo='".(int)$rowDet['idarticulo']."'");
+		$presMdl->actualizarPrecio((int)$rowDet['idarticulo'], $pres['idpresentacion'], $precio_venta);
 	}
 	// Recalcular total del ingreso
 	$idingreso = (int)$rowDet['idingreso'];
@@ -941,7 +978,7 @@ public function actualizarDetalle($iddetalle, $cantidad, $precio_compra, $precio
 	} elseif ($numero_lote !== '' && $fecha_vencimiento !== '') {
 		// No había lote vinculado aún: crear uno y vincularlo al detalle
 		$fvLoteSQL = "'$fecha_vencimiento'";
-		$sqlNuevoLote = "INSERT INTO lote_articulo (idarticulo,numero_lote,fecha_vencimiento,cantidad_inicial,cantidad_actual,idingreso,condicion) VALUES ('".(int)$rowDet['idarticulo']."','$numero_lote',$fvLoteSQL,'$cantidad','$cantidad','".(int)$rowDet['idingreso']."',1)";
+		$sqlNuevoLote = "INSERT INTO lote_articulo (idarticulo,numero_lote,fecha_vencimiento,cantidad_inicial,cantidad_actual,idingreso,condicion) VALUES ('".(int)$rowDet['idarticulo']."','$numero_lote',$fvLoteSQL,'$cantidadBase','$cantidadBase','".(int)$rowDet['idingreso']."',1)";
 		$idloteNuevo = ejecutarConsulta_retornarID($sqlNuevoLote);
 		if ($idloteNuevo) {
 			ejecutarConsulta("UPDATE detalle_ingreso SET idlote='$idloteNuevo' WHERE iddetalle_ingreso='$iddetalle'");
@@ -955,7 +992,7 @@ public function eliminarDetalle($iddetalle){
 	if ($iddetalle <= 0) {
 		return array("ok"=>false, "message"=>"ID de detalle inválido");
 	}
-	$rowDet = ejecutarConsultaSimpleFila("SELECT idarticulo, idingreso, cantidad, IFNULL(idlote,0) AS idlote FROM detalle_ingreso WHERE iddetalle_ingreso='$iddetalle' LIMIT 1");
+	$rowDet = ejecutarConsultaSimpleFila("SELECT idarticulo, idingreso, ".Presentacion::sqlCantidadBase('detalle_ingreso')." AS cantidad, IFNULL(idlote,0) AS idlote FROM detalle_ingreso WHERE iddetalle_ingreso='$iddetalle' LIMIT 1");
 	if (!$rowDet) {
 		return array("ok"=>false, "message"=>"No se encontró el artículo en esta compra");
 	}
@@ -1019,10 +1056,11 @@ public function ingresocabecera($idingreso){
 }
 
 public function ingresodetalles($idingreso){
-	$sql="SELECT a.nombre AS articulo, a.codigo, IFNULL(u.abreviatura,'und') as unidad, d.cantidad, d.precio_compra, d.precio_venta, (d.cantidad*d.precio_compra) AS subtotal
+	list($uniSel, $uniJoin) = Presentacion::sqlUnidadDetalle('d', 'u');
+	$sql="SELECT a.nombre AS articulo, a.codigo, $uniSel as unidad, d.cantidad, d.precio_compra, d.precio_venta, (d.cantidad*d.precio_compra) AS subtotal
 	FROM detalle_ingreso d
 	INNER JOIN articulo a ON d.idarticulo=a.idarticulo
-	LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad
+	LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad $uniJoin
 	WHERE d.idingreso='$idingreso'";
 	return ejecutarConsulta($sql);
 }

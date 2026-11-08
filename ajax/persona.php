@@ -1,5 +1,19 @@
 <?php 
 require_once "../modelos/Persona.php";
+require_once "../config/Autorizacion.php";
+if (session_status() === PHP_SESSION_NONE) session_start();
+
+// Proveedores: registrar es libre; editar o eliminar requiere el permiso
+// "Editar y anular compras" o autorización del administrador.
+if (!function_exists('esProveedorBloqueado')) {
+	function esProveedorBloqueado($idpersona) {
+		$idpersona = (int)$idpersona;
+		if ($idpersona <= 0) return false;
+		$row = ejecutarConsultaSimpleFila("SELECT tipo_persona FROM persona WHERE idpersona='$idpersona' LIMIT 1");
+		if (!$row || strtoupper(trim($row['tipo_persona'])) !== 'PROVEEDOR') return false;
+		return !autPuede('proveedor', $idpersona);
+	}
+}
 
 $persona=new Persona();
 
@@ -18,6 +32,10 @@ switch ($_GET["op"]) {
 		$rspta=$persona->insertar($tipo_persona,$nombre,$tipo_documento,$num_documento,$direccion,$telefono,$email);
 		echo $rspta ? "Datos registrados correctamente" : "No se pudo registrar los datos";
 	}else{
+		if (esProveedorBloqueado($idpersona)) {
+			echo "Para modificar un proveedor necesitas la autorización de un administrador.";
+			break;
+		}
          $rspta=$persona->editar($idpersona,$tipo_persona,$nombre,$tipo_documento,$num_documento,$direccion,$telefono,$email);
 		echo $rspta ? "Datos actualizados correctamente" : "No se pudo actualizar los datos";
 	}
@@ -30,7 +48,13 @@ switch ($_GET["op"]) {
 			echo json_encode(array("ok"=>false, "message"=>"Tu sesión venció. Vuelve a iniciar sesión."));
 			break;
 		}
-		echo json_encode($persona->eliminar($idpersona));
+		if (esProveedorBloqueado($idpersona)) {
+			echo json_encode(autRespuestaRequerida('Para eliminar un proveedor necesitas la autorización de un administrador.'));
+			break;
+		}
+		$rsptaEl = $persona->eliminar($idpersona);
+		if (!empty($rsptaEl['ok'])) autConsumir('proveedor', $idpersona);
+		echo json_encode($rsptaEl);
 		break;
 	
 	case 'mostrar':
@@ -44,7 +68,7 @@ switch ($_GET["op"]) {
 
 		while ($reg=$rspta->fetch_object()) {
 			$data[]=array(
-            "0"=>'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idpersona.')"><i class="fa fa-pencil"></i></button>'.' '.'<button class="btn btn-danger btn-xs" onclick="eliminar('.$reg->idpersona.')"><i class="fa fa-trash"></i></button>',
+            "0"=>'<button class="btn btn-warning btn-xs" title="Editar proveedor" onclick="mostrar('.$reg->idpersona.')"><i class="fa fa-pencil"></i>'.autCandado('proveedor', $reg->idpersona).'</button>'.' '.'<button class="btn btn-danger btn-xs" title="Eliminar proveedor" onclick="eliminar('.$reg->idpersona.')"><i class="fa fa-trash"></i>'.autCandado('proveedor', $reg->idpersona).'</button>',
             "1"=>$reg->nombre,
             "2"=>$reg->tipo_documento.": ".$reg->num_documento,
             "3"=>(!empty($reg->direccion) ? $reg->direccion : "-"),

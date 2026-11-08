@@ -3,6 +3,7 @@ ob_start();
 error_reporting(0);
 if (strlen(session_id()) < 1) session_start();
 require_once "../../config/Conexion.php";
+require_once "../../modelos/Presentacion.php";
 
 // Detectar columnas farmacéuticas (pueden no existir si la migración no se ejecutó)
 function _catColExists($col) {
@@ -207,6 +208,14 @@ switch ($op) {
             );
         }
 
+        // Presentaciones de venta (Tableta, Blíster x10, Caja x100...) de la página actual
+        $presMdl  = new Presentacion();
+        $mapaPres = $presMdl->mapaPorArticulos(array_map(function($x){ return $x['idarticulo']; }, $productos));
+        foreach ($productos as &$prod) {
+            $prod['presentaciones'] = isset($mapaPres[$prod['idarticulo']]) ? $mapaPres[$prod['idarticulo']] : array();
+        }
+        unset($prod);
+
         echo json_encode(array(
             'ok'       => true,
             'total'    => $total,
@@ -384,6 +393,8 @@ switch ($op) {
         $r['stock']        = (int)round((float)$r['stock']);
         $r['imagenes']     = _catImagenes($r);
         $r['total_imagenes'] = count($r['imagenes']);
+        $presMdl = new Presentacion();
+        $r['presentaciones'] = $presMdl->listarPorArticulo((int)$r['idarticulo']);
         echo json_encode(array('ok' => true, 'producto' => $r));
         break;
 

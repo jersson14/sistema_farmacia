@@ -158,9 +158,9 @@ switch ($op) {
 		if (empty($valores)) {
 			$cargoStr = strtolower($fetch->cargo ?? '');
 			if (strpos($cargoStr, 'admin') !== false) {
-				$valores = [1,2,3,4,5,6,7,8,9,10,11];
+				$valores = [1,2,3,4,5,6,7,8,9,10,11,14,15];
 			} else {
-				$valores = [1,4]; // Vendedor: Escritorio + Ventas
+				$valores = [1,3,4]; // Vendedor: Escritorio + Compras (solo registrar) + Ventas
 			}
 		}
 
@@ -176,6 +176,10 @@ switch ($op) {
 		in_array(9, $valores)?$_SESSION['kardex']=1:$_SESSION['kardex']=0;
 		in_array(10,$valores)?$_SESSION['cuentas']=1:$_SESSION['cuentas']=0;
 		in_array(11,$valores)?$_SESSION['backup']=1:$_SESSION['backup']=0;
+		// Acciones sensibles: sin estos permisos se pide autorización del administrador
+		$_SESSION['ventas_anular']  = in_array(14,$valores) ? 1 : 0;
+		$_SESSION['compras_editar'] = in_array(15,$valores) ? 1 : 0;
+		unset($_SESSION['autorizaciones']);
 
 	}
 	echo json_encode($fetch);

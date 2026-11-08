@@ -42,7 +42,10 @@ $appCurrencySymbol = function_exists('obtenerSimboloMoneda') ? obtenerSimboloMon
 <script src="../public/js/bootstrap-select.min.js"></script>
 <script src="<?= assetV('../public/js/app-notify.js') ?>"></script>
 <script src="<?= assetV('../public/js/app-eliminar.js') ?>"></script>
+<script src="<?= assetV('../public/js/app-autorizar.js') ?>"></script>
+<?php require_once __DIR__ . '/../config/Autorizacion.php'; ?>
 <script>
+window.APP_PERMISOS = <?php echo json_encode(autPermisosParaJs()); ?>;
 window.appCurrencyCode = <?php echo json_encode($appCurrencyCode); ?>;
 window.appCurrencySymbol = <?php echo json_encode($appCurrencySymbol); ?>;
 window.appMoney = function(value, decimals) {
