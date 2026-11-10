@@ -313,7 +313,7 @@ function _vencPoll(){
       if (_vencSonidoHabilitado) _vencSonido();
       var msg = "";
       if (vencidos > 0) msg += vencidos + " lote(s) VENCIDO(S). ";
-      if (proximos > 0) msg += proximos + " lote(s) próximo(s) a vencer (≤30 días).";
+      if (proximos > 0) msg += proximos + " lote(s) próximo(s) a vencer (≤" + (r.dias_alerta || 180) + " días).";
       if (typeof Notification !== "undefined" && Notification.permission === "granted") {
         new Notification("📅 Alerta de vencimientos", {
           body: msg.trim(),
@@ -322,7 +322,7 @@ function _vencPoll(){
       }
       if (typeof appNotify === "function") {
         if (vencidos > 0) appNotify("error",   "🗓 " + vencidos + " lote(s) VENCIDO(S) con stock — retira del inventario");
-        if (proximos > 0) appNotify("warning", "🗓 " + proximos + " lote(s) vencen en menos de 30 días");
+        if (proximos > 0) appNotify("warning", "🗓 " + proximos + " lote(s) vencen en los próximos " + (r.dias_alerta || 180) + " días");
       }
     }
     _vencUltimoTotal = total;

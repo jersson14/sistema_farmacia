@@ -28,7 +28,8 @@ switch ($op) {
         $rspta = $lote->listarProximosVencer($dias);
         $data  = array();
         while ($reg = $rspta->fetch_object()) {
-            $urgencia = (int)$reg->dias_restantes <= 15 ? 'danger' : ((int)$reg->dias_restantes <= 30 ? 'warning' : 'info');
+            $dr = (int)$reg->dias_restantes;
+            $urgencia = $dr <= 15 ? 'danger' : ($dr <= 30 ? 'warning' : ($dr <= 90 ? 'info' : 'default'));
             $data[] = array(
                 '0' => htmlspecialchars($reg->codigo),
                 '1' => htmlspecialchars($reg->articulo),
@@ -74,13 +75,35 @@ switch ($op) {
         break;
 
     case 'contadores':
+        $diasAlerta = $lote->diasAlerta();
         echo json_encode(array(
             'ok'            => true,
             'vencidos'      => $lote->contarVencidos(),
             'vence_30'      => $lote->contarProximosVencer(30),
             'vence_60'      => $lote->contarProximosVencer(60),
-            'vence_90'      => $lote->contarProximosVencer(90)
+            'vence_90'      => $lote->contarProximosVencer(90),
+            'dias_alerta'   => $diasAlerta,
+            'vence_alerta'  => $lote->contarProximosVencer($diasAlerta),
+            'puede_config'  => !empty($_SESSION['acceso']) && $_SESSION['acceso'] == 1
         ));
+        break;
+
+    case 'guardarDiasAlerta':
+        header('Content-Type: application/json');
+        if (empty($_SESSION['acceso']) || $_SESSION['acceso'] != 1) {
+            echo json_encode(array('ok'=>false,'message'=>'Solo un administrador puede cambiar este ajuste.'));
+            break;
+        }
+        $dias = isset($_POST['dias']) ? (int)limpiarCadena($_POST['dias']) : 0;
+        if ($dias < 1 || $dias > 730) {
+            echo json_encode(array('ok'=>false,'message'=>'Ingresa una cantidad de días entre 1 y 730.'));
+            break;
+        }
+        if ($lote->guardarDiasAlerta($dias)) {
+            echo json_encode(array('ok'=>true,'message'=>'Se avisará con '.$dias.' días de anticipación.','dias'=>$dias));
+        } else {
+            echo json_encode(array('ok'=>false,'message'=>'No se pudo guardar. Pide al administrador ejecutar la migración 20261110_dias_alerta_vencimiento.sql.'));
+        }
         break;
 
     case 'porArticulo':
@@ -106,7 +129,8 @@ switch ($op) {
     case 'notifVencimiento':
         header('Content-Type: application/json');
         $vencidos = $lote->contarVencidos();
-        $proximos = $lote->contarProximosVencer(30);
+        $diasAlerta = $lote->diasAlerta();
+        $proximos = $lote->contarProximosVencer($diasAlerta);
         $sql = "SELECT a.nombre AS articulo, l.numero_lote, l.fecha_vencimiento,
                        l.cantidad_actual,
                        DATEDIFF(CURDATE(), l.fecha_vencimiento) AS dias_vencido,
@@ -117,7 +141,7 @@ switch ($op) {
                 WHERE l.condicion=1
                   AND l.cantidad_actual > 0
                   AND (l.fecha_vencimiento < CURDATE()
-                       OR l.fecha_vencimiento <= DATE_ADD(CURDATE(), INTERVAL 30 DAY))
+                       OR l.fecha_vencimiento <= DATE_ADD(CURDATE(), INTERVAL $diasAlerta DAY))
                 ORDER BY l.fecha_vencimiento ASC
                 LIMIT 8";
         $rs    = ejecutarConsulta($sql);
@@ -137,6 +161,7 @@ switch ($op) {
             'ok'      => true,
             'vencidos'=> $vencidos,
             'proximos'=> $proximos,
+            'dias_alerta' => $diasAlerta,
             'lotes'   => $lotes,
         ]);
         break;
@@ -160,6 +185,7 @@ switch ($op) {
                 ORDER BY a.nombre ASC, l.fecha_vencimiento ASC";
         $rs   = ejecutarConsulta($sql);
         $data = array();
+        $diasAlerta = $lote->diasAlerta();
         while ($reg = $rs->fetch_object()) {
             $dias = (int)$reg->dias_restantes;
             $cant = (int)$reg->cantidad_actual;
@@ -169,6 +195,8 @@ switch ($op) {
                 $badge = '<span class="label label-danger">VENCIDO hace '.abs($dias).' d</span>';
             } elseif ($dias <= 30) {
                 $badge = '<span class="label label-warning">VENCE en '.$dias.' d</span>';
+            } elseif ($dias <= $diasAlerta) {
+                $badge = '<span class="label label-info">VENCE en '.$dias.' d</span>';
             } else {
                 $badge = '<span class="label label-success">VIGENTE</span>';
             }
