@@ -391,29 +391,32 @@ body.login-page {
     <style>
       .demo-accesos{margin-top:18px;border:1px solid #f0c27a;border-radius:10px;background:#fff8ec;font-size:13px;color:#444;overflow:hidden}
       .demo-accesos .da-tit{padding:8px 12px;font-weight:700;color:#b9770e;background:#fdebd0}
-      .demo-accesos table{width:100%;border-collapse:collapse}
-      .demo-accesos th,.demo-accesos td{padding:7px 12px;text-align:left;border-top:1px solid #f5dcb5}
-      .demo-accesos th{font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:#8a6d3b;font-weight:600}
-      .demo-accesos td code{font-family:monospace;font-size:13px;color:#222;background:none;padding:0}
-      .demo-accesos button{border:0;border-radius:6px;padding:4px 10px;background:#f39c12;color:#fff;font-size:12px;font-weight:600;cursor:pointer}
+      .demo-accesos .da-fila{display:flex;align-items:center;gap:10px;padding:9px 12px;border-top:1px solid #f5dcb5}
+      .demo-accesos .da-info{flex:1;min-width:0}
+      .demo-accesos .da-perfil{font-weight:600;color:#333;font-size:13px}
+      .demo-accesos .da-cred{margin-top:2px;font-size:13px;color:#555;word-break:break-word}
+      .demo-accesos .da-cred span{white-space:nowrap;margin-right:8px;display:inline-block}
+      .demo-accesos .da-cred code{font-family:monospace;font-size:13px;color:#222;background:#fdebd0;padding:1px 5px;border-radius:4px}
+      .demo-accesos button{flex-shrink:0;border:0;border-radius:6px;padding:7px 14px;background:#f39c12;color:#fff;font-size:13px;font-weight:600;cursor:pointer;width:auto}
       .demo-accesos button:hover{background:#d68910}
-      .demo-accesos .da-pie{padding:6px 12px;font-size:12.5px;color:#8a6d3b;border-top:1px solid #f5dcb5}
+      .demo-accesos .da-pie{padding:7px 12px;font-size:12.5px;color:#8a6d3b;border-top:1px solid #f5dcb5}
     </style>
     <div class="demo-accesos">
       <div class="da-tit">Versión demo: accesos de prueba</div>
-      <table>
-        <thead><tr><th>Perfil</th><th>Usuario</th><th>Contraseña</th><th></th></tr></thead>
-        <tbody>
-          <tr>
-            <td>Administrador</td><td><code>admin</code></td><td><code>admin123</code></td>
-            <td><button type="button" onclick="demoUsar('admin','admin123')">Usar</button></td>
-          </tr>
-          <tr>
-            <td>Cajero</td><td><code>vendedor</code></td><td><code>vendedor123</code></td>
-            <td><button type="button" onclick="demoUsar('vendedor','vendedor123')">Usar</button></td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="da-fila">
+        <div class="da-info">
+          <div class="da-perfil">Administrador</div>
+          <div class="da-cred"><span>Usuario <code>admin</code></span> <span>Clave <code>admin123</code></span></div>
+        </div>
+        <button type="button" onclick="demoUsar('admin','admin123')">Usar</button>
+      </div>
+      <div class="da-fila">
+        <div class="da-info">
+          <div class="da-perfil">Cajero</div>
+          <div class="da-cred"><span>Usuario <code>vendedor</code></span> <span>Clave <code>vendedor123</code></span></div>
+        </div>
+        <button type="button" onclick="demoUsar('vendedor','vendedor123')">Usar</button>
+      </div>
       <div class="da-pie">Pulsa <b>Usar</b> para llenar el formulario y luego Iniciar Sesión.</div>
     </div>
     <script>
