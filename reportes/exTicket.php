@@ -50,7 +50,8 @@ $telefono = !empty($cfgEmpresa['telefono'])         ? $cfgEmpresa['telefono']   
 $email    = !empty($cfgEmpresa['email'])            ? $cfgEmpresa['email']           : '';
 $web      = !empty($cfgEmpresa['web'])              ? $cfgEmpresa['web']             : '';
 
-$logo = '../files/farma2.png';
+// Logo de Acceso > Empresa (o el neutro por defecto)
+$logo = !empty($cfgEmpresa['logo_url']) ? $cfgEmpresa['logo_url'] : '../files/logo_default.png';
 
 $total    = (float)$reg->total_venta;
 $impuesto = (float)$reg->impuesto;

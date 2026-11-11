@@ -11,9 +11,10 @@ if (!function_exists('assetV')) {
   }
 }
 
-$brandNombre = "FARMACIA DEMO";
-$brandSub = "AL CUIDADO DE TU SALUD";
-$brandLogo = "../files/famacia.png";
+// Marca: todo sale de Acceso > Empresa (configuracion_empresa). Estos son solo valores neutros por defecto.
+$brandNombre = "MI FARMACIA";
+$brandSub = "";
+$brandLogo = "../files/logo_default.png";
 $brandPrimary = "#1D4ED8";
 $brandPrimaryDark = "#1E3A8A";
 $brandSecondary = "#DC2626";
@@ -66,8 +67,6 @@ if (!function_exists('darkenHexColor')) {
           $brandLogo = "../files/empresa/" . $cfg['logo'];
         } elseif (file_exists(__DIR__ . "/" . $cfg['logo'])) {
           $brandLogo = $cfg['logo'];
-        } else {
-          $brandLogo = "logo1.jpeg";
         }
       }
       if (!empty($cfg['color_primario'])) {
@@ -88,7 +87,7 @@ if (!function_exists('darkenHexColor')) {
 <head>
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>Farmacia Demo | Sistema</title>
+  <title><?php echo htmlspecialchars(ucwords(mb_strtolower($brandNombre, 'UTF-8'))); ?> | Sistema</title>
   <!-- Tell the browser to be responsive to screen width -->
   <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
   <!-- Bootstrap 3.3.7 -->
@@ -438,13 +437,13 @@ if (!function_exists('darkenHexColor')) {
     <a href="escritorio.php" class="logo app-brand-logo">
       <!-- mini logo for sidebar mini 50x50 pixels -->
       <span class="logo-mini">
-        <img src="<?php echo htmlspecialchars($brandLogo); ?>" alt="Logo Empresa" class="brand-logo-mini-img" onerror="this.src='logo1.jpeg'">
+        <img src="<?php echo htmlspecialchars($brandLogo); ?>" alt="Logo Empresa" class="brand-logo-mini-img" onerror="this.src='../files/logo_default.png'">
       </span>
       <!-- logo for regular state and mobile devices -->
       
       <span class="logo-lg">
         <span class="brand-logo-lg-wrap">
-          <img src="<?php echo htmlspecialchars($brandLogo); ?>" alt="Logo Empresa" class="brand-logo-img" onerror="this.src='logo1.jpeg'">
+          <img src="<?php echo htmlspecialchars($brandLogo); ?>" alt="Logo Empresa" class="brand-logo-img" onerror="this.src='../files/logo_default.png'">
         </span>
       </span>
     </a>

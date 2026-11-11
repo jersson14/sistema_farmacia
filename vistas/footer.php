@@ -129,7 +129,7 @@ function _notifPoll(){
       if (typeof Notification !== "undefined" && Notification.permission === "granted") {
         new Notification("Nuevo pedido online", {
           body: "Tienes " + n + " pedido(s) pendientes.",
-          icon: "../files/famacia.png"
+          icon: <?php echo json_encode(isset($brandLogo) ? $brandLogo : "../files/logo_default.png"); ?>
         });
       }
       if (typeof appNotify === "function") {
@@ -223,7 +223,7 @@ function _stockPoll(){
       if (typeof Notification !== "undefined" && Notification.permission === "granted") {
         new Notification("⚠ Stock bajo", {
           body: n + " producto(s) con stock crítico. Revisa el inventario.",
-          icon: "../files/famacia.png"
+          icon: <?php echo json_encode(isset($brandLogo) ? $brandLogo : "../files/logo_default.png"); ?>
         });
       }
       if (typeof appNotify === "function") {
@@ -317,7 +317,7 @@ function _vencPoll(){
       if (typeof Notification !== "undefined" && Notification.permission === "granted") {
         new Notification("📅 Alerta de vencimientos", {
           body: msg.trim(),
-          icon: "../files/famacia.png"
+          icon: <?php echo json_encode(isset($brandLogo) ? $brandLogo : "../files/logo_default.png"); ?>
         });
       }
       if (typeof appNotify === "function") {
