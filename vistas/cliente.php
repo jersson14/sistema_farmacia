@@ -101,7 +101,7 @@ if ($_SESSION['ventas']==1) {
 }
 require 'footer.php';
  ?>
- <script src="scripts/cliente.js"></script>
+ <script src="<?= assetV('scripts/cliente.js') ?>"></script>
  <?php 
 }
 

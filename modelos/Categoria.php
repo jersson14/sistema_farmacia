@@ -24,6 +24,9 @@ public function desactivar($idcategoria){
 	$sql="UPDATE categoria SET condicion='0' WHERE idcategoria='$idcategoria'";
 	return ejecutarConsulta($sql);
 }
+public function eliminar($idcategoria){
+	return eliminarRegistro('categoria', 'idcategoria', $idcategoria, 'La categoría', array('liberar'=>array('nombre')));
+}
 public function activar($idcategoria){
 	$sql="UPDATE categoria SET condicion='1' WHERE idcategoria='$idcategoria'";
 	return ejecutarConsulta($sql);
@@ -37,7 +40,7 @@ public function mostrar($idcategoria){
 
 //listar registros
 public function listar(){
-	$sql="SELECT * FROM categoria";
+	$sql="SELECT * FROM categoria WHERE condicion<>2 ORDER BY nombre ASC";
 	return ejecutarConsulta($sql);
 }
 //listar y mostrar en selct

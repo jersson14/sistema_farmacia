@@ -86,7 +86,31 @@ function guardaryeditar(e){
      limpiar();
 }
 
+// Registrar proveedores es libre; editar o eliminar requiere el permiso
+// "Editar y anular compras" o la autorización de un administrador.
+function nombreProveedorFila(idpersona){
+	var nombre = "";
+	if (tabla) {
+		tabla.rows().every(function(){
+			var d = this.data();
+			if (d && String(d[0]).indexOf("(" + idpersona + ")") !== -1) nombre = $("<span>").html(d[1]).text();
+		});
+	}
+	return nombre;
+}
+
 function mostrar(idpersona){
+	appAutorizar({
+		recurso: "proveedor:" + idpersona,
+		titulo: "Editar proveedor",
+		detalle: nombreProveedorFila(idpersona),
+		mensaje: "Podrás modificar los datos de este proveedor durante los próximos minutos.",
+		boton: "Autorizar",
+		onAutorizado: function(){ mostrarAutorizado(idpersona); }
+	});
+}
+
+function mostrarAutorizado(idpersona){
 	$.post("../ajax/persona.php?op=mostrar",{idpersona : idpersona},
 		function(data,status)
 		{
@@ -105,17 +129,36 @@ function mostrar(idpersona){
 }
 
 
-//funcion para desactivar
 function eliminar(idpersona){
-	bootbox.confirm("¿Esta seguro de eliminar este dato?", function(result){
-		if (result) {
-
-			$.post("../ajax/persona.php?op=eliminar", {idpersona : idpersona }, function(e){
-				bootbox.alert(e);
-				tabla.ajax.reload();
-			});
-		}
-	})
+	var mensaje = "Si tiene compras registradas, se quitará de las listas pero su historial se conserva en los reportes.";
+	var aut = {
+		recurso: "proveedor:" + idpersona,
+		titulo: "Eliminar proveedor",
+		detalle: nombreProveedorFila(idpersona),
+		mensaje: mensaje,
+		boton: "Autorizar y eliminar",
+		peligro: true
+	};
+	var enviar = function(){
+		$.post("../ajax/persona.php?op=eliminar", {idpersona: idpersona}, function(raw){
+			var r = appAutorizar.parse(raw);
+			if (appAutorizar.manejar(r, aut, enviar)) return;
+			if (typeof appNotify === "function") appNotify(r.ok ? "success" : "error", r.message || (r.ok ? "Proveedor eliminado" : "No se pudo eliminar el proveedor"));
+			if (r.ok) tabla.ajax.reload(null, false);
+		}).fail(function(){
+			if (typeof appNotify === "function") appNotify("error", "No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.");
+		});
+	};
+	appAutorizar($.extend({}, aut, { onAutorizado: function(yaConfirmado){
+		if (yaConfirmado) { enviar(); return; }
+		appEliminar({
+			url: "../ajax/persona.php?op=eliminar",
+			data: {idpersona: idpersona},
+			titulo: "Eliminar proveedor",
+			mensaje: "¿Deseas eliminar este proveedor? " + mensaje,
+			onSuccess: function(){ tabla.ajax.reload(null, false); }
+		});
+	}}));
 }
 
 

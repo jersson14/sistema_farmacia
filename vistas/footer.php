@@ -1,4 +1,14 @@
 <?php
+// Versión automática de archivos propios (fecha de modificación): el navegador,
+// sobre todo el del celular, descarga el archivo nuevo apenas cambia.
+if (!function_exists('assetV')) {
+  function assetV($ruta) {
+    $fs = __DIR__ . '/' . $ruta;
+    return $ruta . (is_file($fs) ? '?v=' . filemtime($fs) : '');
+  }
+}
+?>
+<?php
 $appCurrencyCode = function_exists('obtenerMonedaEmpresaCodigo') ? obtenerMonedaEmpresaCodigo() : 'PEN';
 $appCurrencySymbol = function_exists('obtenerSimboloMoneda') ? obtenerSimboloMoneda($appCurrencyCode) : 'S/';
 ?>
@@ -27,11 +37,15 @@ $appCurrencySymbol = function_exists('obtenerSimboloMoneda') ? obtenerSimboloMon
 <script src="../public/datatables/dataTables.buttons.min.js"></script>
 <script src="../public/datatables/buttons.html5.min.js"></script>
 <script src="../public/datatables/buttons.colVis.min.js"></script>
-<script src="../public/js/app-datatable.js?v=20260321b"></script>
+<script src="<?= assetV('../public/js/app-datatable.js') ?>"></script>
 <script src="../public/js/bootbox.min.js"></script>
 <script src="../public/js/bootstrap-select.min.js"></script>
-<script src="../public/js/app-notify.js?v=20260321b"></script>
+<script src="<?= assetV('../public/js/app-notify.js') ?>"></script>
+<script src="<?= assetV('../public/js/app-eliminar.js') ?>"></script>
+<script src="<?= assetV('../public/js/app-autorizar.js') ?>"></script>
+<?php require_once __DIR__ . '/../config/Autorizacion.php'; ?>
 <script>
+window.APP_PERMISOS = <?php echo json_encode(autPermisosParaJs()); ?>;
 window.appCurrencyCode = <?php echo json_encode($appCurrencyCode); ?>;
 window.appCurrencySymbol = <?php echo json_encode($appCurrencySymbol); ?>;
 window.appMoney = function(value, decimals) {
@@ -299,7 +313,7 @@ function _vencPoll(){
       if (_vencSonidoHabilitado) _vencSonido();
       var msg = "";
       if (vencidos > 0) msg += vencidos + " lote(s) VENCIDO(S). ";
-      if (proximos > 0) msg += proximos + " lote(s) próximo(s) a vencer (≤30 días).";
+      if (proximos > 0) msg += proximos + " lote(s) próximo(s) a vencer (≤" + (r.dias_alerta || 180) + " días).";
       if (typeof Notification !== "undefined" && Notification.permission === "granted") {
         new Notification("📅 Alerta de vencimientos", {
           body: msg.trim(),
@@ -308,7 +322,7 @@ function _vencPoll(){
       }
       if (typeof appNotify === "function") {
         if (vencidos > 0) appNotify("error",   "🗓 " + vencidos + " lote(s) VENCIDO(S) con stock — retira del inventario");
-        if (proximos > 0) appNotify("warning", "🗓 " + proximos + " lote(s) vencen en menos de 30 días");
+        if (proximos > 0) appNotify("warning", "🗓 " + proximos + " lote(s) vencen en los próximos " + (r.dias_alerta || 180) + " días");
       }
     }
     _vencUltimoTotal = total;

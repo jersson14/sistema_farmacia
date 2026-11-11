@@ -31,9 +31,13 @@ switch ($_GET["op"]) {
 		}
 		break;
 
-	case 'desactivar':
-		$rspta=$unidad->desactivar($idunidad);
-		echo $rspta ? "Unidad desactivada correctamente" : "No se pudo desactivar la unidad";
+	case 'eliminar':
+		if (session_status() === PHP_SESSION_NONE) session_start();
+		if (empty($_SESSION['idusuario']) || empty($_SESSION['almacen'])) {
+			echo json_encode(array("ok"=>false, "message"=>"No tienes permiso para eliminar en este módulo"));
+			break;
+		}
+		echo json_encode($unidad->eliminar($idunidad));
 		break;
 
 	case 'activar':
@@ -52,7 +56,7 @@ switch ($_GET["op"]) {
 
 		while ($reg=$rspta->fetch_object()) {
 			$data[]=array(
-				"0"=>($reg->condicion)?'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idunidad.')"><i class="fa fa-pencil"></i></button>'.' '.'<button class="btn btn-danger btn-xs" onclick="desactivar('.$reg->idunidad.')"><i class="fa fa-close"></i></button>':'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idunidad.')"><i class="fa fa-pencil"></i></button>'.' '.'<button class="btn btn-primary btn-xs" onclick="activar('.$reg->idunidad.')"><i class="fa fa-check"></i></button>',
+				"0"=>'<button class="btn btn-warning btn-xs" title="Editar" onclick="mostrar('.$reg->idunidad.')"><i class="fa fa-pencil"></i></button>'.' <button class="btn btn-danger btn-xs" title="Eliminar" onclick="eliminar('.$reg->idunidad.')"><i class="fa fa-trash"></i></button>'.($reg->condicion ? '' : ' <button class="btn btn-primary btn-xs" title="Activar" onclick="activar('.$reg->idunidad.')"><i class="fa fa-check"></i></button>'),
 				"1"=>$reg->nombre,
 				"2"=>$reg->abreviatura,
 				"3"=>$reg->descripcion,

@@ -96,16 +96,14 @@ function mostrar(idcategoria){
 }
 
 
-//funcion para desactivar
-function desactivar(idcategoria){
-	bootbox.confirm("¿Esta seguro de desactivar este dato?", function(result){
-		if (result) {
-			$.post("../ajax/categoria.php?op=desactivar", {idcategoria : idcategoria}, function(e){
-				bootbox.alert(e);
-				tabla.ajax.reload();
-			});
-		}
-	})
+function eliminar(idcategoria){
+	appEliminar({
+		url: "../ajax/categoria.php?op=eliminar",
+		data: {idcategoria: idcategoria},
+		titulo: "Eliminar categoría",
+		mensaje: "¿Deseas eliminar esta categoría? Si tiene productos asignados, se quitará de las listas pero los productos se conservan.",
+		onSuccess: function(){ tabla.ajax.reload(null, false); }
+	});
 }
 
 function activar(idcategoria){

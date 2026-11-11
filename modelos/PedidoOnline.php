@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../config/Conexion.php";
+require_once __DIR__ . "/Presentacion.php";
 
 class PedidoOnline
 {
@@ -26,33 +27,45 @@ class PedidoOnline
 
         $conexion->autocommit(false);
         try {
-            // Calcular subtotal desde items validados
+            // Calcular subtotal desde items validados (precio de la presentación elegida)
+            $presMdl  = new Presentacion();
+            $mapaPres = $presMdl->mapaPorArticulos(array_map(function($it){ return (int)$it['idarticulo']; }, $items));
             $subtotal = 0;
             $detalles = array();
+            $baseSolicitada = array(); // unidades base pedidas por artículo (tabletas + cajas...)
             foreach ($items as $item) {
                 $idarticulo = (int)$item['idarticulo'];
                 $cantidad   = max(1, (int)$item['cantidad']);
-                // Validar que el artículo existe, está activo y tiene stock
+                // Validar que el artículo existe y está activo
                 $art = ejecutarConsultaSimpleFila(
-                    "SELECT a.idarticulo, a.nombre, a.stock,
-                            COALESCE(NULLIF(a.precio_venta,0),
-                                (SELECT di.precio_venta FROM detalle_ingreso di WHERE di.idarticulo=a.idarticulo ORDER BY di.iddetalle_ingreso DESC LIMIT 1),
-                            0) AS precio_venta
+                    "SELECT a.idarticulo, a.nombre, a.stock
                      FROM articulo a WHERE a.idarticulo='$idarticulo' AND a.condicion=1 LIMIT 1"
                 );
                 if (!$art) {
                     $conexion->rollback(); $conexion->autocommit(true); return false;
                 }
-                if ((float)$art['stock'] < $cantidad) {
+                $listaArt = isset($mapaPres[$idarticulo]) ? $mapaPres[$idarticulo] : array();
+                $pres = Presentacion::elegirDeLista($listaArt, isset($item['idpresentacion']) ? $item['idpresentacion'] : 0);
+                if (!$pres) {
                     $conexion->rollback(); $conexion->autocommit(true);
-                    return array('ok'=>false,'message'=> 'Stock insuficiente para ' . $art['nombre']);
+                    return array('ok'=>false,'message'=> 'La presentación elegida de ' . $art['nombre'] . ' ya no está disponible. Revisa tu carrito.');
                 }
-                $precio   = (float)$art['precio_venta'];
+                $factor = max(1, (float)$pres['factor']);
+                $baseSolicitada[$idarticulo] = (isset($baseSolicitada[$idarticulo]) ? $baseSolicitada[$idarticulo] : 0) + $cantidad * $factor;
+                if ((float)$art['stock'] < $baseSolicitada[$idarticulo]) {
+                    $conexion->rollback(); $conexion->autocommit(true);
+                    return array('ok'=>false,'message'=> 'Stock insuficiente para ' . $art['nombre'] . '. Reduce la cantidad en tu carrito.');
+                }
+                $precio   = Presentacion::precioCliente($pres, true); // pedido = cliente identificado con DNI
                 $sub      = round($precio * $cantidad, 2);
                 $subtotal += $sub;
+                // En el nombre se ve lo que pidió: "Paracetamol 500 mg — Caja x100"
+                $nombreProd = $art['nombre'] . (count($listaArt) > 1 ? ' — ' . Presentacion::etiqueta($pres) : '');
                 $detalles[] = array(
                     'idarticulo'     => $idarticulo,
-                    'nombre_producto'=> limpiarCadena($art['nombre']),
+                    'idpresentacion' => (int)$pres['id'],
+                    'factor'         => $factor,
+                    'nombre_producto'=> limpiarCadena(mb_substr($nombreProd, 0, 250)),
                     'precio_unitario'=> $precio,
                     'cantidad'       => $cantidad,
                     'subtotal'       => $sub
@@ -88,11 +101,21 @@ class PedidoOnline
                 $conexion->rollback(); $conexion->autocommit(true); return false;
             }
 
+            $colPres = $conexion->query("SHOW COLUMNS FROM `detalle_pedido_online` LIKE 'idpresentacion'");
+            $conPres = $colPres && $colPres->num_rows > 0;
             foreach ($detalles as $d) {
-                $sqlD = "INSERT INTO detalle_pedido_online
-                         (idpedido, idarticulo, nombre_producto, precio_unitario, cantidad, subtotal)
-                         VALUES('$idpedido','{$d['idarticulo']}','{$d['nombre_producto']}',
-                                '{$d['precio_unitario']}','{$d['cantidad']}','{$d['subtotal']}')";
+                if ($conPres) {
+                    $idpSql = $d['idpresentacion'] > 0 ? "'{$d['idpresentacion']}'" : "NULL";
+                    $sqlD = "INSERT INTO detalle_pedido_online
+                             (idpedido, idarticulo, idpresentacion, nombre_producto, precio_unitario, cantidad, factor, subtotal)
+                             VALUES('$idpedido','{$d['idarticulo']}',$idpSql,'{$d['nombre_producto']}',
+                                    '{$d['precio_unitario']}','{$d['cantidad']}','{$d['factor']}','{$d['subtotal']}')";
+                } else {
+                    $sqlD = "INSERT INTO detalle_pedido_online
+                             (idpedido, idarticulo, nombre_producto, precio_unitario, cantidad, subtotal)
+                             VALUES('$idpedido','{$d['idarticulo']}','{$d['nombre_producto']}',
+                                    '{$d['precio_unitario']}','{$d['cantidad']}','{$d['subtotal']}')";
+                }
                 ejecutarConsulta($sqlD);
             }
 
@@ -175,6 +198,21 @@ class PedidoOnline
         $rs  = ejecutarConsulta($sql);
         $r   = array();
         while ($row = $rs->fetch_assoc()) $r[$row['estado']] = (int)$row['total'];
+        return $r;
+    }
+
+    // Borra el pedido y su detalle. Si ya se convirtio en venta, la venta del POS se conserva.
+    public function eliminar($idpedido) {
+        $idpedido = (int)$idpedido;
+        $ped = ejecutarConsultaSimpleFila("SELECT comprobante_pago FROM pedido_online WHERE idpedido='$idpedido' LIMIT 1");
+        $r = eliminarRegistro('pedido_online', 'idpedido', $idpedido, 'El pedido #'.$idpedido, array(
+            'previos'    => array("DELETE FROM detalle_pedido_online WHERE idpedido='$idpedido'"),
+            'archivable' => false
+        ));
+        if ($r['ok'] && $ped && $ped['comprobante_pago'] !== '') {
+            $archivo = __DIR__ . '/../files/tienda/' . basename($ped['comprobante_pago']);
+            if (is_file($archivo)) @unlink($archivo);
+        }
         return $r;
     }
 }

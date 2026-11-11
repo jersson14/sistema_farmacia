@@ -40,22 +40,41 @@ switch ($_GET['op']) {
 
         $saldo = $saldoInicialRango;
         $data = array();
+        $entradasRango = 0; $salidasRango = 0; $nCompras = 0; $nVentas = 0;
+        $ultimaCompra = null;
         while ($reg = $movs->fetch_object()) {
             $entrada = (float)$reg->entrada;
             $salida = (float)$reg->salida;
             $saldo += ($entrada - $salida);
+            if ($reg->tipo === 'INGRESO') { $entradasRango += $entrada; $nCompras++; } else { $salidasRango += $salida; $nVentas++; }
 
-            $data[] = array(
+            $fila = array(
                 'fecha' => date('d/m/Y H:i', strtotime($reg->fecha_hora)),
                 'tipo' => $reg->tipo,
                 'documento' => $reg->documento,
+                'iddoc' => (int)$reg->iddoc,
                 'tercero' => $reg->tercero,
+                'lote' => (string)$reg->lote,
+                'vencimiento' => !empty($reg->vencimiento) ? date('d/m/Y', strtotime($reg->vencimiento)) : '',
                 'entrada' => number_format($entrada, 0),
                 'salida' => number_format($salida, 0),
                 'saldo' => number_format($saldo, 0),
                 'costo' => (float)$reg->costo,
                 'precio_ref' => (float)$reg->precio_ref
             );
+            $data[] = $fila;
+            if ($reg->tipo === 'INGRESO') {
+                $ultimaCompra = array(
+                    'fecha' => date('d/m/Y', strtotime($reg->fecha_hora)),
+                    'proveedor' => $reg->tercero,
+                    'documento' => $reg->documento,
+                    'iddoc' => (int)$reg->iddoc,
+                    'cantidad' => number_format($entrada, 0),
+                    'costo' => (float)$reg->costo,
+                    'lote' => (string)$reg->lote,
+                    'vencimiento' => $fila['vencimiento']
+                );
+            }
         }
 
         echo json_encode(array(
@@ -63,9 +82,18 @@ switch ($_GET['op']) {
             'articulo' => $info['nombre'],
             'codigo' => $info['codigo'],
             'unidad' => $info['unidad'],
+            'precio_venta' => (float)$info['precio_venta'],
             'stock_actual' => number_format($stockActual, 0),
             'stock_minimo' => number_format((float)$info['stock_minimo'], 0),
+            'bajo_minimo' => ($stockActual <= (float)$info['stock_minimo']),
             'saldo_inicial' => number_format($saldoInicialRango, 0),
+            'entradas_rango' => number_format($entradasRango, 0),
+            'salidas_rango' => number_format($salidasRango, 0),
+            'n_compras' => $nCompras,
+            'n_ventas' => $nVentas,
+            'desde' => $desde,
+            'hasta' => $hasta,
+            'ultima_compra' => $ultimaCompra,
             'movimientos' => $data
         ));
         break;

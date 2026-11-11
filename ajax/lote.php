@@ -11,21 +11,34 @@ require_once "../modelos/Lote.php";
 $lote = new Lote();
 $op   = $_GET['op'] ?? '';
 
+if (!function_exists('proveedorLoteHtml')) {
+    function proveedorLoteHtml($reg) {
+        if (empty($reg->proveedor)) {
+            return '<span class="text-muted">Sin compra vinculada</span>';
+        }
+        $fecha = !empty($reg->fecha_compra) ? date('d/m/Y', strtotime($reg->fecha_compra)) : '';
+        return '<strong>'.htmlspecialchars($reg->proveedor).'</strong>'
+             . '<br><small class="text-muted">'.htmlspecialchars(trim($reg->documento)).($fecha ? ' · '.$fecha : '').'</small>';
+    }
+}
+
 switch ($op) {
     case 'proximosVencer':
         $dias  = isset($_GET['dias']) ? max(1, (int)$_GET['dias']) : 30;
         $rspta = $lote->listarProximosVencer($dias);
         $data  = array();
         while ($reg = $rspta->fetch_object()) {
-            $urgencia = (int)$reg->dias_restantes <= 15 ? 'danger' : ((int)$reg->dias_restantes <= 30 ? 'warning' : 'info');
+            $dr = (int)$reg->dias_restantes;
+            $urgencia = $dr <= 15 ? 'danger' : ($dr <= 30 ? 'warning' : ($dr <= 90 ? 'info' : 'default'));
             $data[] = array(
                 '0' => htmlspecialchars($reg->codigo),
                 '1' => htmlspecialchars($reg->articulo),
                 '2' => htmlspecialchars($reg->numero_lote),
-                '3' => date('d/m/Y', strtotime($reg->fecha_vencimiento)),
-                '4' => (int)$reg->dias_restantes,
-                '5' => (int)$reg->cantidad_actual,
-                '6' => '<span class="label label-'.$urgencia.'">'.(int)$reg->dias_restantes.' días</span>'
+                '3' => proveedorLoteHtml($reg),
+                '4' => date('d/m/Y', strtotime($reg->fecha_vencimiento)),
+                '5' => (int)$reg->dias_restantes,
+                '6' => (int)$reg->cantidad_actual,
+                '7' => '<span class="label label-'.$urgencia.'">'.(int)$reg->dias_restantes.' días</span>'
             );
         }
         echo json_encode(array(
@@ -45,10 +58,11 @@ switch ($op) {
                 '0' => htmlspecialchars($reg->codigo),
                 '1' => htmlspecialchars($reg->articulo),
                 '2' => htmlspecialchars($reg->numero_lote),
-                '3' => date('d/m/Y', strtotime($reg->fecha_vencimiento)),
-                '4' => (int)$reg->dias_vencido,
-                '5' => (int)$reg->cantidad_actual,
-                '6' => '<span class="label label-danger">VENCIDO hace '.(int)$reg->dias_vencido.' días</span>'
+                '3' => proveedorLoteHtml($reg),
+                '4' => date('d/m/Y', strtotime($reg->fecha_vencimiento)),
+                '5' => (int)$reg->dias_vencido,
+                '6' => (int)$reg->cantidad_actual,
+                '7' => '<span class="label label-danger">VENCIDO hace '.(int)$reg->dias_vencido.' días</span>'
             );
         }
         echo json_encode(array(
@@ -61,13 +75,35 @@ switch ($op) {
         break;
 
     case 'contadores':
+        $diasAlerta = $lote->diasAlerta();
         echo json_encode(array(
             'ok'            => true,
             'vencidos'      => $lote->contarVencidos(),
             'vence_30'      => $lote->contarProximosVencer(30),
             'vence_60'      => $lote->contarProximosVencer(60),
-            'vence_90'      => $lote->contarProximosVencer(90)
+            'vence_90'      => $lote->contarProximosVencer(90),
+            'dias_alerta'   => $diasAlerta,
+            'vence_alerta'  => $lote->contarProximosVencer($diasAlerta),
+            'puede_config'  => !empty($_SESSION['acceso']) && $_SESSION['acceso'] == 1
         ));
+        break;
+
+    case 'guardarDiasAlerta':
+        header('Content-Type: application/json');
+        if (empty($_SESSION['acceso']) || $_SESSION['acceso'] != 1) {
+            echo json_encode(array('ok'=>false,'message'=>'Solo un administrador puede cambiar este ajuste.'));
+            break;
+        }
+        $dias = isset($_POST['dias']) ? (int)limpiarCadena($_POST['dias']) : 0;
+        if ($dias < 1 || $dias > 730) {
+            echo json_encode(array('ok'=>false,'message'=>'Ingresa una cantidad de días entre 1 y 730.'));
+            break;
+        }
+        if ($lote->guardarDiasAlerta($dias)) {
+            echo json_encode(array('ok'=>true,'message'=>'Se avisará con '.$dias.' días de anticipación.','dias'=>$dias));
+        } else {
+            echo json_encode(array('ok'=>false,'message'=>'No se pudo guardar. Pide al administrador ejecutar la migración 20261110_dias_alerta_vencimiento.sql.'));
+        }
         break;
 
     case 'porArticulo':
@@ -93,7 +129,8 @@ switch ($op) {
     case 'notifVencimiento':
         header('Content-Type: application/json');
         $vencidos = $lote->contarVencidos();
-        $proximos = $lote->contarProximosVencer(30);
+        $diasAlerta = $lote->diasAlerta();
+        $proximos = $lote->contarProximosVencer($diasAlerta);
         $sql = "SELECT a.nombre AS articulo, l.numero_lote, l.fecha_vencimiento,
                        l.cantidad_actual,
                        DATEDIFF(CURDATE(), l.fecha_vencimiento) AS dias_vencido,
@@ -104,7 +141,7 @@ switch ($op) {
                 WHERE l.condicion=1
                   AND l.cantidad_actual > 0
                   AND (l.fecha_vencimiento < CURDATE()
-                       OR l.fecha_vencimiento <= DATE_ADD(CURDATE(), INTERVAL 30 DAY))
+                       OR l.fecha_vencimiento <= DATE_ADD(CURDATE(), INTERVAL $diasAlerta DAY))
                 ORDER BY l.fecha_vencimiento ASC
                 LIMIT 8";
         $rs    = ejecutarConsulta($sql);
@@ -124,6 +161,7 @@ switch ($op) {
             'ok'      => true,
             'vencidos'=> $vencidos,
             'proximos'=> $proximos,
+            'dias_alerta' => $diasAlerta,
             'lotes'   => $lotes,
         ]);
         break;
@@ -136,13 +174,18 @@ switch ($op) {
                        l.fecha_vencimiento,
                        l.cantidad_inicial,
                        l.cantidad_actual,
-                       DATEDIFF(l.fecha_vencimiento, CURDATE()) AS dias_restantes
+                       DATEDIFF(l.fecha_vencimiento, CURDATE()) AS dias_restantes,
+                       i.idingreso, i.fecha_hora AS fecha_compra, i.tipo_comprobante, i.serie_comprobante, i.num_comprobante,
+                       i.estado AS estado_compra, p.nombre AS proveedor
                 FROM lote_articulo l
                 INNER JOIN articulo a ON a.idarticulo = l.idarticulo
+                LEFT JOIN ingreso i ON i.idingreso = l.idingreso
+                LEFT JOIN persona p ON p.idpersona = i.idproveedor
                 WHERE l.condicion = 1
                 ORDER BY a.nombre ASC, l.fecha_vencimiento ASC";
         $rs   = ejecutarConsulta($sql);
         $data = array();
+        $diasAlerta = $lote->diasAlerta();
         while ($reg = $rs->fetch_object()) {
             $dias = (int)$reg->dias_restantes;
             $cant = (int)$reg->cantidad_actual;
@@ -152,21 +195,37 @@ switch ($op) {
                 $badge = '<span class="label label-danger">VENCIDO hace '.abs($dias).' d</span>';
             } elseif ($dias <= 30) {
                 $badge = '<span class="label label-warning">VENCE en '.$dias.' d</span>';
+            } elseif ($dias <= $diasAlerta) {
+                $badge = '<span class="label label-info">VENCE en '.$dias.' d</span>';
             } else {
                 $badge = '<span class="label label-success">VIGENTE</span>';
             }
             $fVenc = $reg->fecha_vencimiento ? date('d/m/Y', strtotime($reg->fecha_vencimiento)) : '-';
             $fFab  = $reg->fecha_fabricacion  ? date('d/m/Y', strtotime($reg->fecha_fabricacion))  : '-';
+            // Proveedor y compra de origen del lote
+            if (!empty($reg->idingreso)) {
+                $provHtml   = '<strong>'.htmlspecialchars($reg->proveedor ?: '-').'</strong>';
+                $docCompra  = trim($reg->tipo_comprobante.' '.$reg->serie_comprobante.'-'.$reg->num_comprobante);
+                $compraHtml = ($reg->fecha_compra ? date('d/m/Y', strtotime($reg->fecha_compra)) : '-')
+                            . '<br><small class="text-muted">'.htmlspecialchars($docCompra).'</small>'
+                            . ($reg->estado_compra === 'Borrador' ? ' <span class="label label-warning">Borrador</span>' : '')
+                            . ($reg->estado_compra === 'Anulado'  ? ' <span class="label label-danger">Anulada</span>'  : '');
+            } else {
+                $provHtml   = '<span class="text-muted">Sin compra vinculada</span>';
+                $compraHtml = '<span class="text-muted">-</span>';
+            }
             $data[] = array(
-                '0' => htmlspecialchars($reg->codigo),
-                '1' => htmlspecialchars($reg->articulo),
-                '2' => htmlspecialchars($reg->numero_lote),
-                '3' => $fFab,
-                '4' => $fVenc,
-                '5' => (int)$reg->cantidad_inicial,
-                '6' => $cant,
-                '7' => $badge,
-                '8' => (int)$reg->idlote
+                '0'  => htmlspecialchars($reg->codigo),
+                '1'  => htmlspecialchars($reg->articulo),
+                '2'  => htmlspecialchars($reg->numero_lote),
+                '3'  => $provHtml,
+                '4'  => $compraHtml,
+                '5'  => $fFab,
+                '6'  => $fVenc,
+                '7'  => (int)$reg->cantidad_inicial,
+                '8'  => $cant,
+                '9'  => $badge,
+                '10' => (int)$reg->idlote
             );
         }
         echo json_encode(array(

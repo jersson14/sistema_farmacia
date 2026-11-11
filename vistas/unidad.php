@@ -71,7 +71,7 @@ if ($_SESSION['almacen']==1) {
 
 require 'footer.php';
 ?>
-<script src="scripts/unidad.js"></script>
+<script src="<?= assetV('scripts/unidad.js') ?>"></script>
 <?php
 }
 

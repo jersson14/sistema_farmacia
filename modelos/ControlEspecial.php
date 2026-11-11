@@ -17,7 +17,7 @@ class ControlEspecial
         if ($idventa <= 0) return false;
 
         // Obtener artículos de control especial en esta venta con info de lote
-        $sql = "SELECT dv.idarticulo, dv.cantidad, dv.idlote,
+        $sql = "SELECT dv.idarticulo, (dv.cantidad*dv.factor) AS cantidad, dv.idlote,
                        a.nombre AS nombre_articulo,
                        IFNULL(la.numero_lote,'') AS numero_lote,
                        la.fecha_vencimiento,

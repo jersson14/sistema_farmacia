@@ -11,7 +11,7 @@ public function __construct(){
 
 //listar registros
 public function comprasfecha($fecha_inicio,$fecha_fin){
-	$sql="SELECT DATE(i.fecha_hora) as fecha, u.nombre as usuario, p.nombre as proveedor, i.tipo_comprobante, i.serie_comprobante, i.num_comprobante, i.total_compra,i.impuesto,i.estado FROM ingreso i INNER JOIN persona p ON i.idproveedor=p.idpersona INNER JOIN usuario u ON i.idusuario=u.idusuario WHERE DATE(i.fecha_hora)>='$fecha_inicio' AND DATE(i.fecha_hora)<='$fecha_fin'";
+	$sql="SELECT DATE(i.fecha_hora) as fecha, u.nombre as usuario, p.nombre as proveedor, i.tipo_comprobante, i.serie_comprobante, i.num_comprobante, i.total_compra,i.impuesto,i.estado FROM ingreso i INNER JOIN persona p ON i.idproveedor=p.idpersona INNER JOIN usuario u ON i.idusuario=u.idusuario WHERE DATE(i.fecha_hora)>='$fecha_inicio' AND DATE(i.fecha_hora)<='$fecha_fin' AND i.estado<>'Borrador'";
 	return ejecutarConsulta($sql);
 }
 
@@ -35,13 +35,13 @@ public function ventasfechacliente($fecha_inicio, $fecha_fin, $idcliente = 0) {
 
 public function listarClientesSelect() {
 	$sql="SELECT idpersona, nombre FROM persona
-		WHERE tipo_persona='Cliente' AND condicion=1
+		WHERE tipo_persona='Cliente'".sqlPersonaVisible()."
 		ORDER BY nombre ASC";
 	return ejecutarConsulta($sql);
 }
 
 public function totalcomprahoy(){
-	$sql="SELECT IFNULL(SUM(total_compra),0) as total_compra FROM ingreso WHERE DATE(fecha_hora)=curdate()";
+	$sql="SELECT IFNULL(SUM(total_compra),0) as total_compra FROM ingreso WHERE DATE(fecha_hora)=curdate() AND estado<>'Borrador'";
 	return ejecutarConsulta($sql);
 }
 
@@ -53,7 +53,7 @@ public function totalventahoy(){
 public function comprasultimos_10dias(){
 	$sql="SELECT DATE(fecha_hora) AS fecha, SUM(total_compra) AS total
 	FROM ingreso
-	WHERE fecha_hora >= DATE_SUB(CURDATE(), INTERVAL 9 DAY)
+	WHERE fecha_hora >= DATE_SUB(CURDATE(), INTERVAL 9 DAY) AND estado<>'Borrador'
 	GROUP BY DATE(fecha_hora)
 	ORDER BY DATE(fecha_hora) ASC";
 	return ejecutarConsulta($sql);
@@ -71,7 +71,7 @@ public function ventasultimos_12meses(){
 public function totalcomprasemes(){
 	$sql="SELECT IFNULL(SUM(total_compra),0) AS total_compra
 	FROM ingreso
-	WHERE YEAR(fecha_hora)=YEAR(CURDATE()) AND MONTH(fecha_hora)=MONTH(CURDATE())";
+	WHERE YEAR(fecha_hora)=YEAR(CURDATE()) AND MONTH(fecha_hora)=MONTH(CURDATE()) AND estado<>'Borrador'";
 	return ejecutarConsulta($sql);
 }
 
@@ -86,8 +86,8 @@ public function kpisgenerales(){
 	$sql="SELECT
 	(SELECT COUNT(*) FROM articulo WHERE condicion=1) AS articulos_activos,
 	(SELECT COUNT(*) FROM categoria WHERE condicion=1) AS categorias_activas,
-	(SELECT COUNT(*) FROM persona WHERE tipo_persona='Cliente') AS clientes,
-	(SELECT COUNT(*) FROM persona WHERE tipo_persona='Proveedor') AS proveedores,
+	(SELECT COUNT(*) FROM persona WHERE tipo_persona='Cliente'".sqlPersonaVisible().") AS clientes,
+	(SELECT COUNT(*) FROM persona WHERE tipo_persona='Proveedor'".sqlPersonaVisible().") AS proveedores,
 	(SELECT IFNULL(SUM(stock),0) FROM articulo WHERE condicion=1) AS stock_total";
 	return ejecutarConsulta($sql);
 }
@@ -123,7 +123,7 @@ public function topproductosvendidos($limit=7){
 	$limit=(int)$limit;
 	if ($limit<=0) $limit=7;
 	$sql="SELECT a.nombre AS producto,
-	IFNULL(SUM(dv.cantidad),0) AS cantidad,
+	IFNULL(SUM(dv.cantidad*dv.factor),0) AS cantidad,
 	IFNULL(SUM((dv.cantidad*dv.precio_venta)-dv.descuento),0) AS total
 	FROM detalle_venta dv
 	INNER JOIN articulo a ON a.idarticulo=dv.idarticulo
@@ -156,7 +156,7 @@ public function ventasporcategoria($limit=8){
 public function comprasultimos_6meses(){
 	$sql="SELECT DATE_FORMAT(fecha_hora,'%Y-%m') AS periodo, DATE_FORMAT(fecha_hora,'%b %Y') AS fecha, IFNULL(SUM(total_compra),0) AS total
 	FROM ingreso
-	WHERE fecha_hora >= DATE_SUB(CURDATE(), INTERVAL 5 MONTH)
+	WHERE fecha_hora >= DATE_SUB(CURDATE(), INTERVAL 5 MONTH) AND estado<>'Borrador'
 	GROUP BY DATE_FORMAT(fecha_hora,'%Y-%m'), DATE_FORMAT(fecha_hora,'%b %Y')
 	ORDER BY YEAR(fecha_hora), MONTH(fecha_hora)";
 	return ejecutarConsulta($sql);
@@ -176,16 +176,16 @@ public function utilidadPorPeriodo($fecha_inicio,$fecha_fin){
 	a.codigo,
 	a.nombre AS articulo,
 	IFNULL(c.nombre,'SIN CATEGORIA') AS categoria,
-	IFNULL(SUM(dv.cantidad),0) AS cantidad_vendida,
+	IFNULL(SUM(dv.cantidad*dv.factor),0) AS cantidad_vendida,
 	IFNULL(SUM((dv.cantidad*dv.precio_venta)-dv.descuento),0) AS venta_total,
-	IFNULL(SUM(dv.cantidad*IFNULL(cp.costo_unitario,0)),0) AS costo_estimado
+	IFNULL(SUM(dv.cantidad*dv.factor*IFNULL(cp.costo_unitario,0)),0) AS costo_estimado
 	FROM detalle_venta dv
 	INNER JOIN venta v ON v.idventa=dv.idventa
 	INNER JOIN articulo a ON a.idarticulo=dv.idarticulo
 	LEFT JOIN categoria c ON c.idcategoria=a.idcategoria
 	LEFT JOIN (
 		SELECT di.idarticulo,
-		CASE WHEN SUM(di.cantidad)>0 THEN SUM(di.cantidad*di.precio_compra)/SUM(di.cantidad) ELSE 0 END AS costo_unitario
+		CASE WHEN SUM(di.cantidad*di.factor)>0 THEN SUM(di.cantidad*di.precio_compra)/SUM(di.cantidad*di.factor) ELSE 0 END AS costo_unitario
 		FROM detalle_ingreso di
 		INNER JOIN ingreso i ON i.idingreso=di.idingreso
 		WHERE DATE(i.fecha_hora)>='$fecha_inicio' AND DATE(i.fecha_hora)<='$fecha_fin'
@@ -209,7 +209,7 @@ public function topProductosPeriodo($fecha_inicio,$fecha_fin,$limit=20,$modo='MA
 	a.nombre AS articulo,
 	IFNULL(c.nombre,'SIN CATEGORIA') AS categoria,
 	IFNULL(u.abreviatura,'und') AS unidad,
-	IFNULL(SUM(CASE WHEN v.idventa IS NOT NULL THEN dv.cantidad ELSE 0 END),0) AS cantidad,
+	IFNULL(SUM(CASE WHEN v.idventa IS NOT NULL THEN dv.cantidad*dv.factor ELSE 0 END),0) AS cantidad,
 	IFNULL(SUM(CASE WHEN v.idventa IS NOT NULL THEN ((dv.cantidad*dv.precio_venta)-dv.descuento) ELSE 0 END),0) AS total
 	FROM articulo a
 	LEFT JOIN categoria c ON c.idcategoria=a.idcategoria
@@ -288,8 +288,8 @@ public function kardexValorizado($fecha_inicio,$fecha_fin){
 	LEFT JOIN (
 		SELECT
 		di.idarticulo,
-		IFNULL(SUM(di.cantidad),0) AS entrada,
-		CASE WHEN SUM(di.cantidad)>0 THEN SUM(di.cantidad*di.precio_compra)/SUM(di.cantidad) ELSE 0 END AS costo_promedio
+		IFNULL(SUM(di.cantidad*di.factor),0) AS entrada,
+		CASE WHEN SUM(di.cantidad*di.factor)>0 THEN SUM(di.cantidad*di.precio_compra)/SUM(di.cantidad*di.factor) ELSE 0 END AS costo_promedio
 		FROM detalle_ingreso di
 		INNER JOIN ingreso i ON i.idingreso=di.idingreso
 		WHERE DATE(i.fecha_hora)>='$fecha_inicio' AND DATE(i.fecha_hora)<='$fecha_fin'
@@ -299,7 +299,7 @@ public function kardexValorizado($fecha_inicio,$fecha_fin){
 	LEFT JOIN (
 		SELECT
 		dv.idarticulo,
-		IFNULL(SUM(dv.cantidad),0) AS salida
+		IFNULL(SUM(dv.cantidad*dv.factor),0) AS salida
 		FROM detalle_venta dv
 		INNER JOIN venta v ON v.idventa=dv.idventa
 		WHERE DATE(v.fecha_hora)>='$fecha_inicio' AND DATE(v.fecha_hora)<='$fecha_fin'
@@ -342,7 +342,7 @@ public function clientesProveedoresPeriodo($fecha_inicio,$fecha_fin,$tipo='TODOS
 		IFNULL(DATE_FORMAT(MAX(i.fecha_hora),'%d/%m/%Y'),'--') AS ultimo_mov
 		FROM ingreso i
 		LEFT JOIN persona p ON p.idpersona=i.idproveedor
-		WHERE DATE(i.fecha_hora)>='$fecha_inicio' AND DATE(i.fecha_hora)<='$fecha_fin'
+		WHERE DATE(i.fecha_hora)>='$fecha_inicio' AND DATE(i.fecha_hora)<='$fecha_fin' AND i.estado<>'Borrador'
 		AND (i.estado='Aceptado' OR i.estado IS NULL OR i.estado='')
 		GROUP BY i.idproveedor,p.nombre,p.num_documento,p.telefono
 		ORDER BY total DESC";
@@ -412,7 +412,7 @@ public function ultimomovimientos($limit=10){
 public function totalcomprarango($fecha_inicio,$fecha_fin){
 	$sql="SELECT IFNULL(SUM(total_compra),0) AS total_compra
 	FROM ingreso
-	WHERE DATE(fecha_hora)>='$fecha_inicio' AND DATE(fecha_hora)<='$fecha_fin'";
+	WHERE DATE(fecha_hora)>='$fecha_inicio' AND DATE(fecha_hora)<='$fecha_fin' AND estado<>'Borrador'";
 	return ejecutarConsulta($sql);
 }
 
@@ -426,7 +426,7 @@ public function totalventarango($fecha_inicio,$fecha_fin){
 public function comprasdiariasrango($fecha_inicio,$fecha_fin){
 	$sql="SELECT DATE(fecha_hora) AS fecha, IFNULL(SUM(total_compra),0) AS total
 	FROM ingreso
-	WHERE DATE(fecha_hora)>='$fecha_inicio' AND DATE(fecha_hora)<='$fecha_fin'
+	WHERE DATE(fecha_hora)>='$fecha_inicio' AND DATE(fecha_hora)<='$fecha_fin' AND estado<>'Borrador'
 	GROUP BY DATE(fecha_hora)
 	ORDER BY DATE(fecha_hora) ASC";
 	return ejecutarConsulta($sql);
@@ -444,7 +444,7 @@ public function ventasmensualesrango($fecha_inicio,$fecha_fin){
 public function comprasmensualesrango($fecha_inicio,$fecha_fin){
 	$sql="SELECT DATE_FORMAT(fecha_hora,'%Y-%m') AS periodo, DATE_FORMAT(fecha_hora,'%b %Y') AS fecha, IFNULL(SUM(total_compra),0) AS total
 	FROM ingreso
-	WHERE DATE(fecha_hora)>='$fecha_inicio' AND DATE(fecha_hora)<='$fecha_fin'
+	WHERE DATE(fecha_hora)>='$fecha_inicio' AND DATE(fecha_hora)<='$fecha_fin' AND estado<>'Borrador'
 	GROUP BY DATE_FORMAT(fecha_hora,'%Y-%m'), DATE_FORMAT(fecha_hora,'%b %Y')
 	ORDER BY YEAR(fecha_hora), MONTH(fecha_hora)";
 	return ejecutarConsulta($sql);
@@ -472,7 +472,7 @@ public function topproductosvendidosrango($fecha_inicio,$fecha_fin,$limit=7){
 	$limit=(int)$limit;
 	if ($limit<=0) $limit=7;
 	$sql="SELECT a.nombre AS producto,
-	IFNULL(SUM(dv.cantidad),0) AS cantidad,
+	IFNULL(SUM(dv.cantidad*dv.factor),0) AS cantidad,
 	IFNULL(SUM((dv.cantidad*dv.precio_venta)-dv.descuento),0) AS total
 	FROM detalle_venta dv
 	INNER JOIN articulo a ON a.idarticulo=dv.idarticulo
@@ -503,7 +503,7 @@ public function resumenResultados($fecha_inicio, $fecha_fin) {
 	               AND estado='Aceptado'";
 	$sqlCompras = "SELECT IFNULL(SUM(total_compra),0) AS total_compras
 	               FROM ingreso
-	               WHERE DATE(fecha_hora)>='$fecha_inicio' AND DATE(fecha_hora)<='$fecha_fin'";
+	               WHERE DATE(fecha_hora)>='$fecha_inicio' AND DATE(fecha_hora)<='$fecha_fin' AND estado<>'Borrador'";
 	$sqlCaja    = "SELECT
 	                 IFNULL(SUM(CASE WHEN m.tipo='INGRESO' AND m.concepto NOT LIKE 'Venta %' THEN m.monto ELSE 0 END),0) AS ingresos_caja,
 	                 IFNULL(SUM(CASE WHEN m.tipo='EGRESO' THEN m.monto ELSE 0 END),0) AS egresos_caja

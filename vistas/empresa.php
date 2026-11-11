@@ -125,7 +125,7 @@ if ($_SESSION['acceso']==1) {
 }
 require 'footer.php';
 ?>
-<script src="scripts/empresa.js"></script>
+<script src="<?= assetV('scripts/empresa.js') ?>"></script>
 <?php
 }
 ob_end_flush();

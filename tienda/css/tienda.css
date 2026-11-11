@@ -1295,6 +1295,8 @@ body {
   gap: 6px;
 }
 .tf-contact i { color: #60a5fa; }
+.tf-contact a { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.tf-contact a:hover { color: #fff; }
 .tf-links {
   display: flex;
   justify-content: center;
@@ -2004,3 +2006,67 @@ body {
   .pm-receta i { font-size: 18px; }
   .pm-thumb { width: 52px; height: 52px; }
 }
+
+/* ── Validación de formularios (checkout) ── */
+.fgroup input.is-invalid, .fgroup select.is-invalid, .fgroup textarea.is-invalid {
+  border-color: #ef4444;
+  background: #fff5f5;
+  box-shadow: 0 0 0 3px rgba(239,68,68,.15);
+}
+.fgroup .err-text { font-size: 12.5px; color: #b91c1c; margin-top: 5px; font-weight: 600; }
+
+/* ── Presentaciones de venta (Tableta, Blíster x10, Caja x100...) ── */
+.pc-pres {
+  margin: 4px 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pc-desde { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.pm-pres { margin: 0 0 16px; }
+.pm-pres-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+.pm-pres-opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.pm-pres-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+.pm-pres-opt:hover:not(:disabled) { border-color: var(--primary-light); background: var(--primary-xlight); }
+.pm-pres-opt.activa { border-color: var(--primary); background: var(--primary-xlight); box-shadow: 0 0 0 3px rgba(29, 78, 216, .12); }
+.pm-pres-opt:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.pm-pres-opt:disabled { opacity: .5; cursor: not-allowed; }
+.pm-pres-nombre { font-size: 14px; font-weight: 700; color: var(--text); }
+.pm-pres-precio { font-size: 15px; font-weight: 800; color: var(--primary); }
+.pm-pres-equiv { font-size: 11.5px; color: var(--text-secondary); }
+.pm-pres-cont { font-size: 12.5px; font-weight: 600; color: var(--text); background: var(--primary-xlight); border-radius: 6px; padding: 1px 6px; align-self: flex-start; }
+.ci-pres { font-size: 12.5px; font-weight: 600; color: var(--primary); margin: 2px 0; }
+
+/* ── Precio con DNI (cliente registrado) ── */
+.pc-dni { font-size: 12.5px; color: #047857; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 3px 8px; margin: 2px 0 8px; display: inline-flex; align-items: center; gap: 4px; }
+.pc-dni strong { font-size: 14px; }
+.pm-dni:empty { display: none; }
+.pm-dni { background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; padding: 10px 12px; margin: -4px 0 16px; }
+.pm-dni-precio { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; color: #047857; }
+.pm-dni-precio strong { font-size: 22px; font-weight: 800; }
+.pm-dni-precio small { color: var(--text-secondary); }
+.pm-dni-tag { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; }
+.pm-dni-ahorro { font-size: 12px; font-weight: 700; background: #047857; color: #fff; border-radius: 999px; padding: 1px 8px; }
+.pm-dni-nota { font-size: 12.5px; color: var(--text-secondary); margin-top: 4px; }
+.pm-dni-nota a { color: #047857; font-weight: 700; }
+.pm-dni-nota.ok { color: #047857; }
+.ci-dni { font-size: 12px; color: #047857; }
+.ci-dni s { color: var(--text-secondary); }

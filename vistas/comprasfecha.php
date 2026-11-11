@@ -79,7 +79,7 @@ if ($_SESSION['consultac']==1) {
 
 require 'footer.php';
  ?>
- <script src="scripts/comprasfecha.js"></script>
+ <script src="<?= assetV('scripts/comprasfecha.js') ?>"></script>
  <?php 
 }
 

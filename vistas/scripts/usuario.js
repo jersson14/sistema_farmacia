@@ -2,24 +2,97 @@ var tabla;
 var PERFIL_MODE = !!window.appPerfilMode;
 var PERFIL_ID   = window.appPerfilId || null;
 
+// Permisos base por rol. El Administrador recibe todos los permisos existentes.
 var PERMISOS_ROL = {
-    "Administrador": [1,2,3,4,5,6,7,8,9,10,11],
-    "Vendedor":      [1,4]
+    "Vendedor": [1,4]   // Escritorio + Ventas (vender siempre está permitido)
 };
 
-// Marca los checkboxes ocultos según el rol elegido
-function aplicarPermisosPorRol(rol){
-    var ids = PERMISOS_ROL[rol] || PERMISOS_ROL["Vendedor"];
-    $("#permisos input[type=checkbox]").each(function(){
-        $(this).prop("checked", ids.indexOf(parseInt($(this).val())) >= 0);
-    });
+// Permisos que el administrador puede encender o apagar para cada vendedor.
+// 14 y 15 los crea la migración 20261108_permisos_autorizacion.sql
+var PERMISOS_ESPECIALES = [
+    { id: 3,  icono: "fa-truck",  nombre: "Registrar compras",
+      desc: "Puede registrar compras nuevas y proveedores. No puede editar ni anular compras ya registradas.", defecto: true },
+    { id: 14, icono: "fa-ban",    nombre: "Anular y eliminar ventas sin autorización",
+      desc: "Apagado: cada anulación o eliminación de una venta la autoriza un administrador con su clave.", defecto: false },
+    { id: 15, icono: "fa-pencil", nombre: "Editar y anular compras sin autorización",
+      desc: "Incluye agregar o corregir productos de una compra registrada y editar o eliminar proveedores. Apagado: lo autoriza un administrador.", defecto: false }
+];
+
+function checkboxPermiso(id){
+    return $("#permisos input[type=checkbox][value='" + id + "']");
 }
 
-// Carga los checkboxes de permisos (ocultos) y aplica el rol actual
+// Estado actual de los permisos especiales (id -> bool)
+function estadoEspeciales(usarDefecto){
+    var estado = {};
+    PERMISOS_ESPECIALES.forEach(function(p){
+        estado[p.id] = usarDefecto ? p.defecto : checkboxPermiso(p.id).prop("checked");
+    });
+    return estado;
+}
+
+// Marca los checkboxes ocultos según el rol y los permisos especiales elegidos
+function aplicarPermisosPorRol(rol, especiales){
+    var $todos = $("#permisos input[type=checkbox]");
+    if (rol === "Administrador") {
+        $todos.prop("checked", true);
+    } else {
+        var ids = PERMISOS_ROL["Vendedor"];
+        especiales = especiales || estadoEspeciales(true);
+        $todos.each(function(){
+            var id = parseInt($(this).val(), 10);
+            var marcado = ids.indexOf(id) >= 0 || especiales[id] === true;
+            $(this).prop("checked", marcado);
+        });
+    }
+    renderPermisosEspeciales(rol);
+}
+
+// Dibuja los interruptores visibles a partir de los checkboxes ocultos
+function renderPermisosEspeciales(rol){
+    var esAdmin = rol === "Administrador";
+    var $lista = $("#permEspecialesLista").empty();
+    $("#permEspecialesNota").text(esAdmin
+        ? "El administrador tiene todos los permisos y puede autorizar las acciones de los vendedores."
+        : "El vendedor siempre puede vender. Lo que esté apagado aquí lo debe autorizar un administrador con su usuario y clave.");
+    var faltan = false;
+    PERMISOS_ESPECIALES.forEach(function(p){
+        var $cb = checkboxPermiso(p.id);
+        if (!$cb.length) { faltan = true; return; }
+        var on = esAdmin || $cb.prop("checked");
+        var $item = $(
+            '<label class="perm-item">' +
+                '<input type="checkbox">' +
+                '<span class="perm-switch" aria-hidden="true"></span>' +
+                '<span class="perm-texto">' +
+                    '<span class="perm-nombre"><i class="fa ' + p.icono + '"></i> </span>' +
+                    '<span class="perm-desc"></span>' +
+                '</span>' +
+            '</label>'
+        );
+        $item.find(".perm-nombre").append(document.createTextNode(p.nombre));
+        $item.find(".perm-desc").text(p.desc);
+        var $input = $item.find("input").prop("checked", on).prop("disabled", esAdmin);
+        $item.toggleClass("is-on", on).toggleClass("is-locked", esAdmin);
+        $input.on("change", function(){
+            var v = $(this).prop("checked");
+            $cb.prop("checked", v);
+            $item.toggleClass("is-on", v);
+        });
+        $lista.append($item);
+    });
+    if (faltan) {
+        $lista.append('<p class="text-warning" style="font-size:12.5px;margin:4px 0 8px;"><i class="fa fa-exclamation-triangle"></i> Falta ejecutar la migración <b>20261108_permisos_autorizacion.sql</b> para ver todos los permisos.</p>');
+    }
+}
+
+// Carga los checkboxes de permisos (ocultos) y aplica el rol actual.
+// Usuario existente: respeta los permisos especiales que ya tenía guardados.
 function cargarYAplicarPermisos(idUsuario, rolActual){
     $.post("../ajax/usuario.php?op=permisos&id=" + (idUsuario || ""), function(r){
         $("#permisos").html(r);
-        aplicarPermisosPorRol(rolActual || $("#cargo").val());
+        var rol = rolActual || $("#cargo").val();
+        aplicarPermisosPorRol(rol, idUsuario ? estadoEspeciales(false) : estadoEspeciales(true));
     });
 }
 
@@ -139,15 +212,14 @@ function mostrar(idusuario){
     });
 }
 
-function desactivar(idusuario){
-    bootbox.confirm("¿Desactivar este usuario?", function(result){
-        if(result){
-            $.post("../ajax/usuario.php?op=desactivar", {idusuario: idusuario}, function(e){
-                bootbox.alert(e);
-                tabla.ajax.reload();
-            });
-        }
-    });
+function eliminar(idusuario){
+	appEliminar({
+		url: "../ajax/usuario.php?op=eliminar",
+		data: {idusuario: idusuario},
+		titulo: "Eliminar usuario",
+		mensaje: "¿Deseas eliminar este usuario? Ya no podrá ingresar al sistema. Sus ventas y cajas anteriores se conservan en los reportes.",
+		onSuccess: function(){ tabla.ajax.reload(null, false); }
+	});
 }
 
 function activar(idusuario){
@@ -182,6 +254,11 @@ $(function(){
 
     // Al cambiar el rol, reasignar permisos automáticamente
     $("#cargo").on("change", function(){
-        aplicarPermisosPorRol($(this).val());
+        aplicarPermisosPorRol($(this).val(), estadoEspeciales(true));
     });
+
+    // En "Mi perfil" no se administran permisos
+    if (PERFIL_MODE) {
+        $("#permEspeciales").closest(".form-group").hide();
+    }
 });

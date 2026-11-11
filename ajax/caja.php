@@ -99,7 +99,10 @@ switch ($_GET['op']) {
                     '1' => $reg->tipo,
                     '2' => $reg->concepto,
                     '3' => formatearMoneda((float)$reg->monto),
-                    '4' => $reg->usuario
+                    '4' => $reg->usuario,
+                    '5' => Caja::esMovimientoManual($reg->concepto)
+                        ? '<button class="btn btn-danger btn-xs" title="Eliminar movimiento" onclick="eliminarMovimientoCaja(' . (int)$reg->idmovimiento . ')"><i class="fa fa-trash"></i></button>'
+                        : '<span class="text-muted" title="Generado por el sistema"><i class="fa fa-lock"></i></span>'
                 );
             }
         }
@@ -110,6 +113,15 @@ switch ($_GET['op']) {
             'iTotalDisplayRecords' => count($data),
             'aaData' => $data
         ));
+        break;
+
+    case 'eliminarMovimiento':
+        $abierta = $caja->cajaAbiertaUsuario($idusuario);
+        if (!$abierta) {
+            echo json_encode(array('ok' => false, 'message' => 'Solo puedes eliminar movimientos mientras tu caja está abierta'));
+            break;
+        }
+        echo json_encode($caja->eliminarMovimiento(isset($_POST['idmovimiento']) ? $_POST['idmovimiento'] : 0, $abierta['idcaja']));
         break;
 
     case 'historial':

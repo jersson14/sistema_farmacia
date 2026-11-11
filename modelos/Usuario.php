@@ -53,6 +53,18 @@ public function desactivar($idusuario){
 	$sql="UPDATE usuario SET condicion='0' WHERE idusuario='$idusuario'";
 	return ejecutarConsulta($sql);
 }
+public function eliminar($idusuario){
+	$idusuario = (int)$idusuario;
+	$r = eliminarRegistro('usuario', 'idusuario', $idusuario, 'El usuario', array(
+		'previos' => array("DELETE FROM usuario_permiso WHERE idusuario='$idusuario'"),
+		'liberar' => array('login')
+	));
+	if ($r['ok'] && $r['modo'] === 'archivado') {
+		// Sin permisos: aunque alguien reactive la fila, no tendra acceso a ningun modulo
+		ejecutarConsulta("DELETE FROM usuario_permiso WHERE idusuario='$idusuario'");
+	}
+	return $r;
+}
 public function activar($idusuario){
 	$sql="UPDATE usuario SET condicion='1' WHERE idusuario='$idusuario'";
 	return ejecutarConsulta($sql);
@@ -66,7 +78,7 @@ public function mostrar($idusuario){
 
 //listar registros
 public function listar(){
-	$sql="SELECT * FROM usuario";
+	$sql="SELECT * FROM usuario WHERE condicion<>2";
 	return ejecutarConsulta($sql);
 }
 

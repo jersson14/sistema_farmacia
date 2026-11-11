@@ -1,6 +1,7 @@
 <?php 
 //incluir la conexion de base de datos
 require_once __DIR__ . "/../config/Conexion.php";
+require_once __DIR__ . "/Presentacion.php";
 class Venta{
 
 
@@ -97,9 +98,11 @@ public function obtenerSiguienteCorrelativo($tipoComprobante, $serieComprobante)
 }
 
 //metodo insertar registro
-public function insertar($idcliente,$idusuario,$tipo_comprobante,$serie_comprobante,$num_comprobante,$fecha_hora,$impuesto,$total_venta,$idarticulo,$cantidad,$precio_venta,$descuento,$metodo_pago='EFECTIVO',$monto_efectivo=0,$monto_tarjeta=0,$monto_digital=0,$seguro_nombre='',$seguro_copago=0,$seguro_nro_autorizacion=''){
+public function insertar($idcliente,$idusuario,$tipo_comprobante,$serie_comprobante,$num_comprobante,$fecha_hora,$impuesto,$total_venta,$idarticulo,$cantidad,$precio_venta,$descuento,$metodo_pago='EFECTIVO',$monto_efectivo=0,$monto_tarjeta=0,$monto_digital=0,$seguro_nombre='',$seguro_copago=0,$seguro_nro_autorizacion='',$idpresentacion=array()){
 	global $conexion;
 	$idcliente = (int)$idcliente;
+	$presMdl = new Presentacion();
+	$conPresentaciones = Presentacion::disponible();
 	$fecha_hora = $this->normalizarFechaHora($fecha_hora);
 
 	// Si no se seleccionó cliente (0 = Consumidor Final), buscar o crear el registro
@@ -158,13 +161,25 @@ public function insertar($idcliente,$idusuario,$tipo_comprobante,$serie_comproba
 			);
 		}
 
+		// Presentación (Tableta, Blíster, Caja...): el stock se mueve en unidades base
+		$pres = $presMdl->resolver($idArticuloActual, isset($idpresentacion[$i]) ? (int)$idpresentacion[$i] : 0);
+		if (!$pres || (isset($pres['activa']) && !$pres['activa'])) {
+			return array(
+				"ok"=>false,
+				"message"=>"Una de las presentaciones del carrito ya no está disponible. Quita el producto y vuelve a agregarlo"
+			);
+		}
+		$factorActual = (float)$pres['factor'];
+
 		if (!isset($cantidadesSolicitadas[$idArticuloActual])) {
 			$cantidadesSolicitadas[$idArticuloActual] = 0;
 		}
-		$cantidadesSolicitadas[$idArticuloActual] += $cantidadActual;
+		$cantidadesSolicitadas[$idArticuloActual] += $cantidadActual * $factorActual;
 		$articulosAfectados[$idArticuloActual] = true;
 		$detalles[] = array(
 			"idarticulo"=>$idArticuloActual,
+			"idpresentacion"=>$pres['idpresentacion'],
+			"factor"=>$factorActual,
 			"cantidad"=>$cantidadActual,
 			"precio_venta"=>$precioActual,
 			"descuento"=>$descuentoActual
@@ -203,7 +218,7 @@ public function insertar($idcliente,$idusuario,$tipo_comprobante,$serie_comproba
 		}
 
 		$ids = implode(",", array_keys($cantidadesSolicitadas));
-		$sqlStock = "SELECT idarticulo,nombre,stock FROM articulo WHERE idarticulo IN ($ids) FOR UPDATE";
+		$sqlStock = "SELECT a.idarticulo,a.nombre,a.stock,IFNULL(u.abreviatura,'und') AS abrev FROM articulo a LEFT JOIN unidad_medida u ON u.idunidad=a.idunidad WHERE a.idarticulo IN ($ids) FOR UPDATE";
 		$rsStock = ejecutarConsulta($sqlStock);
 		if (!$rsStock) {
 			$conexion->rollback();
@@ -218,7 +233,8 @@ public function insertar($idcliente,$idusuario,$tipo_comprobante,$serie_comproba
 		while ($row = $rsStock->fetch_assoc()) {
 			$stockActual[(int)$row["idarticulo"]] = array(
 				"nombre"=>$row["nombre"],
-				"stock"=>(float)$row["stock"]
+				"stock"=>(float)$row["stock"],
+				"abrev"=>$row["abrev"]
 			);
 		}
 
@@ -230,7 +246,8 @@ public function insertar($idcliente,$idusuario,$tipo_comprobante,$serie_comproba
 			}
 			$stockDisp = (float)$stockActual[$idArt]["stock"];
 			if ($stockDisp < $cantSolicitada) {
-				$erroresStock[] = $stockActual[$idArt]["nombre"]." (stock: ".number_format($stockDisp,4).", solicitado: ".number_format($cantSolicitada,4).")";
+				$ab = $stockActual[$idArt]["abrev"];
+				$erroresStock[] = $stockActual[$idArt]["nombre"]." (hay ".(0 + round($stockDisp, 2))." $ab, pides ".(0 + round($cantSolicitada, 2))." $ab)";
 			}
 		}
 
@@ -281,13 +298,18 @@ public function insertar($idcliente,$idusuario,$tipo_comprobante,$serie_comproba
 				$idloteUsar = (int)$rowLote["idlote"];
 			}
 			$idloteSql = $idloteUsar ? "'".$idloteUsar."'" : "NULL";
-			$sql_detalle="INSERT INTO detalle_venta (idventa,idarticulo,cantidad,precio_venta,descuento,idlote) VALUES('".$idventanew."','".$d["idarticulo"]."','".$d["cantidad"]."','".$d["precio_venta"]."','".$d["descuento"]."',".$idloteSql.")";
+			if ($conPresentaciones) {
+				$idpresSql = $d["idpresentacion"] ? "'".(int)$d["idpresentacion"]."'" : "NULL";
+				$sql_detalle="INSERT INTO detalle_venta (idventa,idarticulo,idpresentacion,cantidad,factor,precio_venta,descuento,idlote) VALUES('".$idventanew."','".$d["idarticulo"]."',".$idpresSql.",'".$d["cantidad"]."','".$d["factor"]."','".$d["precio_venta"]."','".$d["descuento"]."',".$idloteSql.")";
+			} else {
+				$sql_detalle="INSERT INTO detalle_venta (idventa,idarticulo,cantidad,precio_venta,descuento,idlote) VALUES('".$idventanew."','".$d["idarticulo"]."','".$d["cantidad"]."','".$d["precio_venta"]."','".$d["descuento"]."',".$idloteSql.")";
+			}
 			ejecutarConsulta($sql_detalle) or $sw=false;
 			if (!$sw) {
 				break;
 			}
 			if ($idloteUsar) {
-				ejecutarConsulta("UPDATE lote_articulo SET cantidad_actual = cantidad_actual - '".$d["cantidad"]."' WHERE idlote='".$idloteUsar."'");
+				ejecutarConsulta("UPDATE lote_articulo SET cantidad_actual = cantidad_actual - '".($d["cantidad"] * $d["factor"])."' WHERE idlote='".$idloteUsar."'");
 			}
 		}
 
@@ -368,6 +390,40 @@ public function anular($idventa, $idusuario = null){
 	return $ok;
 }
 
+// Elimina definitivamente una venta ANULADA (no toca stock: la anulacion ya se registro).
+// Las ventas aceptadas no se eliminan: son comprobantes emitidos con correlativo.
+public function eliminarDefinitivo($idventa){
+	global $conexion;
+	$idventa = (int)$idventa;
+	$cab = ejecutarConsultaSimpleFila("SELECT estado, tipo_comprobante, serie_comprobante, num_comprobante FROM venta WHERE idventa='$idventa' LIMIT 1");
+	if (!$cab) {
+		return array("ok"=>false, "message"=>"La venta ya no existe");
+	}
+	if ($cab['estado'] !== 'Anulado') {
+		return array("ok"=>false, "message"=>"Primero anula la venta. Solo se pueden eliminar ventas anuladas.");
+	}
+	$legal = ejecutarConsultaSimpleFila("SELECT
+		(SELECT COUNT(*) FROM control_especial WHERE idventa='$idventa') AS ce,
+		(SELECT COUNT(*) FROM receta_medica WHERE idventa='$idventa') AS rx");
+	if ($legal && ((int)$legal['ce'] > 0 || (int)$legal['rx'] > 0)) {
+		return array("ok"=>false, "message"=>"Esta venta tiene receta o registro de control especial (DIGEMID) y debe conservarse");
+	}
+
+	$conexion->begin_transaction();
+	try {
+		$ok = $conexion->query("UPDATE cuenta_cobrar SET idventa=NULL WHERE idventa='$idventa'")
+		   && $conexion->query("UPDATE pedido_online SET idventa_pos=NULL WHERE idventa_pos='$idventa'")
+		   && $conexion->query("DELETE FROM detalle_venta WHERE idventa='$idventa'")
+		   && $conexion->query("DELETE FROM venta WHERE idventa='$idventa'");
+		if (!$ok) throw new Exception($conexion->error);
+		$conexion->commit();
+	} catch (Throwable $e) {
+		$conexion->rollback();
+		return array("ok"=>false, "message"=>"No se pudo eliminar la venta. Inténtalo nuevamente.");
+	}
+	$doc = $cab['tipo_comprobante'].' '.$cab['serie_comprobante'].'-'.$cab['num_comprobante'];
+	return array("ok"=>true, "message"=>"Venta $doc eliminada definitivamente");
+}
 
 //implementar un metodopara mostrar los datos de unregistro a modificar
 public function mostrar($idventa){
@@ -376,22 +432,24 @@ public function mostrar($idventa){
 }
 
 public function listarDetalle($idventa){
-	$sql="SELECT dv.idventa,dv.idarticulo,a.nombre,IFNULL(u.abreviatura,'und') as unidad,dv.cantidad,dv.precio_venta,dv.descuento,(dv.cantidad*dv.precio_venta-dv.descuento) as subtotal
+	list($uniSel, $uniJoin) = Presentacion::sqlUnidadDetalle('dv', 'u');
+	$sql="SELECT dv.idventa,dv.idarticulo,a.nombre,$uniSel as unidad,dv.cantidad,dv.precio_venta,dv.descuento,(dv.cantidad*dv.precio_venta-dv.descuento) as subtotal
 	FROM detalle_venta dv
 	INNER JOIN articulo a ON dv.idarticulo=a.idarticulo
-	LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad
+	LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad $uniJoin
 	WHERE dv.idventa='$idventa'";
 	return ejecutarConsulta($sql);
 }
 
 public function listarDetalleJSON($idventa){
-	$sql="SELECT dv.idarticulo, a.nombre, IFNULL(u.abreviatura,'und') as unidad,
+	list($uniSel, $uniJoin) = Presentacion::sqlUnidadDetalle('dv', 'u');
+	$sql="SELECT dv.idarticulo, a.nombre, $uniSel as unidad,
 	             dv.cantidad, dv.precio_venta, dv.descuento,
 	             (dv.cantidad*dv.precio_venta-dv.descuento) as subtotal,
 	             IFNULL(a.stock, 0) as stock
 	      FROM detalle_venta dv
 	      INNER JOIN articulo a ON dv.idarticulo=a.idarticulo
-	      LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad
+	      LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad $uniJoin
 	      WHERE dv.idventa='$idventa'";
 	return ejecutarConsulta($sql);
 }
@@ -431,26 +489,27 @@ public function ventacabecera($idventa){
 
 public function ventadetalles($idventa){
 	// Intentar query con campos farmacéuticos; si las migraciones no se ejecutaron, fallback sin ellos
-	$sqlFull="SELECT a.nombre AS articulo, a.codigo, IFNULL(u.abreviatura,'und') as unidad,
+	list($uniSel, $uniJoin) = Presentacion::sqlUnidadDetalle('d', 'u');
+	$sqlFull="SELECT a.nombre AS articulo, a.codigo, $uniSel as unidad,
 	          d.cantidad, d.precio_venta, d.descuento, (d.cantidad*d.precio_venta-d.descuento) AS subtotal,
 	          IFNULL(a.principio_activo,'') AS principio_activo,
 	          IFNULL(la.numero_lote,'') AS numero_lote,
 	          la.fecha_vencimiento
 	          FROM detalle_venta d
 	          INNER JOIN articulo a ON d.idarticulo=a.idarticulo
-	          LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad
+	          LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad $uniJoin
 	          LEFT JOIN lote_articulo la ON d.idlote=la.idlote
 	          WHERE d.idventa='$idventa'";
 	try {
 		$rs = ejecutarConsulta($sqlFull);
 		if ($rs) return $rs;
 	} catch (Throwable $e) { /* columnas farmacéuticas no existen, usar fallback */ }
-	$sqlBase="SELECT a.nombre AS articulo, a.codigo, IFNULL(u.abreviatura,'und') as unidad,
+	$sqlBase="SELECT a.nombre AS articulo, a.codigo, $uniSel as unidad,
 	          d.cantidad, d.precio_venta, d.descuento, (d.cantidad*d.precio_venta-d.descuento) AS subtotal,
 	          '' AS principio_activo, '' AS numero_lote, NULL AS fecha_vencimiento
 	          FROM detalle_venta d
 	          INNER JOIN articulo a ON d.idarticulo=a.idarticulo
-	          LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad
+	          LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad $uniJoin
 	          WHERE d.idventa='$idventa'";
 	return ejecutarConsulta($sqlBase);
 }

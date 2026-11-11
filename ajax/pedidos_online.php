@@ -47,10 +47,19 @@ switch ($op) {
                 "6" => '<span class="label ' . $badgeClass . '">' . htmlspecialchars($reg->estado) . '</span>',
                 "7" => '<button class="btn btn-warning btn-xs" onclick="verPedido('.(int)$reg->idpedido.')"><i class="fa fa-eye"></i></button>'
                      . ' <button class="btn btn-success btn-xs" onclick="cambiarEstado('.(int)$reg->idpedido.', \'CONFIRMADO\')"><i class="fa fa-check"></i></button>'
-                     . ' <button class="btn btn-danger btn-xs" onclick="cambiarEstado('.(int)$reg->idpedido.', \'CANCELADO\')"><i class="fa fa-times"></i></button>'
+                     . ' <button class="btn btn-default btn-xs" title="Cancelar pedido" onclick="cambiarEstado('.(int)$reg->idpedido.', \'CANCELADO\')"><i class="fa fa-times"></i></button>'
+                     . ' <button class="btn btn-danger btn-xs" title="Eliminar pedido" onclick="eliminarPedido('.(int)$reg->idpedido.')"><i class="fa fa-trash"></i></button>'
             );
         }
         echo json_encode(array('sEcho'=>1,'iTotalRecords'=>count($data),'iTotalDisplayRecords'=>count($data),'aaData'=>$data));
+        break;
+
+    case 'eliminar':
+        if (empty($_SESSION['ventas'])) {
+            echo json_encode(array('ok'=>false,'message'=>'No tienes permiso para eliminar pedidos'));
+            break;
+        }
+        echo json_encode($mdl->eliminar(isset($_POST['idpedido']) ? (int)$_POST['idpedido'] : 0));
         break;
 
     case 'cambiarEstado':
@@ -209,8 +218,9 @@ switch ($op) {
                 if (!$idpersona) throw new Exception('No se pudo identificar el cliente');
 
                 // Arrays para Venta::insertar()
-                $arrArt = array(); $arrCant = array(); $arrPrecio = array(); $arrDesc = array();
+                $arrArt = array(); $arrCant = array(); $arrPrecio = array(); $arrDesc = array(); $arrPres = array();
                 foreach ($items as $it) {
+                    $arrPres[]   = isset($it['idpresentacion']) ? (int)$it['idpresentacion'] : 0; // Caja, Blíster...
                     $arrArt[]    = (int)$it['idarticulo'];
                     $arrCant[]   = (float)$it['cantidad'];
                     $arrPrecio[] = (float)$it['precio_unitario'];
@@ -237,7 +247,7 @@ switch ($op) {
                     $tipoComp, '', '', '',
                     $impuesto, $mTotal,
                     $arrArt, $arrCant, $arrPrecio, $arrDesc,
-                    $mPago, 0, 0, 0
+                    $mPago, 0, 0, 0, '', 0, '', $arrPres
                 );
 
                 if (!$result['ok']) throw new Exception($result['message']);

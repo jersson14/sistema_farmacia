@@ -13,19 +13,19 @@ if ($_SESSION['ventas']==1) {
 
     <!-- ══════════════ RESUMEN DE PAGOS ══════════════ -->
     <div class="row" id="resumenPagosVenta" style="padding:10px 15px 0">
-      <div class="col-md-3 col-sm-6 col-xs-12">
+      <div class="col-md-3 col-sm-6 col-xs-6">
         <div class="info-box"><span class="info-box-icon bg-green"><i class="fa fa-money"></i></span>
           <div class="info-box-content"><span class="info-box-text">Efectivo</span>
             <span class="info-box-number" id="vResEfectivo">S/ 0.00</span></div></div></div>
-      <div class="col-md-3 col-sm-6 col-xs-12">
+      <div class="col-md-3 col-sm-6 col-xs-6">
         <div class="info-box"><span class="info-box-icon bg-purple"><i class="fa fa-mobile"></i></span>
           <div class="info-box-content"><span class="info-box-text">Yape / Plin</span>
             <span class="info-box-number" id="vResYape">S/ 0.00</span></div></div></div>
-      <div class="col-md-3 col-sm-6 col-xs-12">
+      <div class="col-md-3 col-sm-6 col-xs-6">
         <div class="info-box"><span class="info-box-icon bg-light-blue"><i class="fa fa-credit-card"></i></span>
           <div class="info-box-content"><span class="info-box-text">Tarjeta</span>
             <span class="info-box-number" id="vResTarjeta">S/ 0.00</span></div></div></div>
-      <div class="col-md-3 col-sm-6 col-xs-12">
+      <div class="col-md-3 col-sm-6 col-xs-6">
         <div class="info-box"><span class="info-box-icon bg-yellow"><i class="fa fa-bar-chart"></i></span>
           <div class="info-box-content"><span class="info-box-text">Total ventas</span>
             <span class="info-box-number" id="vResTotal">S/ 0.00</span></div></div></div>
@@ -46,11 +46,11 @@ if ($_SESSION['ventas']==1) {
             </div>
             <div class="box-body">
               <div class="row" style="margin-bottom:10px">
-                <div class="col-md-3 col-sm-6 col-xs-12">
+                <div class="col-md-3 col-sm-6 col-xs-6">
                   <label>Desde</label>
                   <input type="date" id="filtro_venta_inicio" class="form-control">
                 </div>
-                <div class="col-md-3 col-sm-6 col-xs-12">
+                <div class="col-md-3 col-sm-6 col-xs-6">
                   <label>Hasta</label>
                   <input type="date" id="filtro_venta_fin" class="form-control">
                 </div>
@@ -129,8 +129,12 @@ if ($_SESSION['ventas']==1) {
             <input type="text" id="codigo_rapido" class="pos-scan-hidden" placeholder="Escanear">
           </div>
           <div class="pos-topbar-actions">
-            <button type="button" class="pos-historial-btn" onclick="cancelarform()">
-              <i class="fa fa-list"></i> Historial
+            <button type="button" class="pos-help-btn" title="Atajos de teclado"
+                    data-toggle="modal" data-target="#modalAtajosPOS">
+              <i class="fa fa-keyboard-o"></i>
+            </button>
+            <button type="button" class="pos-historial-btn" onclick="cancelarform()" title="Ver historial de ventas">
+              <i class="fa fa-list"></i> <span class="pos-btn-txt">Historial</span>
             </button>
           </div>
         </div>
@@ -298,6 +302,27 @@ if ($_SESSION['ventas']==1) {
     </div><!-- /content-wrapper -->
 
   <!-- ══════════ MODALES (fuera del content-wrapper) ══════════ -->
+
+  <!-- Modal Atajos de teclado del POS -->
+  <div class="modal fade" id="modalAtajosPOS" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-sm" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal">&times;</button>
+          <h4 class="modal-title"><i class="fa fa-keyboard-o"></i> Atajos de teclado</h4>
+        </div>
+        <div class="modal-body">
+          <ul class="pos-atajos-lista">
+            <li><span>Buscar medicamento</span><kbd>Enter</kbd></li>
+            <li><span>Escanear código de barras</span><kbd>Ctrl + B</kbd></li>
+            <li><span>Abrir catálogo completo</span><kbd>F2</kbd></li>
+            <li><span>Cobrar la venta</span><kbd>F10</kbd></li>
+            <li><span>Cerrar ventana activa</span><kbd>Esc</kbd></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Modal Perfil Farmacológico -->
   <div class="modal fade" id="modalPerfilPaciente" tabindex="-1" role="dialog">
@@ -493,7 +518,7 @@ if ($_SESSION['ventas']==1) {
 require 'footer.php';
  ?>
  <script src="../public/js/qz-tray.js"></script>
- <script src="scripts/venta.js?v=20260603a"></script>
+ <script src="<?= assetV('scripts/venta.js') ?>"></script>
  <?php
 }
 ob_end_flush();

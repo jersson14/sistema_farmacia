@@ -8,7 +8,7 @@ $bannerTxt = $cfgTienda->obtener('banner_texto', 'Tu salud, nuestra prioridad');
 <div class="hero">
   <div class="hero-bg-img"></div>
   <div class="hero-inner">
-    <img src="../files/famacia.png" alt="<?php echo htmlspecialchars($nombreEmp); ?>" class="hero-logo">
+    <?php if ($logo): ?><img src="<?php echo htmlspecialchars($logo); ?>" alt="<?php echo htmlspecialchars($nombreEmp); ?>" class="hero-logo"><?php endif; ?>
     <h1><?php echo htmlspecialchars($nombreEmp); ?></h1>
     <p class="hero-sub">Al cuidado de tu salud &nbsp;·&nbsp; <?php echo htmlspecialchars($bannerTxt); ?></p>
     <div class="hero-search">
@@ -102,12 +102,18 @@ $bannerTxt = $cfgTienda->obtener('banner_texto', 'Tu salud, nuestra prioridad');
 <!-- Footer -->
 <div class="tienda-footer">
   <div class="tf-top">
-    <img src="../files/famacia.png" alt="<?php echo htmlspecialchars($nombreEmp); ?>" class="tf-logo">
+    <?php if ($logo): ?><img src="<?php echo htmlspecialchars($logo); ?>" alt="<?php echo htmlspecialchars($nombreEmp); ?>" class="tf-logo"><?php endif; ?>
     <div class="tf-info">
       <div class="tf-name"><?php echo htmlspecialchars($nombreEmp); ?></div>
       <p class="tf-tag">Al cuidado de tu salud</p>
+      <?php if ($direccionEmp): ?>
+      <p class="tf-contact"><a href="https://maps.google.com/?q=<?php echo urlencode($direccionEmp); ?>" target="_blank" rel="noopener"><i class="bi bi-geo-alt-fill"></i> <?php echo htmlspecialchars($direccionEmp); ?></a></p>
+      <?php endif; ?>
       <?php if ($telefono): ?>
       <p class="tf-contact"><i class="bi bi-telephone-fill"></i> <?php echo htmlspecialchars($telefono); ?></p>
+      <?php endif; ?>
+      <?php if ($correoEmp): ?>
+      <p class="tf-contact"><a href="mailto:<?php echo htmlspecialchars($correoEmp); ?>"><i class="bi bi-envelope-fill"></i> <?php echo htmlspecialchars($correoEmp); ?></a></p>
       <?php endif; ?>
     </div>
   </div>
@@ -477,15 +483,72 @@ function cintaOferta(pct){
 }
 
 // ── Tarjeta de producto ────────────────────────────────────
+// ── Presentaciones de venta (Tableta, Blíster x10, Caja x100...) ──
+// Con base: "Blíster x 10 tabletas" (explícito). Sin base: "Blíster x10".
+function etiquetaPres(pr, base){
+  var nom = pr.unidad || pr.abrev || 'Unidad';
+  if (!(pr.factor > 1)) return nom;
+  var nomBase = base ? (base.unidad || base.abrev || '') : '';
+  return nomBase
+    ? nom + ' x ' + (+pr.factor) + ' ' + pluralUnidad(+pr.factor, nomBase)
+    : nom + ' x' + (+pr.factor);
+}
+function presBaseDe(p){
+  var l = (p && p.presentaciones) || [];
+  return l.filter(function(x){ return x.es_base; })[0] || l[0] || null;
+}
+// "Trae 10 tabletas" / "1 tableta"
+function textoContenidoPres(pr, base){
+  var nomBase = base ? (base.unidad || base.abrev || 'unidad') : 'unidad';
+  if (!(pr.factor > 1)) return '1 ' + pluralUnidad(1, nomBase);
+  return 'Trae ' + (+pr.factor) + ' ' + pluralUnidad(+pr.factor, nomBase);
+}
+function tieneVariasPres(p){ return p.presentaciones && p.presentaciones.length > 1; }
+
+// ── Precio con DNI (cliente registrado) ──
+// Menor precio con DNI entre las presentaciones del producto (0 = no tiene)
+function precioDniMin(p){
+  var min = 0;
+  ((p && p.presentaciones) || []).forEach(function(pr){
+    var d = parseFloat(pr.precio_dni) || 0;
+    if (d > 0 && (min === 0 || d < min)) min = d;
+  });
+  return min;
+}
+// Bloque del modal: precio con DNI de la presentación elegida
+function bloqueDniModal(pr, base){
+  var d = parseFloat(pr && pr.precio_dni) || 0;
+  if (!(d > 0)) return '';
+  var ahorro = Math.max(0, (parseFloat(pr.precio) || 0) - d);
+  return '<div class="pm-dni-precio"><span class="pm-dni-tag"><i class="bi bi-person-vcard-fill"></i> Precio con DNI</span>'
+    + '<strong>S/ ' + d.toFixed(2) + '</strong> <small>/ ' + esc(etiquetaPres(pr, base).toLowerCase()) + '</small>'
+    + (ahorro > 0 ? ' <span class="pm-dni-ahorro">Ahorras S/ ' + ahorro.toFixed(2) + '</span>' : '') + '</div>'
+    + (window.TIENDA_LOGADO
+        ? '<div class="pm-dni-nota ok"><i class="bi bi-check-circle-fill"></i> Ya iniciaste sesión: pagas este precio.</div>'
+        : '<div class="pm-dni-nota"><a href="login.php">Inicia sesión con tu DNI</a> para pagar este precio.</div>');
+}
+// Plural simple en español: tableta → tabletas, unidad → unidades
+function pluralUnidad(n, nombre){
+  nombre = (nombre || '').toLowerCase();
+  if (n === 1 || !nombre) return nombre;
+  return /[aeiouáéíóú]$/.test(nombre) ? nombre + 's' : nombre + 'es';
+}
+
 function tarjetaProducto(p){
   var sinStock = p.stock <= 0;
+  var variasPres = tieneVariasPres(p);
   var dci = (p.principio_activo)
     ? '<div class="pdci">' + esc(p.principio_activo) + (p.concentracion ? ' ' + esc(p.concentracion) : '') + '</div>'
     : '';
   var lab = p.laboratorio ? '<div class="plab">' + esc(p.laboratorio) + '</div>' : '';
   var precio    = parseFloat(p.precio_venta) || 0;
   var enOferta  = !!p.en_oferta && parseFloat(p.descuento_porcentaje) > 0;
-  var precioHtml = precio > 0 ? 'S/ ' + precio.toFixed(2) : '<small>Sin precio</small>';
+  if (variasPres) {
+    var minP = null;
+    p.presentaciones.forEach(function(pr){ if (pr.precio > 0 && (minP === null || pr.precio < minP)) minP = pr.precio; });
+    if (minP !== null) precio = minP;
+  }
+  var precioHtml = precio > 0 ? (variasPres ? '<small class="pc-desde">Desde</small> ' : '') + 'S/ ' + precio.toFixed(2) : '<small>Sin precio</small>';
   var ahorro = 0;
   if (enOferta && precio > 0) {
     var original = parseFloat(p.precio_original || 0);
@@ -504,10 +567,17 @@ function tarjetaProducto(p){
     +   '<div class="pcat">' + esc(p.categoria) + '</div>'
     +   '<div class="pname">' + esc(p.nombre) + '</div>'
     +   dci + lab
+    +   (variasPres ? '<div class="pc-pres"><i class="bi bi-boxes"></i> ' + p.presentaciones.map(function(pr){ return esc(etiquetaPres(pr, presBaseDe(p))); }).join(' · ') + '</div>' : '')
     +   (enOferta && ahorro > 0 ? '<span class="pc-ahorro"><i class="bi bi-piggy-bank-fill"></i> Ahorras S/ ' + ahorro.toFixed(2) + '</span>' : '')
     +   '<div class="pprice">' + precioHtml + '</div>'
+    +   (precioDniMin(p) > 0
+        ? '<div class="pc-dni"><i class="bi bi-person-vcard-fill"></i> ' + (window.TIENDA_LOGADO ? 'Tu precio con DNI' : 'Con DNI') + (variasPres ? ' desde' : '')
+          + ' <strong>S/ ' + precioDniMin(p).toFixed(2) + '</strong></div>'
+        : '')
     +   (sinStock
         ? '<button class="btn-agregar" disabled onclick="event.stopPropagation()"><i class="bi bi-x-circle"></i> Sin stock</button>'
+        : variasPres
+        ? '<button class="btn-agregar" onclick="event.stopPropagation(); verProducto(' + p.idarticulo + ')"><i class="bi bi-ui-radios-grid"></i> Elegir presentación</button>'
         : '<button class="btn-agregar" onclick="event.stopPropagation(); agregarAlCarrito(' + p.idarticulo + ',\'' + esc(p.nombre).replace(/\'/g,"\\'") + '\', this)"><i class="bi bi-cart-plus"></i> Agregar</button>')
     + '</div></div>';
 }
@@ -614,10 +684,33 @@ function verProducto(id){
         + '<span>' + esc(cv.detalle) + '</span></div>'
         + '</div>';
 
+      // Presentaciones: el cliente elige cómo lo quiere (Tableta, Blíster, Caja...)
+      pmProducto = p;
+      var listaPres = p.presentaciones || [];
+      var presBase = listaPres.filter(function(x){ return x.es_base; })[0] || listaPres[0] || null;
+      pmPresSel = presBase ? presBase.id : 0;
+      var presSec = '';
+      if (listaPres.length > 1) {
+        presSec = '<div class="pm-pres"><div class="pm-pres-title">Elige cómo lo quieres</div><div class="pm-pres-opts" role="radiogroup">';
+        listaPres.forEach(function(pr){
+          var disp = Math.floor((parseFloat(p.stock) || 0) / (parseFloat(pr.factor) || 1));
+          presSec += '<button type="button" role="radio" class="pm-pres-opt' + (pr.id === pmPresSel ? ' activa' : '') + '"'
+            + ' data-id="' + pr.id + '" aria-checked="' + (pr.id === pmPresSel) + '"' + (disp < 1 ? ' disabled title="Sin stock en esta presentación"' : '')
+            + ' onclick="elegirPresentacionModal(' + pr.id + ')">'
+            + '<span class="pm-pres-nombre">' + esc(pr.unidad || pr.abrev || 'Unidad') + '</span>'
+            + '<span class="pm-pres-cont">' + esc(textoContenidoPres(pr, presBase)) + '</span>'
+            + '<span class="pm-pres-precio">S/ ' + parseFloat(pr.precio || 0).toFixed(2) + '</span>'
+            + (pr.factor > 1 && presBase && pr.precio > 0 ? '<span class="pm-pres-equiv">S/ ' + (pr.precio / pr.factor).toFixed(2) + ' c/' + esc((presBase.unidad || presBase.abrev || 'unidad').toLowerCase()) + '</span>' : '')
+            + (disp < 1 ? '<span class="pm-pres-equiv">Sin stock</span>' : '')
+            + '</button>';
+        });
+        presSec += '</div></div>';
+      }
+
       // Stock y botón
       var stockTxt = sinStock
         ? '<div class="pm-nostock">⚠️ Sin stock disponible actualmente</div>'
-        : '<div class="pm-stock-ok">✅ En stock (' + p.stock + ' disponibles)</div>';
+        : '<div class="pm-stock-ok" id="pmStock">✅ En stock (' + p.stock + ' disponibles)</div>';
 
       var btnSec = sinStock
         ? '<button class="btn-primary-lg" disabled style="opacity:.5;cursor:not-allowed"><i class="bi bi-x-circle"></i> Sin stock</button>'
@@ -625,7 +718,7 @@ function verProducto(id){
 
       var precioModalHtml = precio > 0
         ? (enOferta ? '<span class="precio-tachado">S/ ' + parseFloat(p.precio_original || 0).toFixed(2) + '</span>' : '')
-          + 'S/ ' + precio.toFixed(2) + ' <small>/ unidad</small>'
+          + 'S/ ' + precio.toFixed(2) + ' <small>/ ' + esc(presBase ? etiquetaPres(presBase, presBase).toLowerCase() : 'unidad') + '</small>'
         : '<small style="font-size:16px">Consultar precio</small>';
 
       contenido.innerHTML = imgSec
@@ -633,8 +726,10 @@ function verProducto(id){
         + '<div class="pm-cat">' + esc(p.categoria) + '</div>'
         + '<div class="pm-name">' + esc(p.nombre) + '</div>'
         + (meta ? '<div class="pm-meta">' + meta + '</div>' : '')
-        + '<div class="pm-price">' + precioModalHtml + '</div>'
-        + (enOferta && ahorroModal > 0 ? '<div class="pc-ahorro" style="margin:-6px 0 14px"><i class="bi bi-piggy-bank-fill"></i> Ahorras S/ ' + ahorroModal.toFixed(2) + '</div>' : '')
+        + '<div class="pm-price" id="pmPrecio">' + precioModalHtml + '</div>'
+        + (enOferta && ahorroModal > 0 ? '<div class="pc-ahorro" id="pmAhorro" style="margin:-6px 0 14px"><i class="bi bi-piggy-bank-fill"></i> Ahorras S/ ' + ahorroModal.toFixed(2) + '</div>' : '')
+        + '<div class="pm-dni" id="pmDni">' + (presBase ? bloqueDniModal(presBase, presBase) : '') + '</div>'
+        + presSec
         + recetaSec
         + descSec
         + '<hr class="pm-divider">'
@@ -645,6 +740,42 @@ function verProducto(id){
     .catch(function(){
       contenido.innerHTML = '<div class="pm-body"><p style="color:#ef4444">Error al cargar el producto.</p></div>';
     });
+}
+
+// Presentación elegida en el modal
+var pmProducto = null;
+var pmPresSel = 0;
+
+function elegirPresentacionModal(id){
+  if (!pmProducto) return;
+  var pr = (pmProducto.presentaciones || []).filter(function(x){ return x.id === id; })[0];
+  if (!pr) return;
+  var dispSel = Math.floor((parseFloat(pmProducto.stock) || 0) / (parseFloat(pr.factor) || 1));
+  if (dispSel < 1) return; // presentación sin stock: no se puede elegir
+  pmPresSel = id;
+  var opts = document.querySelectorAll('.pm-pres-opt');
+  for (var i = 0; i < opts.length; i++){
+    var act = parseInt(opts[i].getAttribute('data-id'), 10) === id;
+    opts[i].classList.toggle('activa', act);
+    opts[i].setAttribute('aria-checked', act);
+  }
+  var enOferta = !!pmProducto.en_oferta && parseFloat(pmProducto.descuento_porcentaje) > 0;
+  var precio = parseFloat(pr.precio || 0);
+  var lista  = parseFloat(pr.precio_lista || precio);
+  var $precio = document.getElementById('pmPrecio');
+  if ($precio) {
+    $precio.innerHTML = (enOferta && lista > precio ? '<span class="precio-tachado">S/ ' + lista.toFixed(2) + '</span>' : '')
+      + 'S/ ' + precio.toFixed(2) + ' <small>/ ' + esc(etiquetaPres(pr, presBaseDe(pmProducto)).toLowerCase()) + '</small>';
+  }
+  var $dni = document.getElementById('pmDni');
+  if ($dni) $dni.innerHTML = bloqueDniModal(pr, presBaseDe(pmProducto));
+  var $ahorro = document.getElementById('pmAhorro');
+  if ($ahorro) $ahorro.innerHTML = '<i class="bi bi-piggy-bank-fill"></i> Ahorras S/ ' + Math.max(0, lista - precio).toFixed(2);
+  var disp = Math.floor((parseFloat(pmProducto.stock) || 0) / (parseFloat(pr.factor) || 1));
+  var $stock = document.getElementById('pmStock');
+  if ($stock) $stock.innerHTML = '✅ En stock (' + disp + ' ' + esc(disp === 1 ? etiquetaPres(pr, presBaseDe(pmProducto)).toLowerCase() : 'disponibles') + ')';
+  var btn = document.getElementById('btnModalAgregar');
+  if (btn) { btn.disabled = false; btn.classList.remove('adding'); btn.innerHTML = '<i class="bi bi-cart-plus-fill"></i> Agregar al carrito'; }
 }
 
 // Cambia la foto grande del modal desde las miniaturas
@@ -663,7 +794,10 @@ function agregarDesdeModal(id, nombre){
   btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Agregando…';
   var fd = new FormData();
   fd.append('idarticulo', id);
+  fd.append('idpresentacion', pmPresSel || 0);
   fd.append('cantidad', 1);
+  var prSel = pmProducto && tieneVariasPres(pmProducto) ? (pmProducto.presentaciones.filter(function(x){ return x.id === pmPresSel; })[0] || null) : null;
+  if (prSel) nombre = nombre + ' (' + etiquetaPres(prSel, presBaseDe(pmProducto)) + ')';
   fetch('ajax/carrito.php?op=agregar', {method:'POST', body:fd})
     .then(function(r){ return r.json(); })
     .then(function(d){

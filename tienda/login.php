@@ -24,8 +24,8 @@ if (!empty($_SESSION['tienda_cliente'])) {
     <div class="auth-body" id="panelLogin">
       <div id="msgLogin" style="display:none;margin-bottom:14px;padding:10px 14px;border-radius:8px;font-size:14px"></div>
       <div class="fgroup">
-        <label>Correo electrónico</label>
-        <input type="email" id="l_email" placeholder="tu@correo.com" value="jersson2026" autocomplete="email">
+        <label>DNI</label>
+        <input type="text" id="l_dni" placeholder="12345678" maxlength="12" autocomplete="username" inputmode="numeric">
       </div>
       <div class="fgroup">
         <label>Contraseña</label>
@@ -45,8 +45,8 @@ if (!empty($_SESSION['tienda_cliente'])) {
         <input type="text" id="r_nombre" placeholder="Juan Pérez">
       </div>
       <div class="fgroup">
-        <label>Correo electrónico *</label>
-        <input type="email" id="r_email" placeholder="tu@correo.com">
+        <label>DNI *</label>
+        <input type="text" id="r_dni" placeholder="12345678" maxlength="12" inputmode="numeric">
       </div>
       <div class="fgroup">
         <label>Contraseña * <span style="font-weight:400;color:#6b7280">(mín. 6 caracteres)</span></label>
@@ -67,6 +67,10 @@ if (!empty($_SESSION['tienda_cliente'])) {
       <div class="fgroup">
         <label>Distrito</label>
         <input type="text" id="r_dist" placeholder="Tu distrito">
+      </div>
+      <div class="fgroup">
+        <label>Correo electrónico <span style="font-weight:400;color:#6b7280">(opcional)</span></label>
+        <input type="email" id="r_email" placeholder="tu@correo.com">
       </div>
       <button class="btn-primary-lg" id="btnRegistro" onclick="hacerRegistro()">Crear mi cuenta</button>
       <div style="text-align:center;margin-top:16px">
@@ -110,7 +114,7 @@ function hacerLogin(){
   var btn = document.getElementById('btnLogin');
   btn.disabled = true; btn.textContent = 'Verificando...';
   var fd = new FormData();
-  fd.append('email',    document.getElementById('l_email').value);
+  fd.append('dni',      document.getElementById('l_dni').value.trim());
   fd.append('password', document.getElementById('l_pass').value);
   fetchAuth('ajax/auth.php?op=login', fd,
     function(d){
@@ -129,6 +133,7 @@ function hacerRegistro(){
   btn.disabled = true; btn.textContent = 'Creando cuenta...';
   var fd = new FormData();
   fd.append('nombre',    document.getElementById('r_nombre').value);
+  fd.append('dni',       document.getElementById('r_dni').value.trim());
   fd.append('email',     document.getElementById('r_email').value);
   fd.append('password',  document.getElementById('r_pass').value);
   fd.append('password2', document.getElementById('r_pass2').value);

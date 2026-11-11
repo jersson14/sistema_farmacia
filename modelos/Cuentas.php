@@ -9,13 +9,13 @@ class Cuentas
 
     public function listarClientes()
     {
-        $sql = "SELECT idpersona,nombre FROM persona WHERE tipo_persona='Cliente' ORDER BY nombre ASC";
+        $sql = "SELECT idpersona,nombre FROM persona WHERE tipo_persona='Cliente'".sqlPersonaVisible()." ORDER BY nombre ASC";
         return ejecutarConsulta($sql);
     }
 
     public function listarProveedores()
     {
-        $sql = "SELECT idpersona,nombre FROM persona WHERE tipo_persona='Proveedor' ORDER BY nombre ASC";
+        $sql = "SELECT idpersona,nombre FROM persona WHERE tipo_persona='Proveedor'".sqlPersonaVisible()." ORDER BY nombre ASC";
         return ejecutarConsulta($sql);
     }
 
@@ -117,6 +117,25 @@ class Cuentas
         $estado = $nuevoSaldo <= 0.0001 ? 'PAGADO' : 'PENDIENTE';
         $sqlUpd = "UPDATE cuenta_pagar SET saldo='$nuevoSaldo',estado='$estado' WHERE idcuenta_pagar='$idcuenta'";
         return ejecutarConsulta($sqlUpd);
+    }
+
+    // Elimina la cuenta junto con sus abonos (la venta/compra de origen no se toca)
+    public function eliminarCobrar($idcuenta)
+    {
+        $id = (int)$idcuenta;
+        return eliminarRegistro('cuenta_cobrar', 'idcuenta_cobrar', $id, 'La cuenta por cobrar', array(
+            'previos'    => array("DELETE FROM pago_cuenta_cobrar WHERE idcuenta_cobrar='$id'"),
+            'archivable' => false
+        ));
+    }
+
+    public function eliminarPagar($idcuenta)
+    {
+        $id = (int)$idcuenta;
+        return eliminarRegistro('cuenta_pagar', 'idcuenta_pagar', $id, 'La cuenta por pagar', array(
+            'previos'    => array("DELETE FROM pago_cuenta_pagar WHERE idcuenta_pagar='$id'"),
+            'archivable' => false
+        ));
     }
 }
 ?>

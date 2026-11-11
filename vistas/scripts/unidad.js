@@ -96,14 +96,13 @@ function mostrar(idunidad){
 	});
 }
 
-function desactivar(idunidad){
-	bootbox.confirm("¿Esta seguro de desactivar esta unidad?", function(result){
-		if (result) {
-			$.post("../ajax/unidad.php?op=desactivar", {idunidad : idunidad}, function(e){
-				bootbox.alert(e);
-				tabla.ajax.reload();
-			});
-		}
+function eliminar(idunidad){
+	appEliminar({
+		url: "../ajax/unidad.php?op=eliminar",
+		data: {idunidad: idunidad},
+		titulo: "Eliminar unidad de medida",
+		mensaje: "¿Deseas eliminar esta unidad de medida? Si la usan productos, se quitará de las listas pero los productos se conservan.",
+		onSuccess: function(){ tabla.ajax.reload(null, false); }
 	});
 }
 

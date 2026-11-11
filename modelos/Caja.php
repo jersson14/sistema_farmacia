@@ -79,6 +79,26 @@ class Caja
         return ejecutarConsulta($sql);
     }
 
+    // Solo movimientos manuales de una caja ABIERTA: los de ventas/anulaciones los genera el sistema
+    public function eliminarMovimiento($idmovimiento, $idcaja)
+    {
+        $idmovimiento = (int)$idmovimiento;
+        $idcaja = (int)$idcaja;
+        $mov = ejecutarConsultaSimpleFila("SELECT concepto FROM caja_movimiento WHERE idmovimiento='$idmovimiento' AND idcaja='$idcaja' LIMIT 1");
+        if (!$mov) {
+            return array('ok' => false, 'message' => 'Solo puedes eliminar movimientos de tu caja abierta');
+        }
+        if (!self::esMovimientoManual($mov['concepto'])) {
+            return array('ok' => false, 'message' => 'Este movimiento lo generó una venta o anulación. Para corregirlo, anula la venta correspondiente.');
+        }
+        return eliminarRegistro('caja_movimiento', 'idmovimiento', $idmovimiento, 'El movimiento', array('archivable' => false));
+    }
+
+    public static function esMovimientoManual($concepto)
+    {
+        return !preg_match('/^(Venta |Anulacion )/i', (string)$concepto);
+    }
+
     public function historialCajas($idusuario, $esAdmin = false)
     {
         $filtro = $esAdmin ? "" : "WHERE c.idusuario='$idusuario'";

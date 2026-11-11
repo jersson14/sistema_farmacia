@@ -77,6 +77,16 @@ function listarMovimientosCaja() {
   });
 }
 
+function eliminarMovimientoCaja(idmovimiento) {
+  appEliminar({
+    url: "../ajax/caja.php?op=eliminarMovimiento",
+    data: { idmovimiento: idmovimiento },
+    titulo: "Eliminar movimiento de caja",
+    mensaje: "El movimiento se quitará de la caja y el total esperado se recalculará. ¿Deseas continuar?",
+    onSuccess: refrescarTodoCaja
+  });
+}
+
 function initHistorial(tableId) {
   return $(tableId).DataTable({
     aProcessing: true,

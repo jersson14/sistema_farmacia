@@ -67,21 +67,27 @@ function cargarCarrito(){
         var img = item.imagen ? '../files/articulos/' + item.imagen : '../public/img/default-50x50.gif';
         var row = document.createElement('div');
         row.className = 'cart-item';
-        row.id = 'ci-' + item.idarticulo;
+        var clave = String(item.clave || item.idarticulo);
+        var claveJs = "'" + clave.replace(/[^0-9:]/g, '') + "'";
+        row.id = 'ci-' + clave.replace(':', '-');
         row.innerHTML =
           '<div class="ci-img">'
           +   '<img src="' + img + '" onerror="this.src=\'../public/img/default-50x50.gif\'" alt="">'
           + '</div>'
           + '<div>'
           +   '<div class="ci-name">' + esc(item.nombre) + '</div>'
+          +   (item.mostrar_presentacion ? '<div class="ci-pres"><i class="bi bi-boxes"></i> ' + esc(item.presentacion) + '</div>' : '')
           +   '<div class="ci-price">S/ ' + item.precio.toFixed(2) + ' c/u &nbsp;·&nbsp; <strong>S/ ' + item.subtotal.toFixed(2) + '</strong></div>'
+          +   (item.con_dni
+              ? '<div class="ci-dni"><i class="bi bi-person-vcard-fill"></i> Precio con DNI aplicado <s>S/ ' + parseFloat(item.precio_regular).toFixed(2) + '</s></div>'
+              : (item.precio_dni > 0 ? '<div class="ci-dni"><i class="bi bi-person-vcard-fill"></i> Con DNI: S/ ' + parseFloat(item.precio_dni).toFixed(2) + ' c/u · <a href="login.php">inicia sesión</a></div>' : ''))
           + '</div>'
           + '<div class="qty-control">'
-          +   '<button onclick="cambiarQty(' + item.idarticulo + ',' + (item.cantidad-1) + ')">−</button>'
-          +   '<input type="number" value="' + item.cantidad + '" min="0" max="' + item.stock_max + '" id="qty-' + item.idarticulo + '" onchange="cambiarQty(' + item.idarticulo + ',this.value)">'
-          +   '<button onclick="cambiarQty(' + item.idarticulo + ',' + (item.cantidad+1) + ')">+</button>'
+          +   '<button onclick="cambiarQty(' + claveJs + ',' + (item.cantidad-1) + ')">−</button>'
+          +   '<input type="number" value="' + item.cantidad + '" min="0" max="' + item.stock_max + '" onchange="cambiarQty(' + claveJs + ',this.value)">'
+          +   '<button onclick="cambiarQty(' + claveJs + ',' + (item.cantidad+1) + ')">+</button>'
           + '</div>'
-          + '<button class="btn-delete" onclick="quitarItem(' + item.idarticulo + ')" title="Quitar">✕</button>';
+          + '<button class="btn-delete" onclick="quitarItem(' + claveJs + ')" title="Quitar">✕</button>';
         cont.appendChild(row);
       });
     });
@@ -89,16 +95,17 @@ function cargarCarrito(){
 
 function esc(s){ var d=document.createElement('span'); d.textContent=String(s||''); return d.innerHTML; }
 
-function cambiarQty(id, qty){
+// "clave" = idarticulo:idpresentacion (Tableta y Caja del mismo producto son líneas distintas)
+function cambiarQty(clave, qty){
   qty = parseInt(qty);
-  var fd = new FormData(); fd.append('idarticulo', id); fd.append('cantidad', qty);
+  var fd = new FormData(); fd.append('clave', clave); fd.append('cantidad', qty);
   fetch('ajax/carrito.php?op=actualizar', {method:'POST', body:fd})
     .then(function(r){ return r.json(); })
     .then(function(d){ if (d.ok) cargarCarrito(); });
 }
 
-function quitarItem(id){
-  var fd = new FormData(); fd.append('idarticulo', id);
+function quitarItem(clave){
+  var fd = new FormData(); fd.append('clave', clave);
   fetch('ajax/carrito.php?op=quitar', {method:'POST', body:fd})
     .then(function(r){ return r.json(); })
     .then(function(d){ if (d.ok) cargarCarrito(); });

@@ -45,6 +45,7 @@ if ($_SESSION['almacen'] == 1) {
                 <th>Código</th>
                 <th>Artículo</th>
                 <th>N° Lote</th>
+                <th>Proveedor</th>
                 <th>F. Vencimiento</th>
                 <th>Días vencido</th>
                 <th>Stock lote</th>
@@ -55,6 +56,7 @@ if ($_SESSION['almacen'] == 1) {
                 <th>Código</th>
                 <th>Artículo</th>
                 <th>N° Lote</th>
+                <th>Proveedor</th>
                 <th>F. Vencimiento</th>
                 <th>Días vencido</th>
                 <th>Stock lote</th>
@@ -65,19 +67,30 @@ if ($_SESSION['almacen'] == 1) {
 
           <!-- Tab próximos -->
           <div class="tab-pane" id="tabProximos" role="tabpanel">
-            <div style="margin-bottom:12px;">
-              <label>Mostrar lotes que vencen en los próximos</label>
-              <select id="selDiasVenc" class="form-control" style="display:inline-block;width:auto;margin:0 8px;">
-                <option value="30">30 días</option>
-                <option value="60">60 días</option>
-                <option value="90">90 días</option>
-              </select>
+            <div class="row" style="margin-bottom:12px;">
+              <div class="col-md-6 col-sm-12" style="margin-bottom:8px;">
+                <label for="selDiasVenc">Mostrar lotes que vencen en los próximos</label>
+                <select id="selDiasVenc" class="form-control" style="display:inline-block;width:auto;margin:0 8px;">
+                  <option value="30">30 días (1 mes)</option>
+                  <option value="60">60 días (2 meses)</option>
+                  <option value="90">90 días (3 meses)</option>
+                  <option value="120">120 días (4 meses)</option>
+                  <option value="150">150 días (5 meses)</option>
+                  <option value="180">180 días (6 meses)</option>
+                  <option value="270">270 días (9 meses)</option>
+                  <option value="365">365 días (1 año)</option>
+                </select>
+              </div>
+              <div class="col-md-6 col-sm-12 text-right" id="cfgAlertaVenc" style="margin-bottom:8px;">
+                <!-- llenado por vencimientos.js -->
+              </div>
             </div>
             <table id="tblProximos" class="table table-striped table-bordered table-condensed table-hover" style="width:100%">
               <thead>
                 <th>Código</th>
                 <th>Artículo</th>
                 <th>N° Lote</th>
+                <th>Proveedor</th>
                 <th>F. Vencimiento</th>
                 <th>Días restantes</th>
                 <th>Stock lote</th>
@@ -88,6 +101,7 @@ if ($_SESSION['almacen'] == 1) {
                 <th>Código</th>
                 <th>Artículo</th>
                 <th>N° Lote</th>
+                <th>Proveedor</th>
                 <th>F. Vencimiento</th>
                 <th>Días restantes</th>
                 <th>Stock lote</th>
@@ -108,7 +122,7 @@ if ($_SESSION['almacen'] == 1) {
 
 require 'footer.php';
 ?>
-<script src="scripts/vencimientos.js"></script>
+<script src="<?= assetV('scripts/vencimientos.js') ?>"></script>
 <?php
 }
 

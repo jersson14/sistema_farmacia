@@ -101,7 +101,7 @@ if ($_SESSION['compras']==1) {
 }
 require 'footer.php';
  ?>
- <script src="scripts/proveedor.js"></script>
+ <script src="<?= assetV('scripts/proveedor.js') ?>"></script>
  <?php 
 }
 

@@ -1,6 +1,7 @@
 <?php 
 //incluir la conexion de base de datos
 require_once __DIR__ . "/../config/Conexion.php";
+require_once __DIR__ . "/Presentacion.php";
 class Ingreso{
 
 
@@ -302,8 +303,9 @@ public function anular($idingreso){
 	$cab = ejecutarConsultaSimpleFila("SELECT estado, IFNULL(stock_ajustado,0) AS stock_ajustado FROM ingreso WHERE idingreso='$idingreso' LIMIT 1");
 	if (!$cab) return false;
 	if ($cab['estado'] === 'Anulado') return true;
+	if ($cab['estado'] === 'Borrador') return false;
 
-	$detalles = ejecutarConsulta("SELECT idarticulo, cantidad FROM detalle_ingreso WHERE idingreso='$idingreso'");
+	$detalles = ejecutarConsulta("SELECT idarticulo, ".Presentacion::sqlCantidadBase('detalle_ingreso')." AS cantidad FROM detalle_ingreso WHERE idingreso='$idingreso'");
 	$filas = array();
 	while ($d = $detalles->fetch_object()) { $filas[] = $d; }
 
@@ -334,7 +336,7 @@ public function activar($idingreso){
 	try {
 		ejecutarConsulta("UPDATE ingreso SET estado='Aceptado', stock_ajustado=0 WHERE idingreso='$idingreso'");
 		if ((int)$cab['stock_ajustado'] === 1) {
-			$detalles = ejecutarConsulta("SELECT idarticulo, cantidad FROM detalle_ingreso WHERE idingreso='$idingreso'");
+			$detalles = ejecutarConsulta("SELECT idarticulo, ".Presentacion::sqlCantidadBase('detalle_ingreso')." AS cantidad FROM detalle_ingreso WHERE idingreso='$idingreso'");
 			while ($d = $detalles->fetch_object()) {
 				ejecutarConsulta("UPDATE articulo SET stock = stock + '".(float)$d->cantidad."' WHERE idarticulo='".(int)$d->idarticulo."'");
 			}
@@ -364,7 +366,7 @@ public function eliminarDefinitivo($idingreso){
 	}
 	$stockYaAjustado = (int)$cab['stock_ajustado'] === 1;
 
-	$rspta = ejecutarConsulta("SELECT iddetalle_ingreso, idarticulo, cantidad, IFNULL(idlote,0) AS idlote FROM detalle_ingreso WHERE idingreso='$idingreso'");
+	$rspta = ejecutarConsulta("SELECT iddetalle_ingreso, idarticulo, ".Presentacion::sqlCantidadBase('detalle_ingreso')." AS cantidad, IFNULL(idlote,0) AS idlote FROM detalle_ingreso WHERE idingreso='$idingreso'");
 	$filas = array();
 	while ($d = $rspta->fetch_object()) {
 		if ((int)$d->idlote > 0) {
@@ -458,28 +460,10 @@ public function agregarDetalle($idingreso, $idusuario, $idarticulo, $cantidad, $
 	try {
 		$totalAgregado = 0;
 		foreach ($detalles as $d) {
-			$nLoteEsc = limpiarCadena($d['nLote']);
-			$fVencSQL = $d['fVenc'] !== '' ? "'".$d['fVenc']."'" : 'NULL';
-			$sqlDet = "INSERT INTO detalle_ingreso
-				(idingreso,idarticulo,cantidad,precio_compra,precio_venta,numero_lote,fecha_vencimiento)
-				VALUES('$idingreso','{$d['idArt']}','{$d['cant']}','{$d['pCom']}','{$d['pVen']}','$nLoteEsc',$fVencSQL)";
-			$iddet = ejecutarConsulta_retornarID($sqlDet);
+			$iddet = $this->insertarDetalleFila($idingreso, $d['idArt'], $d['cant'], $d['pCom'], $d['pVen'], $d['nLote'], $d['fVenc'], $d['fFab']);
 			if (!$iddet) {
 				$conexion->rollback(); $conexion->autocommit(true);
 				return array("ok"=>false, "message"=>"No se pudo registrar el detalle");
-			}
-			if ($d['pVen'] > 0) {
-				ejecutarConsulta("UPDATE articulo SET precio_venta='{$d['pVen']}' WHERE idarticulo='{$d['idArt']}'");
-			}
-			if ($d['nLote'] !== '' && $d['fVenc'] !== '') {
-				$fFabSQL = $d['fFab'] !== '' ? "'".$d['fFab']."'" : 'NULL';
-				$sqlLote = "INSERT INTO lote_articulo
-					(idarticulo,numero_lote,fecha_vencimiento,fecha_fabricacion,cantidad_inicial,cantidad_actual,idingreso,condicion)
-					VALUES('{$d['idArt']}','$nLoteEsc','{$d['fVenc']}',$fFabSQL,'{$d['cant']}','{$d['cant']}','$idingreso',1)";
-				$idlote = ejecutarConsulta_retornarID($sqlLote);
-				if ($idlote) {
-					ejecutarConsulta("UPDATE detalle_ingreso SET idlote='$idlote' WHERE iddetalle_ingreso='$iddet'");
-				}
 			}
 			$totalAgregado += $d['cant'] * $d['pCom'];
 		}
@@ -514,27 +498,433 @@ public function agregarDetalle($idingreso, $idusuario, $idarticulo, $cantidad, $
 }
 
 
+// ─────────────────────────────────────────────────────────────────
+// Autoguardado por fila (compra en BORRADOR)
+// Flujo: crearBorrador() → guardarFilaDetalle() por cada fila completa
+//        → guardarCabecera(confirmar=true) pasa el ingreso a Aceptado.
+// El trigger tr_updStockIngreso suma stock al insertar cada fila; por eso
+// descartarBorrador() y eliminarDetalle() lo revierten explícitamente.
+// ─────────────────────────────────────────────────────────────────
+
+private function normalizarMetodoPago($metodo_pago){
+	$metodosOk = array('EFECTIVO','YAPE','PLIN','TARJETA','TRANSFERENCIA','MIXTO');
+	$m = strtoupper(trim((string)$metodo_pago));
+	return in_array($m, $metodosOk, true) ? $m : 'EFECTIVO';
+}
+
+private function recalcularTotal($idingreso){
+	$idingreso = (int)$idingreso;
+	$totalRow = ejecutarConsultaSimpleFila("SELECT IFNULL(SUM(cantidad*precio_compra),0) AS total FROM detalle_ingreso WHERE idingreso='$idingreso'");
+	$nuevoTotal = $totalRow ? round((float)$totalRow['total'], 2) : 0;
+	ejecutarConsulta("UPDATE ingreso SET total_compra='$nuevoTotal' WHERE idingreso='$idingreso'");
+	return $nuevoTotal;
+}
+
+/** Inserta una fila de detalle (+ lote si corresponde). Devuelve iddetalle o false. No maneja transacción. */
+private function insertarDetalleFila($idingreso, $idarticulo, $cantidad, $precio_compra, $precio_venta, $numero_lote, $fecha_vencimiento, $fecha_fabricacion = '', $idpresentacion = 0){
+	$idingreso  = (int)$idingreso;
+	$idarticulo = (int)$idarticulo;
+	$nLoteEsc   = limpiarCadena($numero_lote);
+	$fVencSQL   = $fecha_vencimiento !== '' ? "'".$fecha_vencimiento."'" : 'NULL';
+	// Presentación comprada (Caja x100...): stock y lote se registran en unidades base
+	$presMdl = new Presentacion();
+	$pres = $presMdl->resolver($idarticulo, $idpresentacion);
+	if (!$pres) {
+		return false;
+	}
+	$factor = (float)$pres['factor'];
+	$cantidadBase = $cantidad * $factor;
+	if (Presentacion::disponible()) {
+		$idpresSql = $pres['idpresentacion'] ? "'".(int)$pres['idpresentacion']."'" : 'NULL';
+		$sqlDet = "INSERT INTO detalle_ingreso
+			(idingreso,idarticulo,idpresentacion,cantidad,factor,precio_compra,precio_venta,numero_lote,fecha_vencimiento)
+			VALUES('$idingreso','$idarticulo',$idpresSql,'$cantidad','$factor','$precio_compra','$precio_venta','$nLoteEsc',$fVencSQL)";
+	} else {
+		$sqlDet = "INSERT INTO detalle_ingreso
+			(idingreso,idarticulo,cantidad,precio_compra,precio_venta,numero_lote,fecha_vencimiento)
+			VALUES('$idingreso','$idarticulo','$cantidad','$precio_compra','$precio_venta','$nLoteEsc',$fVencSQL)";
+	}
+	$iddet = ejecutarConsulta_retornarID($sqlDet);
+	if (!$iddet) {
+		return false;
+	}
+	if ($precio_venta > 0) {
+		$presMdl->actualizarPrecio($idarticulo, $pres['idpresentacion'], $precio_venta);
+	}
+	if ($numero_lote !== '' && $fecha_vencimiento !== '') {
+		$fFabSQL = ($fecha_fabricacion !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha_fabricacion)) ? "'".$fecha_fabricacion."'" : 'NULL';
+		$sqlLote = "INSERT INTO lote_articulo
+			(idarticulo,numero_lote,fecha_vencimiento,fecha_fabricacion,cantidad_inicial,cantidad_actual,idingreso,condicion)
+			VALUES('$idarticulo','$nLoteEsc','$fecha_vencimiento',$fFabSQL,'$cantidadBase','$cantidadBase','$idingreso',1)";
+		$idlote = ejecutarConsulta_retornarID($sqlLote);
+		if ($idlote) {
+			ejecutarConsulta("UPDATE detalle_ingreso SET idlote='$idlote' WHERE iddetalle_ingreso='$iddet'");
+		}
+	}
+	return $iddet;
+}
+
+/** Valida una fecha de vencimiento (obligatoria, formato Y-m-d, real y no pasada). Devuelve '' si es válida o el mensaje de error. */
+private function validarFechaVencimiento($fecha){
+	$fecha = trim((string)$fecha);
+	if ($fecha === '') {
+		return "Falta la fecha de vencimiento";
+	}
+	if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha)) {
+		return "La fecha de vencimiento tiene un formato incorrecto. Usa el selector de fecha";
+	}
+	$p = explode('-', $fecha);
+	if (!checkdate((int)$p[1], (int)$p[2], (int)$p[0])) {
+		return "La fecha de vencimiento no es válida. Verifica el día y el mes";
+	}
+	if ($fecha < date('Y-m-d')) {
+		return "La fecha de vencimiento ya pasó. No se puede recibir un producto vencido";
+	}
+	return '';
+}
+
+/** Crea la cabecera de una compra en estado Borrador. Devuelve ok + idingreso. */
+public function crearBorrador($idproveedor, $idusuario, $tipo_comprobante, $serie_comprobante, $num_comprobante, $fecha_hora, $impuesto, $metodo_pago = 'EFECTIVO', $temperatura_recepcion = null, $temp_observacion = ''){
+	global $conexion;
+	$idproveedor = (int)$idproveedor;
+	$idusuario   = (int)$idusuario;
+	if ($idproveedor <= 0) {
+		return array("ok"=>false, "message"=>"Selecciona un proveedor antes de agregar artículos");
+	}
+	$validarProveedor = ejecutarConsultaSimpleFila("SELECT idpersona FROM persona WHERE idpersona='$idproveedor' AND tipo_persona='Proveedor' LIMIT 1");
+	if (!$validarProveedor) {
+		return array("ok"=>false, "message"=>"El proveedor seleccionado no existe o no es válido");
+	}
+	$fecha_hora  = $this->normalizarFechaHora($fecha_hora);
+	$impuesto    = round((float)$impuesto, 2);
+	$metodo_pago = $this->normalizarMetodoPago($metodo_pago);
+	$tempSql     = ($temperatura_recepcion === null || $temperatura_recepcion === '') ? 'NULL' : (float)$temperatura_recepcion;
+	$temp_observacion = limpiarCadena(substr(trim((string)$temp_observacion), 0, 200));
+
+	$conexion->autocommit(false);
+	try {
+		$tipo_comprobante  = $this->normalizarTipoComprobante($tipo_comprobante);
+		$serie_comprobante = $this->normalizarSerieComprobante($serie_comprobante, $tipo_comprobante);
+		$num_comprobante   = substr(preg_replace('/[^0-9]/', '', (string)$num_comprobante), 0, 10);
+		if ($num_comprobante === '') {
+			$correlativo = $this->obtenerCorrelativoInterno($tipo_comprobante, $serie_comprobante, true);
+			$num_comprobante = $correlativo["numero"];
+		} else {
+			$existe = ejecutarConsultaSimpleFila("SELECT idingreso, estado FROM ingreso
+				WHERE tipo_comprobante='$tipo_comprobante' AND serie_comprobante='$serie_comprobante'
+				AND num_comprobante='$num_comprobante' LIMIT 1 FOR UPDATE");
+			if ($existe && isset($existe["idingreso"])) {
+				$conexion->rollback(); $conexion->autocommit(true);
+				$msg = ($existe["estado"] === 'Borrador')
+					? "Ya existe una compra en borrador con el comprobante $serie_comprobante-$num_comprobante. Continúala desde el listado o cambia el número"
+					: "Ya existe una compra registrada con el comprobante $serie_comprobante-$num_comprobante. Cambia el número";
+				return array("ok"=>false, "message"=>$msg);
+			}
+		}
+		$sql = "INSERT INTO ingreso (idproveedor,idusuario,tipo_comprobante,serie_comprobante,num_comprobante,fecha_hora,impuesto,total_compra,estado,temperatura_recepcion,temp_observacion,metodo_pago)
+			VALUES ('$idproveedor','$idusuario','$tipo_comprobante','$serie_comprobante','$num_comprobante','$fecha_hora','$impuesto','0.00','Borrador',$tempSql,'$temp_observacion','$metodo_pago')";
+		$idingreso = ejecutarConsulta_retornarID($sql);
+		if (!$idingreso) {
+			$conexion->rollback(); $conexion->autocommit(true);
+			return array("ok"=>false, "message"=>"No se pudo iniciar la compra. Intenta de nuevo");
+		}
+		$conexion->commit(); $conexion->autocommit(true);
+	} catch (Throwable $e) {
+		$conexion->rollback(); $conexion->autocommit(true);
+		return array("ok"=>false, "message"=>"No se pudo iniciar la compra: ".$e->getMessage());
+	}
+	return array(
+		"ok"=>true,
+		"idingreso"=>(int)$idingreso,
+		"estado"=>"Borrador",
+		"tipo_comprobante"=>$tipo_comprobante,
+		"serie_comprobante"=>$serie_comprobante,
+		"num_comprobante"=>$num_comprobante
+	);
+}
+
+/**
+ * Guarda (inserta o actualiza) UNA fila del detalle de una compra en Borrador o Aceptada.
+ * Devuelve ok, iddetalle y nuevo_total.
+ */
+public function guardarFilaDetalle($idingreso, $iddetalle, $idarticulo, $cantidad, $precio_compra, $precio_venta, $numero_lote, $fecha_vencimiento, $idpresentacion = 0){
+	global $conexion;
+	$idingreso  = (int)$idingreso;
+	$iddetalle  = (int)$iddetalle;
+	$idarticulo = (int)$idarticulo;
+	if ($idingreso <= 0) {
+		return array("ok"=>false, "message"=>"La compra aún no está iniciada. Selecciona el proveedor e intenta de nuevo");
+	}
+	$cab = ejecutarConsultaSimpleFila("SELECT idingreso, estado FROM ingreso WHERE idingreso='$idingreso' LIMIT 1");
+	if (!$cab) {
+		return array("ok"=>false, "message"=>"La compra ya no existe. Vuelve a iniciarla");
+	}
+	if ($cab["estado"] !== 'Borrador' && $cab["estado"] !== 'Aceptado') {
+		return array("ok"=>false, "message"=>"No se puede modificar una compra anulada");
+	}
+	$cantidad      = $this->normalizarCantidad($cantidad);
+	$precio_compra = round((float)$precio_compra, 2);
+	$precio_venta  = round((float)$precio_venta, 2);
+	$numero_lote   = trim((string)$numero_lote);
+	$fecha_vencimiento = trim((string)$fecha_vencimiento);
+
+	$art = ejecutarConsultaSimpleFila("SELECT idarticulo, nombre FROM articulo WHERE idarticulo='$idarticulo' LIMIT 1");
+	if (!$art) {
+		return array("ok"=>false, "message"=>"El producto no existe");
+	}
+	$nombreArt = $art["nombre"];
+	if ($cantidad <= 0) {
+		return array("ok"=>false, "message"=>"La cantidad de $nombreArt debe ser mayor que cero");
+	}
+	if ($precio_compra < 0 || $precio_venta < 0) {
+		return array("ok"=>false, "message"=>"Los precios de $nombreArt no pueden ser negativos");
+	}
+	$errFecha = $this->validarFechaVencimiento($fecha_vencimiento);
+	if ($errFecha !== '') {
+		return array("ok"=>false, "message"=>$errFecha." ($nombreArt)");
+	}
+	$presMdl = new Presentacion();
+	$presChk = $presMdl->resolver($idarticulo, $idpresentacion);
+	if (!$presChk || (isset($presChk['activa']) && !$presChk['activa'])) {
+		return array("ok"=>false, "message"=>"La presentación elegida para $nombreArt ya no está disponible. Elige otra");
+	}
+
+	if ($iddetalle > 0) {
+		$det = ejecutarConsultaSimpleFila("SELECT iddetalle_ingreso FROM detalle_ingreso WHERE iddetalle_ingreso='$iddetalle' AND idingreso='$idingreso' LIMIT 1");
+		if (!$det) {
+			return array("ok"=>false, "message"=>"La fila de $nombreArt ya no existe en esta compra. Vuelve a agregarla");
+		}
+		$r = $this->actualizarDetalle($iddetalle, $cantidad, $precio_compra, $precio_venta, $numero_lote, $fecha_vencimiento, $idpresentacion);
+		if (!empty($r["ok"])) {
+			$r["iddetalle"] = $iddetalle;
+			$r["idingreso"] = $idingreso;
+			$r["message"]   = "Guardado: $nombreArt";
+		}
+		return $r;
+	}
+
+	$conexion->autocommit(false);
+	try {
+		$iddetNuevo = $this->insertarDetalleFila($idingreso, $idarticulo, $cantidad, $precio_compra, $precio_venta, $numero_lote, $fecha_vencimiento, '', $idpresentacion);
+		if (!$iddetNuevo) {
+			$conexion->rollback(); $conexion->autocommit(true);
+			return array("ok"=>false, "message"=>"No se pudo guardar la fila de $nombreArt. Intenta de nuevo");
+		}
+		$nuevoTotal = $this->recalcularTotal($idingreso);
+		$conexion->commit(); $conexion->autocommit(true);
+	} catch (Throwable $e) {
+		$conexion->rollback(); $conexion->autocommit(true);
+		return array("ok"=>false, "message"=>"No se pudo guardar la fila de $nombreArt: ".$e->getMessage());
+	}
+	return array("ok"=>true, "message"=>"Guardado: $nombreArt", "iddetalle"=>(int)$iddetNuevo, "idingreso"=>$idingreso, "nuevo_total"=>$nuevoTotal);
+}
+
+/**
+ * Actualiza la cabecera de una compra (Borrador o Aceptada). Si $confirmar=true
+ * valida que tenga filas completas, recalcula el total y la deja en estado Aceptado.
+ */
+public function guardarCabecera($idingreso, $c, $confirmar = false){
+	global $conexion;
+	$idingreso = (int)$idingreso;
+	if ($idingreso <= 0) {
+		return array("ok"=>false, "message"=>"La compra no está iniciada");
+	}
+	$cab = ejecutarConsultaSimpleFila("SELECT idingreso, estado, tipo_comprobante, serie_comprobante, num_comprobante FROM ingreso WHERE idingreso='$idingreso' LIMIT 1");
+	if (!$cab) {
+		return array("ok"=>false, "message"=>"La compra ya no existe");
+	}
+	if ($cab["estado"] !== 'Borrador' && $cab["estado"] !== 'Aceptado') {
+		return array("ok"=>false, "message"=>"No se puede modificar una compra anulada");
+	}
+	$set = array();
+	if (isset($c["idproveedor"]) && (int)$c["idproveedor"] > 0) {
+		$idprov = (int)$c["idproveedor"];
+		$okProv = ejecutarConsultaSimpleFila("SELECT idpersona FROM persona WHERE idpersona='$idprov' AND tipo_persona='Proveedor' LIMIT 1");
+		if (!$okProv) {
+			return array("ok"=>false, "message"=>"El proveedor seleccionado no es válido");
+		}
+		$set[] = "idproveedor='$idprov'";
+	}
+	$tipo  = (isset($c["tipo_comprobante"]) && $c["tipo_comprobante"] !== '') ? $this->normalizarTipoComprobante($c["tipo_comprobante"]) : $cab["tipo_comprobante"];
+	$serie = (isset($c["serie_comprobante"]) && $c["serie_comprobante"] !== '') ? $this->normalizarSerieComprobante($c["serie_comprobante"], $tipo) : $cab["serie_comprobante"];
+	$num   = isset($c["num_comprobante"]) ? substr(preg_replace('/[^0-9]/', '', (string)$c["num_comprobante"]), 0, 10) : (string)$cab["num_comprobante"];
+	if ($num === '') {
+		$num = (string)$cab["num_comprobante"];
+	}
+	if ($num === '' && $confirmar) {
+		$correlativo = $this->obtenerCorrelativoInterno($tipo, $serie, false);
+		$num = $correlativo["numero"];
+	}
+	if ($num !== '') {
+		$dup = ejecutarConsultaSimpleFila("SELECT idingreso FROM ingreso WHERE tipo_comprobante='$tipo' AND serie_comprobante='$serie' AND num_comprobante='$num' AND idingreso<>'$idingreso' LIMIT 1");
+		if ($dup) {
+			return array("ok"=>false, "message"=>"Ya existe otra compra con el comprobante $tipo $serie-$num. Cambia el número");
+		}
+	}
+	$set[] = "tipo_comprobante='$tipo'";
+	$set[] = "serie_comprobante='$serie'";
+	$set[] = "num_comprobante='$num'";
+	if (isset($c["fecha_hora"]) && $c["fecha_hora"] !== '') {
+		$set[] = "fecha_hora='".$this->normalizarFechaHora($c["fecha_hora"])."'";
+	}
+	if (isset($c["impuesto"]) && $c["impuesto"] !== '') {
+		$set[] = "impuesto='".round((float)$c["impuesto"], 2)."'";
+	}
+	if (isset($c["metodo_pago"])) {
+		$set[] = "metodo_pago='".$this->normalizarMetodoPago($c["metodo_pago"])."'";
+	}
+	if (array_key_exists("temperatura_recepcion", $c)) {
+		$set[] = "temperatura_recepcion=".(($c["temperatura_recepcion"] === null || $c["temperatura_recepcion"] === '') ? 'NULL' : (float)$c["temperatura_recepcion"]);
+	}
+	if (isset($c["temp_observacion"])) {
+		$set[] = "temp_observacion='".limpiarCadena(substr(trim((string)$c["temp_observacion"]), 0, 200))."'";
+	}
+
+	$items = 0; $total = 0;
+	$conexion->autocommit(false);
+	try {
+		if ($confirmar) {
+			$cnt = ejecutarConsultaSimpleFila("SELECT COUNT(*) AS items, SUM(CASE WHEN fecha_vencimiento IS NULL THEN 1 ELSE 0 END) AS sin_fecha FROM detalle_ingreso WHERE idingreso='$idingreso'");
+			$items = $cnt ? (int)$cnt["items"] : 0;
+			if ($items <= 0) {
+				$conexion->rollback(); $conexion->autocommit(true);
+				return array("ok"=>false, "message"=>"La compra no tiene artículos guardados. Agrega al menos uno y completa su fila");
+			}
+			if ($cnt && (int)$cnt["sin_fecha"] > 0) {
+				$conexion->rollback(); $conexion->autocommit(true);
+				return array("ok"=>false, "message"=>"Hay ".(int)$cnt["sin_fecha"]." artículo(s) sin fecha de vencimiento. Complétalos antes de confirmar");
+			}
+			$set[] = "estado='Aceptado'";
+			$set[] = "stock_ajustado=0";
+		}
+		ejecutarConsulta("UPDATE ingreso SET ".implode(",", $set)." WHERE idingreso='$idingreso'");
+		$total = $this->recalcularTotal($idingreso);
+		$conexion->commit(); $conexion->autocommit(true);
+	} catch (Throwable $e) {
+		$conexion->rollback(); $conexion->autocommit(true);
+		return array("ok"=>false, "message"=>"No se pudo guardar la compra: ".$e->getMessage());
+	}
+	return array(
+		"ok"=>true,
+		"message"=>$confirmar ? "Compra confirmada correctamente" : "Datos de la compra guardados",
+		"idingreso"=>$idingreso,
+		"estado"=>$confirmar ? 'Aceptado' : $cab["estado"],
+		"items"=>$items,
+		"total"=>$total,
+		"tipo_comprobante"=>$tipo,
+		"serie_comprobante"=>$serie,
+		"num_comprobante"=>$num
+	);
+}
+
+/** Elimina por completo una compra en Borrador, revirtiendo el stock que sumó el trigger. */
+public function descartarBorrador($idingreso){
+	global $conexion;
+	$idingreso = (int)$idingreso;
+	if ($idingreso <= 0) {
+		return array("ok"=>false, "message"=>"ID de compra inválido");
+	}
+	$cab = ejecutarConsultaSimpleFila("SELECT idingreso, estado FROM ingreso WHERE idingreso='$idingreso' LIMIT 1");
+	if (!$cab) {
+		return array("ok"=>true, "message"=>"El borrador ya no existe");
+	}
+	if ($cab["estado"] !== 'Borrador') {
+		return array("ok"=>false, "message"=>"Solo se pueden descartar compras en borrador");
+	}
+	$rs = ejecutarConsulta("SELECT iddetalle_ingreso, idarticulo, ".Presentacion::sqlCantidadBase('detalle_ingreso')." AS cantidad, IFNULL(idlote,0) AS idlote FROM detalle_ingreso WHERE idingreso='$idingreso'");
+	$filas = array();
+	while ($d = $rs->fetch_object()) {
+		if ((int)$d->idlote > 0) {
+			$ventasLote = ejecutarConsultaSimpleFila("SELECT COUNT(*) AS total FROM detalle_venta WHERE idlote='".(int)$d->idlote."'");
+			if ($ventasLote && (int)$ventasLote["total"] > 0) {
+				return array("ok"=>false, "message"=>"No se puede descartar: uno de los lotes de este borrador ya tiene ventas registradas. Confirma la compra en su lugar");
+			}
+		}
+		$filas[] = $d;
+	}
+	$conexion->autocommit(false);
+	try {
+		foreach ($filas as $d) {
+			ejecutarConsulta("UPDATE articulo SET stock = stock - '".(float)$d->cantidad."' WHERE idarticulo='".(int)$d->idarticulo."'");
+			if ((int)$d->idlote > 0) {
+				ejecutarConsulta("DELETE FROM lote_articulo WHERE idlote='".(int)$d->idlote."'");
+			}
+		}
+		ejecutarConsulta("DELETE FROM detalle_ingreso WHERE idingreso='$idingreso'");
+		$ok = ejecutarConsulta("DELETE FROM ingreso WHERE idingreso='$idingreso'");
+		if (!$ok) {
+			$conexion->rollback(); $conexion->autocommit(true);
+			return array("ok"=>false, "message"=>"No se pudo descartar el borrador");
+		}
+		$conexion->commit(); $conexion->autocommit(true);
+	} catch (Throwable $e) {
+		$conexion->rollback(); $conexion->autocommit(true);
+		return array("ok"=>false, "message"=>"No se pudo descartar el borrador: ".$e->getMessage());
+	}
+	return array("ok"=>true, "message"=>"Borrador descartado. El stock quedó como antes", "items"=>count($filas));
+}
+
+/** Último borrador pendiente del usuario (para ofrecer continuarlo al abrir el formulario). */
+public function borradorPendiente($idusuario){
+	$idusuario = (int)$idusuario;
+	$sql = "SELECT i.idingreso, i.idproveedor, IFNULL(p.nombre,'-') AS proveedor,
+		DATE_FORMAT(i.fecha_hora,'%d/%m/%Y %H:%i') AS fecha, i.tipo_comprobante, i.serie_comprobante, i.num_comprobante,
+		i.total_compra, (SELECT COUNT(*) FROM detalle_ingreso d WHERE d.idingreso=i.idingreso) AS items
+		FROM ingreso i LEFT JOIN persona p ON p.idpersona=i.idproveedor
+		WHERE i.estado='Borrador' AND i.idusuario='$idusuario'
+		ORDER BY i.idingreso DESC LIMIT 1";
+	return ejecutarConsultaSimpleFila($sql);
+}
+
+/** Detalle de una compra como arreglo (para reconstruir el carrito editable). */
+public function listarDetalleArray($idingreso){
+	$rs = $this->listarDetalle((int)$idingreso);
+	$out = array();
+	if ($rs) {
+		while ($r = $rs->fetch_assoc()) {
+			$out[] = array(
+				"iddetalle"         => (int)$r["iddetalle_ingreso"],
+				"idarticulo"        => (int)$r["idarticulo"],
+				"nombre"            => $r["nombre"],
+				"unidad"            => $r["unidad"],
+				"idpresentacion"    => (int)$r["idpresentacion"],
+				"factor"            => (float)$r["factor"],
+				"cantidad"          => (float)$r["cantidad"],
+				"precio_compra"     => (float)$r["precio_compra"],
+				"precio_venta"      => (float)$r["precio_venta"],
+				"numero_lote"       => (string)(isset($r["numero_lote"]) ? $r["numero_lote"] : ''),
+				"fecha_vencimiento" => (string)(isset($r["fecha_vencimiento"]) ? $r["fecha_vencimiento"] : '')
+			);
+		}
+	}
+	return $out;
+}
+
 //metodo para mostrar registros
 public function mostrar($idingreso){
-	$sql="SELECT i.idingreso,DATE_FORMAT(i.fecha_hora,'%Y-%m-%d %H:%i:%s') as fecha,i.idproveedor,p.nombre as proveedor,u.idusuario,u.nombre as usuario, i.tipo_comprobante,i.serie_comprobante,i.num_comprobante,i.total_compra,i.impuesto,i.estado FROM ingreso i INNER JOIN persona p ON i.idproveedor=p.idpersona INNER JOIN usuario u ON i.idusuario=u.idusuario WHERE idingreso='$idingreso'";
+	$sql="SELECT i.idingreso,DATE_FORMAT(i.fecha_hora,'%Y-%m-%d %H:%i:%s') as fecha,i.idproveedor,p.nombre as proveedor,u.idusuario,u.nombre as usuario, i.tipo_comprobante,i.serie_comprobante,i.num_comprobante,i.total_compra,i.impuesto,i.estado,IFNULL(i.metodo_pago,'EFECTIVO') AS metodo_pago,i.temperatura_recepcion,IFNULL(i.temp_observacion,'') AS temp_observacion FROM ingreso i INNER JOIN persona p ON i.idproveedor=p.idpersona LEFT JOIN usuario u ON i.idusuario=u.idusuario WHERE i.idingreso='$idingreso'";
 	return ejecutarConsultaSimpleFila($sql);
 }
 
 public function listarDetalle($idingreso){
-	$sql="SELECT di.iddetalle_ingreso,di.idingreso,di.idarticulo,a.nombre,IFNULL(u.abreviatura,'und') as unidad,di.cantidad,di.precio_compra,di.precio_venta,di.numero_lote,di.fecha_vencimiento
+	list($uniSel, $uniJoin) = Presentacion::sqlUnidadDetalle('di', 'u');
+	$presCols = Presentacion::disponible() ? "IFNULL(di.idpresentacion,0) AS idpresentacion, di.factor" : "0 AS idpresentacion, 1 AS factor";
+	$sql="SELECT di.iddetalle_ingreso,di.idingreso,di.idarticulo,a.nombre,$uniSel as unidad,di.cantidad,di.precio_compra,di.precio_venta,di.numero_lote,di.fecha_vencimiento,$presCols
 	FROM detalle_ingreso di
 	INNER JOIN articulo a ON di.idarticulo=a.idarticulo
-	LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad
+	LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad $uniJoin
 	WHERE di.idingreso='$idingreso'";
 	return ejecutarConsulta($sql);
 }
 
-public function actualizarDetalle($iddetalle, $cantidad, $precio_compra, $precio_venta, $numero_lote, $fecha_vencimiento){
+public function actualizarDetalle($iddetalle, $cantidad, $precio_compra, $precio_venta, $numero_lote, $fecha_vencimiento, $idpresentacion = null){
 	$iddetalle = (int)$iddetalle;
 	if ($iddetalle <= 0) {
 		return array("ok"=>false, "message"=>"ID de detalle inválido");
 	}
-	$rowDet = ejecutarConsultaSimpleFila("SELECT idarticulo, idingreso, cantidad, IFNULL(idlote,0) AS idlote FROM detalle_ingreso WHERE iddetalle_ingreso='$iddetalle' LIMIT 1");
+	$conPres = Presentacion::disponible();
+	$colsPres = $conPres ? ", IFNULL(idpresentacion,0) AS idpresentacion, factor" : ", 0 AS idpresentacion, 1 AS factor";
+	$rowDet = ejecutarConsultaSimpleFila("SELECT idarticulo, idingreso, cantidad, IFNULL(idlote,0) AS idlote $colsPres FROM detalle_ingreso WHERE iddetalle_ingreso='$iddetalle' LIMIT 1");
 	if (!$rowDet) {
 		return array("ok"=>false, "message"=>"No se encontró el detalle");
 	}
@@ -549,21 +939,31 @@ public function actualizarDetalle($iddetalle, $cantidad, $precio_compra, $precio
 	if ($cantidad <= 0) {
 		return array("ok"=>false, "message"=>"La cantidad debe ser mayor que cero");
 	}
+	// Presentación: la que se envía, o la que ya tenía la fila
+	$presMdl = new Presentacion();
+	$idpresUsar = ($idpresentacion === null || (int)$idpresentacion <= 0) ? (int)$rowDet['idpresentacion'] : (int)$idpresentacion;
+	$pres = $presMdl->resolver((int)$rowDet['idarticulo'], $idpresUsar);
+	if (!$pres) {
+		return array("ok"=>false, "message"=>"La presentación elegida no pertenece a este producto");
+	}
+	$factorNuevo = (float)$pres['factor'];
 	$fvSQL = $fecha_vencimiento !== '' ? "'$fecha_vencimiento'" : 'NULL';
-	$sql = "UPDATE detalle_ingreso SET cantidad='$cantidad', precio_compra='$precio_compra', precio_venta='$precio_venta', numero_lote='$numero_lote', fecha_vencimiento=$fvSQL WHERE iddetalle_ingreso='$iddetalle'";
+	$setPres = $conPres ? ", idpresentacion=".($pres['idpresentacion'] ? "'".(int)$pres['idpresentacion']."'" : "NULL").", factor='$factorNuevo'" : "";
+	$sql = "UPDATE detalle_ingreso SET cantidad='$cantidad', precio_compra='$precio_compra', precio_venta='$precio_venta', numero_lote='$numero_lote', fecha_vencimiento=$fvSQL $setPres WHERE iddetalle_ingreso='$iddetalle'";
 	$ok = ejecutarConsulta($sql);
 	if (!$ok) {
 		return array("ok"=>false, "message"=>"No se pudo actualizar el detalle");
 	}
-	// Ajustar stock por diferencia de cantidad
-	$oldCantidad = isset($rowDet['cantidad']) ? (float)$rowDet['cantidad'] : 0;
-	$diferencia = $cantidad - $oldCantidad;
+	// Ajustar stock por diferencia en unidades base
+	$oldBase = (float)$rowDet['cantidad'] * (float)$rowDet['factor'];
+	$cantidadBase = $cantidad * $factorNuevo;
+	$diferencia = $cantidadBase - $oldBase;
 	if (abs($diferencia) > 0.0001) {
 		ejecutarConsulta("UPDATE articulo SET stock = stock + '$diferencia' WHERE idarticulo='".(int)$rowDet['idarticulo']."'");
 	}
-	// Actualizar precio_venta en artículo si cambió
+	// Actualizar el precio de venta de la presentación comprada
 	if ($precio_venta > 0) {
-		ejecutarConsulta("UPDATE articulo SET precio_venta='$precio_venta' WHERE idarticulo='".(int)$rowDet['idarticulo']."'");
+		$presMdl->actualizarPrecio((int)$rowDet['idarticulo'], $pres['idpresentacion'], $precio_venta);
 	}
 	// Recalcular total del ingreso
 	$idingreso = (int)$rowDet['idingreso'];
@@ -578,7 +978,7 @@ public function actualizarDetalle($iddetalle, $cantidad, $precio_compra, $precio
 	} elseif ($numero_lote !== '' && $fecha_vencimiento !== '') {
 		// No había lote vinculado aún: crear uno y vincularlo al detalle
 		$fvLoteSQL = "'$fecha_vencimiento'";
-		$sqlNuevoLote = "INSERT INTO lote_articulo (idarticulo,numero_lote,fecha_vencimiento,cantidad_inicial,cantidad_actual,idingreso,condicion) VALUES ('".(int)$rowDet['idarticulo']."','$numero_lote',$fvLoteSQL,'$cantidad','$cantidad','".(int)$rowDet['idingreso']."',1)";
+		$sqlNuevoLote = "INSERT INTO lote_articulo (idarticulo,numero_lote,fecha_vencimiento,cantidad_inicial,cantidad_actual,idingreso,condicion) VALUES ('".(int)$rowDet['idarticulo']."','$numero_lote',$fvLoteSQL,'$cantidadBase','$cantidadBase','".(int)$rowDet['idingreso']."',1)";
 		$idloteNuevo = ejecutarConsulta_retornarID($sqlNuevoLote);
 		if ($idloteNuevo) {
 			ejecutarConsulta("UPDATE detalle_ingreso SET idlote='$idloteNuevo' WHERE iddetalle_ingreso='$iddetalle'");
@@ -592,7 +992,7 @@ public function eliminarDetalle($iddetalle){
 	if ($iddetalle <= 0) {
 		return array("ok"=>false, "message"=>"ID de detalle inválido");
 	}
-	$rowDet = ejecutarConsultaSimpleFila("SELECT idarticulo, idingreso, cantidad, IFNULL(idlote,0) AS idlote FROM detalle_ingreso WHERE iddetalle_ingreso='$iddetalle' LIMIT 1");
+	$rowDet = ejecutarConsultaSimpleFila("SELECT idarticulo, idingreso, ".Presentacion::sqlCantidadBase('detalle_ingreso')." AS cantidad, IFNULL(idlote,0) AS idlote FROM detalle_ingreso WHERE iddetalle_ingreso='$iddetalle' LIMIT 1");
 	if (!$rowDet) {
 		return array("ok"=>false, "message"=>"No se encontró el artículo en esta compra");
 	}
@@ -647,7 +1047,7 @@ public function listarPorFecha($fechaInicio, $fechaFin){
 }
 
 public function ingresocabecera($idingreso){
-	$sql="SELECT i.idingreso, i.idproveedor, p.nombre AS proveedor, p.direccion, p.tipo_documento, p.num_documento, p.email, p.telefono, i.idusuario, u.nombre AS usuario, i.tipo_comprobante, i.serie_comprobante, i.num_comprobante, DATE_FORMAT(i.fecha_hora,'%d/%m/%Y %H:%i') AS fecha, i.impuesto, i.total_compra
+	$sql="SELECT i.idingreso, i.idproveedor, p.nombre AS proveedor, p.direccion, p.tipo_documento, p.num_documento, p.email, p.telefono, i.idusuario, u.nombre AS usuario, i.tipo_comprobante, i.serie_comprobante, i.num_comprobante, DATE_FORMAT(i.fecha_hora,'%d/%m/%Y %H:%i') AS fecha, i.impuesto, i.total_compra, IFNULL(i.metodo_pago,'EFECTIVO') AS metodo_pago, i.estado
 	FROM ingreso i
 	INNER JOIN persona p ON i.idproveedor=p.idpersona
 	INNER JOIN usuario u ON i.idusuario=u.idusuario
@@ -656,10 +1056,11 @@ public function ingresocabecera($idingreso){
 }
 
 public function ingresodetalles($idingreso){
-	$sql="SELECT a.nombre AS articulo, a.codigo, IFNULL(u.abreviatura,'und') as unidad, d.cantidad, d.precio_compra, d.precio_venta, (d.cantidad*d.precio_compra) AS subtotal
+	list($uniSel, $uniJoin) = Presentacion::sqlUnidadDetalle('d', 'u');
+	$sql="SELECT a.nombre AS articulo, a.codigo, $uniSel as unidad, d.cantidad, d.precio_compra, d.precio_venta, (d.cantidad*d.precio_compra) AS subtotal
 	FROM detalle_ingreso d
 	INNER JOIN articulo a ON d.idarticulo=a.idarticulo
-	LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad
+	LEFT JOIN unidad_medida u ON a.idunidad=u.idunidad $uniJoin
 	WHERE d.idingreso='$idingreso'";
 	return ejecutarConsulta($sql);
 }

@@ -87,7 +87,7 @@ if ($_SESSION['consultav']==1) {
 
 require 'footer.php';
  ?>
- <script src="scripts/ventasfechacliente.js"></script>
+ <script src="<?= assetV('scripts/ventasfechacliente.js') ?>"></script>
  <?php 
 }
 

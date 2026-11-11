@@ -15,10 +15,10 @@ function initTabla() {
         },
         "bDestroy": true,
         "iDisplayLength": 25,
-        "order": [[1, 'asc'], [4, 'asc']],
+        "order": [[1, 'asc'], [6, 'asc']],
         "columnDefs": [
-            { "targets": [5, 6], "className": "text-center" },
-            { "targets": [8], "visible": false, "searchable": false }
+            { "targets": [7, 8], "className": "text-center" },
+            { "targets": [10], "visible": false, "searchable": false }
         ]
     }).DataTable();
 
@@ -26,7 +26,7 @@ function initTabla() {
     $.fn.dataTable.ext.search.push(function(settings, data) {
         if (settings.nTable.id !== 'tblLotes') return true;
         if (!filtroActivo) return true;
-        return data[7].indexOf(filtroActivo) !== -1;
+        return data[9].indexOf(filtroActivo) !== -1;
     });
 }
 

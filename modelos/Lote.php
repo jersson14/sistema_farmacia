@@ -3,6 +3,33 @@ require_once __DIR__ . "/../config/Conexion.php";
 
 class Lote
 {
+    const DIAS_ALERTA_DEFAULT = 180;
+
+    // Días de anticipación configurados para avisar vencimientos (default 6 meses)
+    public function diasAlerta()
+    {
+        try {
+            $row = ejecutarConsultaSimpleFila("SELECT dias_alerta_vencimiento FROM configuracion_empresa ORDER BY idconfig ASC LIMIT 1");
+        } catch (Throwable $e) {
+            $row = null; // migración 20261110 aún no aplicada
+        }
+        $dias = $row ? (int)$row['dias_alerta_vencimiento'] : 0;
+        return ($dias >= 1 && $dias <= 730) ? $dias : self::DIAS_ALERTA_DEFAULT;
+    }
+
+    public function guardarDiasAlerta($dias)
+    {
+        $dias = (int)$dias;
+        if ($dias < 1 || $dias > 730) {
+            return false;
+        }
+        try {
+            return ejecutarConsulta("UPDATE configuracion_empresa SET dias_alerta_vencimiento='$dias'");
+        } catch (Throwable $e) {
+            return false;
+        }
+    }
+
     public function insertar($idarticulo, $numero_lote, $fecha_vencimiento, $fecha_fabricacion, $cantidad, $idingreso)
     {
         $idarticulo        = (int)$idarticulo;
@@ -65,9 +92,13 @@ class Lote
         $dias = max(1, (int)$dias);
         $sql = "SELECT l.idlote, l.numero_lote, l.fecha_vencimiento, l.cantidad_actual,
                        a.idarticulo, a.nombre AS articulo, a.codigo,
-                       DATEDIFF(l.fecha_vencimiento, CURDATE()) AS dias_restantes
+                       DATEDIFF(l.fecha_vencimiento, CURDATE()) AS dias_restantes,
+                       IFNULL(p.nombre,'') AS proveedor, i.fecha_hora AS fecha_compra,
+                       CONCAT(IFNULL(i.tipo_comprobante,''),' ',IFNULL(i.serie_comprobante,''),'-',IFNULL(i.num_comprobante,'')) AS documento
                 FROM lote_articulo l
                 INNER JOIN articulo a ON a.idarticulo = l.idarticulo
+                LEFT JOIN ingreso i ON i.idingreso = l.idingreso
+                LEFT JOIN persona p ON p.idpersona = i.idproveedor
                 WHERE l.condicion=1
                   AND l.cantidad_actual > 0
                   AND l.fecha_vencimiento BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL '$dias' DAY)
@@ -91,9 +122,13 @@ class Lote
     {
         $sql = "SELECT l.idlote, l.numero_lote, l.fecha_vencimiento, l.cantidad_actual,
                        a.idarticulo, a.nombre AS articulo, a.codigo,
-                       DATEDIFF(CURDATE(), l.fecha_vencimiento) AS dias_vencido
+                       DATEDIFF(CURDATE(), l.fecha_vencimiento) AS dias_vencido,
+                       IFNULL(p.nombre,'') AS proveedor, i.fecha_hora AS fecha_compra,
+                       CONCAT(IFNULL(i.tipo_comprobante,''),' ',IFNULL(i.serie_comprobante,''),'-',IFNULL(i.num_comprobante,'')) AS documento
                 FROM lote_articulo l
                 INNER JOIN articulo a ON a.idarticulo = l.idarticulo
+                LEFT JOIN ingreso i ON i.idingreso = l.idingreso
+                LEFT JOIN persona p ON p.idpersona = i.idproveedor
                 WHERE l.condicion=1
                   AND l.cantidad_actual > 0
                   AND l.fecha_vencimiento < CURDATE()

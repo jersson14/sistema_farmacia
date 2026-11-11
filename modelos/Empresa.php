@@ -68,6 +68,63 @@ class Empresa
         return ejecutarConsulta($sql);
     }
 
+    /**
+     * Datos de la empresa para las páginas públicas (landing y tienda).
+     * $rutaBase = prefijo relativo hasta la raíz del proyecto ('' desde index.php, '../' desde /tienda).
+     * Devuelve el logo ya resuelto como URL (con cache-busting) y textos decodificados.
+     */
+    public function datosPublicos($rutaBase = '')
+    {
+        $decode = function ($value) {
+            $txt = trim((string)$value);
+            for ($i = 0; $i < 3; $i++) {
+                $decoded = html_entity_decode($txt, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                if ($decoded === $txt) {
+                    break;
+                }
+                $txt = $decoded;
+            }
+            return trim($txt);
+        };
+
+        $cfg = $this->obtener();
+        if (!$cfg) {
+            $cfg = array();
+        }
+
+        $raiz = __DIR__ . '/../';
+        $logoUrl = '';
+        if (!empty($cfg['logo'])) {
+            $logoFS = realpath($raiz . 'files/empresa/' . $cfg['logo']);
+            if ($logoFS && is_file($logoFS)) {
+                $logoUrl = $rutaBase . 'files/empresa/' . rawurlencode($cfg['logo']) . '?v=' . filemtime($logoFS);
+            }
+        }
+        if ($logoUrl === '') {
+            foreach (array('files/empresa/farmasuyana.png', 'files/famacia.png') as $fallback) {
+                if (is_file($raiz . $fallback)) {
+                    $logoUrl = $rutaBase . $fallback . '?v=' . filemtime($raiz . $fallback);
+                    break;
+                }
+            }
+        }
+
+        $nombreComercial = $decode($cfg['nombre_comercial'] ?? '');
+        $razonSocial     = $decode($cfg['razon_social'] ?? '');
+
+        return array(
+            'nombre'       => $nombreComercial !== '' ? $nombreComercial : ($razonSocial !== '' ? $razonSocial : 'Botica FarmaSuyana'),
+            'razon_social' => $razonSocial,
+            'ruc'          => $decode($cfg['ruc'] ?? ''),
+            'direccion'    => $decode($cfg['direccion'] ?? ''),
+            'telefono'     => $decode(!empty($cfg['telefono']) ? $cfg['telefono'] : ($cfg['celular'] ?? '')),
+            'celular'      => $decode($cfg['celular'] ?? ''),
+            'correo'       => $decode($cfg['correo'] ?? ''),
+            'web'          => $decode($cfg['web'] ?? ''),
+            'logo_url'     => $logoUrl,
+        );
+    }
+
     public function datosReporte()
     {
         $decode = function ($value) {

@@ -161,6 +161,7 @@ function cargarProductosGrid() {
 		}
 		posProductos = r.data;
 		renderGrid();
+		recalcularPorPaginaPOS();
 	}).fail(function() {
 		$("#posProductGrid").html('<div class="pos-grid-empty">Error al cargar productos.</div>');
 	});
@@ -230,6 +231,13 @@ function renderGrid() {
 			'<img class="pos-card-img" src="' + imgSrc + '" onerror="this.src=\'../public/img/default-50x50.gif\'" alt="">' +
 			'<div class="pos-card-nombre">' + $('<span>').text(p.nombre).html() + '</div>' +
 			(generico ? '<div class="pos-card-generico">' + $('<span>').text(generico).html() + '</div>' : '') +
+			((p.presentaciones && p.presentaciones.length > 1)
+				? '<div class="pos-card-pres" title="Se vende por: ' + $('<span>').text(p.presentaciones.map(etiquetaPresentacion).join(', ')).html() + '"><i class="fa fa-cubes"></i> ' +
+				  $('<span>').text(p.presentaciones.map(function(x){ return x.abrev; }).join(' · ')).html() + '</div>'
+				: '') +
+			((basePresentacion(p.presentaciones) && parseFloat(basePresentacion(p.presentaciones).precio_dni) > 0)
+				? '<div class="pos-card-dni" title="Precio para cliente registrado"><i class="fa fa-id-card"></i> Con DNI ' + simbolo + ' ' + parseFloat(basePresentacion(p.presentaciones).precio_dni).toFixed(2) + '</div>'
+				: '') +
 			'<div class="pos-card-footer">' +
 				'<span class="pos-card-precio">' + precioHtml + '</span>' +
 				'<span class="pos-card-badge ' + badgeCls + '">' + badgeTxt + '</span>' +
@@ -318,7 +326,7 @@ function posCardClick(idarticulo) {
 		notifyVenta("warning", "Este producto no tiene precio de venta asignado. Actualiza el precio en el módulo de Ingresos.");
 		return;
 	}
-	agregarDetalle(p.idarticulo, p.nombre, p.precio_venta, p.abreviatura, p.stock, p.tipo_venta);
+	agregarDetalle(p.idarticulo, p.nombre, p.precio_venta, p.abreviatura, p.stock, p.tipo_venta, p.presentaciones);
 }
 
 // ── Visual cart ───────────────────────────────────────────────────
@@ -353,11 +361,29 @@ function renderCarritoVisual() {
 		var stockMax  = stockInp  ? parseFloat(stockInp.value || 9999) : 9999;
 		var subtotal  = (cantidad * precio).toFixed(2);
 		var sym       = window.appCurrencySymbol || 'S/';
+		var presFila  = leerPresentacionesFila(fila);
+		var presSelId = String((fila.querySelector('input[name="idpresentacion[]"]') || {}).value || '');
+		var presActual = buscarPresentacion(presFila, presSelId);
+		var tagDni = (presActual && parseFloat(presActual.precio_dni) > 0 && Math.round(precio * 100) === Math.round(parseFloat(presActual.precio_dni) * 100))
+			? ' <span class="pos-item-dni" title="Precio regular ' + sym + ' ' + parseFloat(presActual.precio).toFixed(2) + '">DNI</span>' : '';
+		var lineaUnidad;
+		if (presFila.length > 1) {
+			var opts = '';
+			for (var k = 0; k < presFila.length; k++) {
+				var pr = presFila[k];
+				opts += '<option value="' + pr.id + '"' + (String(pr.id) === presSelId ? ' selected' : '') + '>' +
+					$('<span>').text(etiquetaPresentacion(pr)).html() + '</option>';
+			}
+			lineaUnidad = '<select class="pos-item-pres" title="Cambiar presentación" onchange="cambiarPresentacionFila(' + idx + ', this.value)">' + opts + '</select> ' +
+				sym + ' ' + precio.toFixed(2) + ' c/u' + tagDni;
+		} else {
+			lineaUnidad = (unidad ? $('<span>').text(unidad).html() + ' · ' : '') + sym + ' ' + precio.toFixed(2) + ' c/u' + tagDni;
+		}
 
 		html += '<div class="pos-item" id="posItem' + idx + '">' +
 			'<div class="pos-item-info">' +
 				'<div class="pos-item-nombre" title="' + $('<span>').text(nombre).html() + '">' + $('<span>').text(nombre).html() + '</div>' +
-				(unidad ? '<div class="pos-item-generico">' + $('<span>').text(unidad).html() + '</div>' : '') +
+				'<div class="pos-item-generico">' + lineaUnidad + '</div>' +
 			'</div>' +
 			'<div class="pos-item-controls">' +
 				'<button type="button" class="pos-item-qty-btn" onclick="posItemDecrement(' + idx + ',' + stockMax + ')">&#8722;</button>' +
@@ -369,6 +395,22 @@ function renderCarritoVisual() {
 		'</div>';
 	}
 	$cont.html(html);
+}
+
+// Confirmación visual al agregar: la fila del carrito destella (sin notificaciones que tapen
+// el carrito). En móvil, el botón flotante hace un pulso porque el carrito está oculto.
+function resaltarItemCarrito(idx) {
+	var $item = $("#posItem" + idx);
+	if ($item.length) {
+		$item[0].scrollIntoView({ block: "nearest" });
+		$item.removeClass("pos-item-flash");
+		void $item[0].offsetWidth;
+		$item.addClass("pos-item-flash");
+	}
+	var $btn = $("#posFloatCartBtn");
+	$btn.removeClass("pos-float-pulse");
+	void ($btn[0] && $btn[0].offsetWidth);
+	$btn.addClass("pos-float-pulse");
 }
 
 function posItemDecrement(idx, stockMax) {
@@ -596,6 +638,9 @@ function init(){
    		e.preventDefault();
    		$('#myModal').modal('show');
    	}
+   	if (e.key === "Escape" && $("#posCarritoPanel").hasClass("carrito-open")) {
+   		cerrarCarritoMobile();
+   	}
    	if (e.key === "F10") {
    		e.preventDefault();
    		if (!cajaCerrada && $("#btnGuardar").is(":visible")) {
@@ -623,6 +668,7 @@ function cargarClientes(idPreferido){
 		$("#idcliente").val(idFinal);
 		$('#idcliente').selectpicker('refresh');
 		clientesCargados = true;
+		aplicarPrecioClienteCarrito();
 	});
 }
 
@@ -672,8 +718,9 @@ function guardarClienteRapido(e){
 }
 
 /* ── Carrito móvil (bottom-sheet) ────────────────────────── */
+var POS_BREAK_MOVIL = 767;
 function esMobil(){
-	return window.innerWidth <= 599;
+	return window.innerWidth <= POS_BREAK_MOVIL;
 }
 
 function abrirCarritoMobile(){
@@ -690,14 +737,17 @@ function cerrarCarritoMobile(){
 }
 
 function actualizarFloatCartBtn(){
-	if (!esMobil()) return;
+	if (!esMobil() || !$("body").hasClass("pos-activo")) {
+		$("#posFloatCartBtn").hide();
+		return;
+	}
 	var count = document.querySelectorAll('#detalles .filas').length;
 	var total = $("#posTotalFinal").text() || "S/ 0.00";
 	$("#posFloatBadge").text(count);
 	$("#posFloatTotal").text(total);
 	// Mostrar/ocultar según si hay productos
 	if (count > 0) {
-		$("#posFloatCartBtn").fadeIn(150);
+		$("#posFloatCartBtn").css("display", "flex");
 	} else {
 		$("#posFloatCartBtn").hide();
 		cerrarCarritoMobile();
@@ -726,6 +776,7 @@ function buscarClientePorDni(){
 			if (encontrado) {
 				$("#idcliente").val(r.idpersona);
 				$("#idcliente").selectpicker("refresh");
+				aplicarPrecioClienteCarrito();
 				notifyVenta("success", "Cliente: " + r.nombre);
 			} else {
 				cargarClientes(r.idpersona);
@@ -828,16 +879,74 @@ function limpiar(){
 
 }
 
-// Calcula la altura exacta del pos-wrapper en píxeles y la aplica.
-// Usa window.innerHeight (no 100vh) para evitar ambigüedad CSS.
+// Calcula la altura exacta del pos-wrapper: desde su borde superior real
+// (debajo del header, sea de 50px, 54px o 80px) hasta el fondo de la ventana.
+// visualViewport evita que la barra del navegador móvil tape el botón COBRAR.
 function ajustarAlturaPOS() {
 	var wrapper = document.getElementById('formularioregistros');
-	if (!wrapper) return;
-	var headerH = 80;
-	var statsEl = document.getElementById('resumenPagosVenta');
-	var statsH  = statsEl ? statsEl.getBoundingClientRect().height : 0;
-	var h = Math.max(window.innerHeight - headerH - statsH, 300);
-	wrapper.style.height = h + 'px';
+	var cw = document.getElementById('mainCW');
+	if (!wrapper || !cw || wrapper.style.display === 'none') return;
+	// El alto lo calcula el CSS (100dvh - --pos-top), así se adapta solo al zoom del
+	// navegador aunque no llegue ningún evento; aquí solo se mide dónde empieza el POS.
+	var top = Math.max(0, Math.round(cw.getBoundingClientRect().top + (window.scrollY || 0)));
+	document.documentElement.style.setProperty('--pos-top', top + 'px');
+	if (window.scrollY) window.scrollTo(0, 0);
+	if (!esMobil()) cerrarCarritoMobile();
+	actualizarFloatCartBtn();
+	recalcularPorPaginaPOS();
+}
+
+// Cuántas tarjetas caben: columnas reales del grid × filas visibles.
+// En móvil se hace scroll, así que se muestran más filas por página.
+function recalcularPorPaginaPOS() {
+	var grid = document.getElementById('posProductGrid');
+	if (!grid || !grid.clientWidth) return;
+	var cols = (getComputedStyle(grid).gridTemplateColumns || '').split(' ').filter(Boolean).length || 4;
+	var card = grid.querySelector('.pos-card');
+	var cardH = card ? card.getBoundingClientRect().height + 8 : 150;
+	// Si sobra más del 60% de una fila se incluye (queda un leve scroll) para no dejar hueco
+	var filas = esMobil() ? 6 : Math.max(2, Math.floor((grid.clientHeight - 16 + cardH * 0.4) / cardH));
+	var nuevo = Math.min(Math.max(cols * filas, 8), 60);
+	if (nuevo !== posPorPagina) {
+		var primero = (posCurrentPage - 1) * posPorPagina;
+		posPorPagina = nuevo;
+		posCurrentPage = Math.floor(primero / posPorPagina) + 1;
+		if (posProductos.length) renderGrid();
+	}
+}
+
+// Si cambia el alto disponible del grid (aparece/desaparece un aviso, se abre el
+// teclado en tablet...) se recalcula cuántos productos caben por página.
+var posGridObserver = null;
+if (window.ResizeObserver) {
+	posGridObserver = new ResizeObserver(function(){
+		clearTimeout(posGridTimer);
+		posGridTimer = setTimeout(recalcularPorPaginaPOS, 120);
+	});
+}
+
+// Temporizadores separados: el del grid no debe cancelar el ajuste de altura
+var posGridTimer = null;
+var posResizeTimer = null;
+function onResizePOS() {
+	clearTimeout(posResizeTimer);
+	posResizeTimer = setTimeout(ajustarAlturaPOS, 120);
+}
+
+// En modo POS se colapsa el menú lateral para ganar ancho (salvo en monitores grandes);
+// al salir se restaura como estaba.
+var posColapsoSidebar = false;
+function colapsarSidebarPOS(activar) {
+	var $b = $("body");
+	if (activar) {
+		if (window.innerWidth > POS_BREAK_MOVIL && window.innerWidth < 1600 && !$b.hasClass("sidebar-collapse")) {
+			$b.addClass("sidebar-collapse");
+			posColapsoSidebar = true;
+		}
+	} else if (posColapsoSidebar) {
+		$b.removeClass("sidebar-collapse");
+		posColapsoSidebar = false;
+	}
 }
 
 //funcion mostrar formulario
@@ -850,12 +959,17 @@ function mostrarform(flag, esNuevo){
 		}
 		$("body").addClass("pos-activo");
 		$("html").css("overflow", "hidden");
+		colapsarSidebarPOS(true);
 		// scroll al tope antes de mostrar el POS para garantizar posición correcta
 		window.scrollTo(0, 0);
-		$("#listadoregistros").hide();
+		$("#listadoregistros, #resumenPagosVenta").hide();
 		$("#formularioregistros").show();
 		ajustarAlturaPOS();
-		$(window).on('resize.pos', ajustarAlturaPOS);
+		$(window).on('resize.pos orientationchange.pos', onResizePOS);
+		if (window.visualViewport) window.visualViewport.addEventListener('resize', onResizePOS);
+		if (posGridObserver) posGridObserver.observe(document.getElementById('posProductGrid'));
+		// El menú lateral anima su ancho: recalcular cuando termina
+		setTimeout(ajustarAlturaPOS, 350);
 		$("#btnagregar").hide();
 		$("#btnGuardar").hide();
 		$("#btnCancelar").show();
@@ -874,12 +988,17 @@ function mostrarform(flag, esNuevo){
 			restaurarBorradorVenta();
 		}
 	}else{
-		$(window).off('resize.pos');
+		$(window).off('resize.pos orientationchange.pos');
+		if (window.visualViewport) window.visualViewport.removeEventListener('resize', onResizePOS);
+		if (posGridObserver) posGridObserver.disconnect();
+		cerrarCarritoMobile();
+		$("#posFloatCartBtn").hide();
 		$("body").removeClass("pos-activo");
 		$("html").css("overflow", "");
-		$("#listadoregistros").show();
+		colapsarSidebarPOS(false);
+		$("#listadoregistros, #resumenPagosVenta").show();
 		$("#formularioregistros").hide();
-		document.getElementById('formularioregistros').style.height = '';
+		document.documentElement.style.removeProperty('--pos-top');
 		$("#btnagregar").show();
 	}
 }
@@ -1212,16 +1331,60 @@ function mostrar(idventa){
 }
 
 
-//funcion para desactivar
-function anular(idventa){
-	bootbox.confirm("Â¿Esta seguro de desactivar este dato?", function(result){
-		if (result) {
-			$.post("../ajax/venta.php?op=anular", {idventa : idventa}, function(e){
-				notifyVenta("warning", e);
-				tabla.ajax.reload();
-			});
-		}
-	})
+// Anular y eliminar ventas: si el usuario no tiene el permiso, un administrador
+// debe autorizar con su usuario y clave (ver public/js/app-autorizar.js).
+function eliminarVenta(idventa, comprobante){
+	var aut = {
+		recurso: "venta:" + idventa,
+		titulo: "Eliminar venta anulada",
+		detalle: comprobante || "",
+		mensaje: "La venta anulada y su detalle se borrarán definitivamente. Esta acción no se puede deshacer.",
+		boton: "Autorizar y eliminar",
+		peligro: true
+	};
+	var enviar = function(){
+		$.post("../ajax/venta.php?op=eliminarDefinitivo", {idventa: idventa}, function(raw){
+			var r = appAutorizar.parse(raw);
+			if (appAutorizar.manejar(r, aut, enviar)) return;
+			notifyVenta(r.ok ? "success" : "error", r.message || (r.ok ? "Venta eliminada" : "No se pudo eliminar la venta"));
+			if (r.ok) tabla.ajax.reload(null, false);
+		}).fail(function(){ notifyVenta("error", "No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo."); });
+	};
+	appAutorizar($.extend({}, aut, { onAutorizado: function(yaConfirmado){
+		if (yaConfirmado) { enviar(); return; }
+		appEliminar({
+			url: "../ajax/venta.php?op=eliminarDefinitivo",
+			data: {idventa: idventa},
+			titulo: "Eliminar venta anulada",
+			mensaje: aut.mensaje,
+			onSuccess: function(){ tabla.ajax.reload(null, false); }
+		});
+	}}));
+}
+
+function anular(idventa, comprobante){
+	var aut = {
+		recurso: "venta:" + idventa,
+		titulo: "Anular venta",
+		detalle: comprobante || "",
+		mensaje: "La venta quedará anulada y, si se cobró en efectivo, se registrará la devolución en caja.",
+		boton: "Autorizar y anular",
+		peligro: true
+	};
+	var enviar = function(){
+		$.post("../ajax/venta.php?op=anular", {idventa : idventa}, function(raw){
+			var r = appAutorizar.parse(raw);
+			if (appAutorizar.manejar(r, aut, enviar)) return;
+			notifyVenta(r.ok ? "success" : "error", r.message || (r.ok ? "Venta anulada" : "No se pudo anular la venta"));
+			if (r.ok) tabla.ajax.reload(null, false);
+		}).fail(function(){ notifyVenta("error", "No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo."); });
+	};
+	appAutorizar($.extend({}, aut, { onAutorizado: function(yaConfirmado){
+		if (yaConfirmado) { enviar(); return; }
+		bootbox.confirm("¿Seguro que deseas anular la venta " + $("<span>").text(comprobante || "").html() + "?", function(result){
+			if (result) enviar();
+		});
+	}}));
 }
 
 //declaramos variables necesarias para trabajar con las compras y sus detalles
@@ -1309,61 +1472,188 @@ function cargarCorrelativoComprobante(){
 	});
 }
 
-function agregarDetalle(idarticulo,articulo,precio_venta,unidad,stockDisponible,tipoVenta){
+// ── Presentaciones de venta (Tableta, Blíster x10, Caja x100...) ──────────
+// El stock llega en la unidad base; cada línea guarda su presentación y su factor.
+function etiquetaPresentacion(p){
+	var nom = p.unidad || p.abrev || 'und';
+	return nom + (p.factor > 1 ? ' x' + (+p.factor) : '');
+}
+
+// ── Precio con DNI: se cobra cuando la venta tiene un cliente registrado (no "Consumidor Final") ──
+function clienteConDni(){
+	var v = String($("#idcliente").val() || "0").trim();
+	return v !== "" && v !== "0";
+}
+
+function precioParaCliente(pres){
+	var dni = parseFloat(pres && pres.precio_dni) || 0;
+	return (clienteConDni() && dni > 0) ? dni : (parseFloat(pres && pres.precio) || 0);
+}
+
+function basePresentacion(lista){
+	for (var i = 0; i < (lista || []).length; i++) { if (lista[i].es_base) return lista[i]; }
+	return (lista && lista[0]) || null;
+}
+
+// Al cambiar el cliente se recalculan los precios del carrito (solo los que el cajero no editó a mano)
+function aplicarPrecioClienteCarrito(){
+	var filas = document.querySelectorAll('#detalles .filas');
+	var cambiadas = 0;
+	for (var i = 0; i < filas.length; i++) {
+		var fila = filas[i];
+		var p = buscarPresentacion(leerPresentacionesFila(fila), (fila.querySelector('input[name="idpresentacion[]"]') || {}).value || 0);
+		if (!p || !(parseFloat(p.precio_dni) > 0)) continue;
+		var inp = fila.querySelector('input[name="precio_venta[]"]');
+		var actual = Math.round((parseFloat(inp.value) || 0) * 100);
+		var esAuto = actual === Math.round(parseFloat(p.precio) * 100) || actual === Math.round(parseFloat(p.precio_dni) * 100);
+		if (!esAuto) continue;
+		var nuevo = precioParaCliente(p);
+		if (Math.round(nuevo * 100) !== actual) { inp.value = nuevo.toFixed(2); cambiadas++; }
+	}
+	if (cambiadas > 0) {
+		modificarSubtotales();
+		renderCarritoVisual();
+		guardarBorradorVenta();
+		notifyVenta(clienteConDni() ? "success" : "warning", clienteConDni()
+			? "Precio con DNI aplicado a " + cambiadas + " producto(s)."
+			: "Consumidor Final: se volvió al precio regular en " + cambiadas + " producto(s).");
+	}
+}
+
+function presentacionesDe(idarticulo){
+	if (typeof posProductos === "undefined" || !posProductos) return null;
+	for (var i = 0; i < posProductos.length; i++) {
+		if (posProductos[i].idarticulo === parseInt(idarticulo, 10)) return posProductos[i].presentaciones || null;
+	}
+	return null;
+}
+
+function leerPresentacionesFila(fila){
+	try { return JSON.parse(fila.getAttribute('data-pres') || '[]'); } catch(e) { return []; }
+}
+
+function buscarPresentacion(lista, id){
+	for (var i = 0; i < lista.length; i++) { if (String(lista[i].id) === String(id)) return lista[i]; }
+	return null;
+}
+
+// Construye la fila (oculta) del detalle de venta
+function construirFilaVenta(o){
+	var esc = function(t){ return $('<span>').text(t == null ? '' : String(t)).html(); };
+	var presAttr = esc(JSON.stringify(o.presentaciones || [])).replace(/"/g, '&quot;');
+	var subtotal = (o.cantidad * o.precio - (o.descuento || 0)).toFixed(2);
+	return '<tr class="filas" id="fila' + o.idx + '" data-tipo-venta="' + o.tipoVenta + '" data-pres="' + presAttr + '" data-stock-base="' + o.stockBase + '">' +
+		'<td><button type="button" class="btn btn-danger" onclick="eliminarDetalle(' + o.idx + ')">X</button></td>' +
+		'<td><input type="hidden" name="idarticulo[]" value="' + o.idarticulo + '">' +
+			'<input type="hidden" name="idpresentacion[]" value="' + (o.idpresentacion || 0) + '">' +
+			'<input type="hidden" name="stock_disponible[]" value="' + o.stockMax + '">' + esc(o.nombre) + '</td>' +
+		'<td class="td-unidad">' + esc(o.unidad) + '</td>' +
+		'<td><input type="number" step="0.5" min="0.5" max="' + o.stockMax + '" name="cantidad[]" value="' + o.cantidad + '" oninput="modificarSubtotales()"></td>' +
+		'<td><input type="number" step="0.01" min="0.01" name="precio_venta[]" value="' + o.precio + '" oninput="modificarSubtotales()"></td>' +
+		'<td><input type="number" step="0.01" min="0.00" name="descuento[]" value="' + (o.descuento || 0) + '" oninput="modificarSubtotales()"></td>' +
+		'<td><span id="subtotal' + o.idx + '" name="subtotal">' + subtotal + '</span></td>' +
+		'<td><button type="button" onclick="modificarSubtotales()" class="btn btn-info"><i class="fa fa-refresh"></i></button></td>' +
+	'</tr>';
+}
+
+function agregarDetalle(idarticulo,articulo,precio_venta,unidad,stockDisponible,tipoVenta,presentaciones,idpresInicial){
 	var cantidad=1;
 	var descuento=0;
-	var unidadTexto = unidad || "und";
 	var tipoVentaNorm = (tipoVenta || 'OTC').toUpperCase();
-	var stockDisponibleNum = normalizarEnteroNoNegativo(stockDisponible || 0);
-	var articulos = document.getElementsByName("idarticulo[]");
-	var cantidades = document.getElementsByName("cantidad[]");
-	var stocksDisponibles = document.getElementsByName("stock_disponible[]");
-	if (stockDisponibleNum <= 0) {
+	var stockBase = normalizarEnteroNoNegativo(stockDisponible || 0);
+	var lista = (presentaciones && presentaciones.length) ? presentaciones : (presentacionesDe(idarticulo) || []);
+	if (!lista.length) {
+		lista = [{ id: 0, unidad: unidad || 'und', abrev: unidad || 'und', factor: 1, precio: parseFloat(precio_venta || 0), es_base: 1 }];
+	}
+	var base = null;
+	for (var b = 0; b < lista.length; b++) { if (lista[b].es_base) { base = lista[b]; break; } }
+	var pres = (idpresInicial ? buscarPresentacion(lista, idpresInicial) : null) || base || lista[0];
+	var factor = parseFloat(pres.factor || 1) || 1;
+	var stockMax = Math.floor(stockBase / factor);
+	var unidadTexto = pres.abrev || unidad || "und";
+
+	if (stockBase <= 0) {
 		notifyVenta("warning", "Este articulo no tiene stock disponible.");
 		return;
 	}
-	if (idarticulo!="") {
-		for (var i = 0; i < articulos.length; i++) {
-			if (parseInt(articulos[i].value, 10) === parseInt(idarticulo, 10)) {
-				var stockFila = normalizarEnteroNoNegativo((stocksDisponibles[i] && stocksDisponibles[i].value) ? stocksDisponibles[i].value : stockDisponibleNum);
-				var nuevaCantidadNum = normalizarCantidadEntera(parseFloat(cantidades[i].value || 0) + 1, 1);
-				if (nuevaCantidadNum > stockFila) {
-					notifyVenta("warning", "No puedes vender mas de " + stockFila + " " + unidadTexto + " para este articulo.");
-					return;
-				}
-				cantidades[i].value = nuevaCantidadNum;
-				modificarSubtotales();
-				renderCarritoVisual();
-				$('#myModal').modal('hide');
-				notifyVenta("info", "El articulo ya estaba agregado. Se incremento la cantidad.");
-				guardarBorradorVenta();
-				return;
-			}
+	if (stockMax <= 0) {
+		notifyVenta("warning", "No alcanza para 1 " + etiquetaPresentacion(pres) + ": quedan " + stockBase + " " + ((base && base.abrev) || "und") + ".");
+		return;
+	}
+	if (idarticulo=="") {
+		notifyVenta("warning", "No se pudo agregar el articulo. Revisa la informacion del producto.");
+		return;
+	}
+	var filas = document.querySelectorAll('#detalles .filas');
+	for (var i = 0; i < filas.length; i++) {
+		var f = filas[i];
+		var idArtF  = f.querySelector('input[name="idarticulo[]"]');
+		var idPresF = f.querySelector('input[name="idpresentacion[]"]');
+		if (!idArtF || parseInt(idArtF.value, 10) !== parseInt(idarticulo, 10)) continue;
+		if (String(idPresF ? idPresF.value : 0) !== String(pres.id)) continue;
+		var cantF = f.querySelector('input[name="cantidad[]"]');
+		var stockFila = normalizarEnteroNoNegativo((f.querySelector('input[name="stock_disponible[]"]') || {}).value || stockMax);
+		var nuevaCantidadNum = normalizarCantidadEntera(parseFloat(cantF.value || 0) + 1, 1);
+		if (nuevaCantidadNum > stockFila) {
+			notifyVenta("warning", "No puedes vender mas de " + stockFila + " " + unidadTexto + " de este producto.");
+			return;
 		}
-		var subtotal=cantidad*precio_venta;
-		var fila='<tr class="filas" id="fila'+cont+'" data-tipo-venta="'+tipoVentaNorm+'">'+
-        '<td><button type="button" class="btn btn-danger" onclick="eliminarDetalle('+cont+')">X</button></td>'+
-        '<td><input type="hidden" name="idarticulo[]" value="'+idarticulo+'"><input type="hidden" name="stock_disponible[]" value="'+stockDisponibleNum+'">'+articulo+'</td>'+
-        '<td>'+unidadTexto+'</td>'+
-        '<td><input type="number" step="0.5" min="0.5" max="'+stockDisponibleNum+'" name="cantidad[]" id="cantidad[]" value="'+cantidad+'" oninput="modificarSubtotales()"></td>'+
-        '<td><input type="number" step="0.01" min="0.01" name="precio_venta[]" id="precio_venta[]" value="'+precio_venta+'" oninput="modificarSubtotales()"></td>'+
-        '<td><input type="number" step="0.01" min="0.00" name="descuento[]" value="'+descuento+'" oninput="modificarSubtotales()"></td>'+
-        '<td><span id="subtotal'+cont+'" name="subtotal">'+subtotal+'</span></td>'+
-        '<td><button type="button" onclick="modificarSubtotales()" class="btn btn-info"><i class="fa fa-refresh"></i></button></td>'+
-		'</tr>';
-		cont++;
-		detalles++;
-		$('#detalles').append(fila);
+		cantF.value = nuevaCantidadNum;
 		modificarSubtotales();
-		actualizarContadorItems();
 		renderCarritoVisual();
 		$('#myModal').modal('hide');
-		notifyVenta("success", "Articulo agregado a la venta.");
+		resaltarItemCarrito(f.id.replace('fila', ''));
 		guardarBorradorVenta();
-	}else{
-		notifyVenta("warning", "No se pudo agregar el articulo. Revisa la informacion del producto.");
+		return;
 	}
+	var precioPres = (pres.precio !== undefined && pres.precio !== null) ? precioParaCliente(pres) : parseFloat(precio_venta || 0);
+	if (!(precioPres > 0)) {
+		notifyVenta("warning", "La presentación " + etiquetaPresentacion(pres) + " no tiene precio. Actualízalo en el producto.");
+		return;
+	}
+	$('#detalles').append(construirFilaVenta({
+		idx: cont, idarticulo: idarticulo, nombre: articulo, unidad: unidadTexto, tipoVenta: tipoVentaNorm,
+		presentaciones: lista, idpresentacion: pres.id, stockBase: stockBase, stockMax: stockMax,
+		cantidad: cantidad, precio: precioPres, descuento: descuento
+	}));
+	cont++;
+	detalles++;
+	modificarSubtotales();
+	actualizarContadorItems();
+	renderCarritoVisual();
+	$('#myModal').modal('hide');
+	resaltarItemCarrito(cont - 1);
+	guardarBorradorVenta();
 }
+
+// El cajero cambia la presentación de una línea (ej. de Tableta a Caja)
+function cambiarPresentacionFila(idx, idpres){
+	var fila = document.getElementById('fila' + idx);
+	if (!fila) return;
+	var lista = leerPresentacionesFila(fila);
+	var p = buscarPresentacion(lista, idpres);
+	if (!p) return;
+	var stockBase = parseFloat(fila.getAttribute('data-stock-base') || 0) || 0;
+	var max = Math.floor(stockBase / (parseFloat(p.factor) || 1));
+	if (max < 1) {
+		var base = null;
+		for (var b = 0; b < lista.length; b++) { if (lista[b].es_base) { base = lista[b]; break; } }
+		notifyVenta("warning", "No alcanza para 1 " + etiquetaPresentacion(p) + ": quedan " + stockBase + " " + ((base && base.abrev) || "und") + ".");
+		renderCarritoVisual();
+		return;
+	}
+	fila.querySelector('input[name="idpresentacion[]"]').value = p.id;
+	fila.querySelector('input[name="precio_venta[]"]').value = precioParaCliente(p).toFixed(2);
+	fila.querySelector('input[name="stock_disponible[]"]').value = max;
+	var cantInp = fila.querySelector('input[name="cantidad[]"]');
+	cantInp.setAttribute('max', max);
+	// Al cambiar de presentación la cantidad vuelve a 1 (evita cobrar 2 cajas cuando eran 2 tabletas)
+	cantInp.value = 1;
+	$(fila).find('.td-unidad').text(p.abrev || '');
+	modificarSubtotales();
+	guardarBorradorVenta();
+}
+
 function modificarSubtotales(){
 	var cant=document.getElementsByName("cantidad[]");
 	var prev=document.getElementsByName("precio_venta[]");
@@ -1571,7 +1861,7 @@ function buscarCodigoRapido(codigoForzado, callback){
 			return;
 		}
 
-		agregarDetalle(r.idarticulo, r.nombre, r.precio_venta || 0, r.unidad || "und", r.stock || 0, r.tipo_venta || 'OTC');
+		agregarDetalle(r.idarticulo, r.nombre, r.precio_venta || 0, r.unidad || "und", r.stock || 0, r.tipo_venta || 'OTC', r.presentaciones || null, r.idpresentacion || 0);
 		$("#codigo_rapido").focus();
 		if (typeof callback === "function") {
 			callback();
@@ -1682,7 +1972,10 @@ function guardarBorradorVenta() {
 			precio_venta:precioInp ? precioInp.value : '0',
 			descuento:   descInp   ? descInp.value   : '0',
 			stock:       stockInp  ? stockInp.value  : '0',
-			tipoVenta:   fila.getAttribute('data-tipo-venta') || 'OTC'
+			tipoVenta:   fila.getAttribute('data-tipo-venta') || 'OTC',
+			stockBase:   fila.getAttribute('data-stock-base') || (stockInp ? stockInp.value : '0'),
+			presentaciones: leerPresentacionesFila(fila),
+			idpresentacion: (fila.querySelector('input[name="idpresentacion[]"]') || {}).value || 0
 		});
 	}
 	try {
@@ -1734,19 +2027,13 @@ function restaurarBorradorVentaConfirmar() {
 		var cant = parseFloat(it.cantidad || 1);
 		var stk  = normalizarEnteroNoNegativo(it.stock || 0);
 		var tv   = (it.tipoVenta || 'OTC').toUpperCase();
-		var sub  = (cant * pv - desc).toFixed(2);
-		var fila = '<tr class="filas" id="fila' + cont + '" data-tipo-venta="' + tv + '">' +
-			'<td><button type="button" class="btn btn-danger" onclick="eliminarDetalle(' + cont + ')">X</button></td>' +
-			'<td><input type="hidden" name="idarticulo[]" value="' + it.idarticulo + '"><input type="hidden" name="stock_disponible[]" value="' + stk + '">' + $('<span>').text(it.nombre).html() + '</td>' +
-			'<td>' + $('<span>').text(it.unidad || 'und').html() + '</td>' +
-			'<td><input type="number" step="0.5" min="0.5" max="' + stk + '" name="cantidad[]" value="' + cant + '" oninput="modificarSubtotales()"></td>' +
-			'<td><input type="number" step="0.01" min="0.01" name="precio_venta[]" value="' + pv.toFixed(2) + '" oninput="modificarSubtotales()"></td>' +
-			'<td><input type="number" step="0.01" min="0.00" name="descuento[]" value="' + desc.toFixed(2) + '" oninput="modificarSubtotales()"></td>' +
-			'<td><span id="subtotal' + cont + '" name="subtotal">' + sub + '</span></td>' +
-			'<td><button type="button" onclick="modificarSubtotales()" class="btn btn-info"><i class="fa fa-refresh"></i></button></td>' +
-			'</tr>';
+		$('#detalles').append(construirFilaVenta({
+			idx: cont, idarticulo: it.idarticulo, nombre: it.nombre, unidad: it.unidad || 'und', tipoVenta: tv,
+			presentaciones: it.presentaciones || [], idpresentacion: it.idpresentacion || 0,
+			stockBase: normalizarEnteroNoNegativo(it.stockBase || stk), stockMax: stk,
+			cantidad: cant, precio: pv.toFixed(2), descuento: desc.toFixed(2)
+		}));
 		cont++; detalles++;
-		$('#detalles').append(fila);
 	}
 	if (b.idcliente) {
 		var encontrado = false;
@@ -1784,3 +2071,9 @@ function descartarBorradorVenta() {
 	$("#bannerBorradorVenta").remove();
 	notifyVenta("info", "Carrito descartado.");
 }
+
+
+// Precio con DNI: recalcular el carrito cuando cambia el cliente
+$(function(){
+	$(document).on("change", "#idcliente", aplicarPrecioClienteCarrito);
+});

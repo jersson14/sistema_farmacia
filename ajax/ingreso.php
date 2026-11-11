@@ -1,5 +1,6 @@
 <?php 
 require_once "../modelos/Ingreso.php";
+require_once "../config/Autorizacion.php";
 if (strlen(session_id())<1) 
 	session_start();
 
@@ -25,6 +26,27 @@ if (!function_exists('fechaFiltroSeguroIngreso')) {
 	}
 }
 
+
+// Una compra en Borrador se está registrando: se puede editar libremente.
+// Una compra ya registrada (Aceptado/Anulado) solo se modifica con el permiso
+// "Editar y anular compras" o con autorización del administrador.
+if (!function_exists('compraEditable')) {
+	function compraEditable($idingreso) {
+		$idingreso = (int)$idingreso;
+		if ($idingreso <= 0) return true; // el modelo responde el error correspondiente
+		$cab = ejecutarConsultaSimpleFila("SELECT estado FROM ingreso WHERE idingreso='$idingreso' LIMIT 1");
+		if (!$cab || $cab['estado'] === 'Borrador') return true;
+		return autPuede('ingreso', $idingreso);
+	}
+	function idIngresoDeDetalle($iddetalle) {
+		$iddetalle = (int)$iddetalle;
+		$row = ejecutarConsultaSimpleFila("SELECT idingreso FROM detalle_ingreso WHERE iddetalle_ingreso='$iddetalle' LIMIT 1");
+		return $row ? (int)$row['idingreso'] : 0;
+	}
+	function respuestaCompraBloqueada() {
+		return autRespuestaRequerida('Para modificar una compra ya registrada necesitas la autorización de un administrador.');
+	}
+}
 
 switch ($_GET["op"]) {
 	case 'resumenPagos':
@@ -112,6 +134,7 @@ switch ($_GET["op"]) {
 			echo json_encode(array("ok"=>false, "message"=>"ID de ingreso inválido"));
 			break;
 		}
+		if (!compraEditable($idingreso_amp)) { echo json_encode(respuestaCompraBloqueada()); break; }
 		$idarticulo_amp      = isset($_POST["idarticulo"])       ? $_POST["idarticulo"]       : array();
 		$cantidad_amp        = isset($_POST["cantidad"])         ? $_POST["cantidad"]         : array();
 		$precio_compra_amp   = isset($_POST["precio_compra"])    ? $_POST["precio_compra"]    : array();
@@ -132,6 +155,78 @@ switch ($_GET["op"]) {
 		echo json_encode($rspta_amp);
 		break;
 
+	// ── Autoguardado por fila / compra en borrador ─────────────────────
+	case 'crearBorrador':
+		$temperatura_cb = (isset($_POST["temperatura_recepcion"]) && $_POST["temperatura_recepcion"] !== '') ? (float)$_POST["temperatura_recepcion"] : null;
+		$temp_obs_cb    = isset($_POST["temp_observacion"]) ? $_POST["temp_observacion"] : '';
+		$metodo_cb      = isset($_POST["metodo_pago"]) ? limpiarCadena($_POST["metodo_pago"]) : 'EFECTIVO';
+		$rspta_cb = $ingreso->crearBorrador($idproveedor, $idusuario, $tipo_comprobante, $serie_comprobante, $num_comprobante, $fecha_hora, $impuesto, $metodo_cb, $temperatura_cb, $temp_obs_cb);
+		echo json_encode($rspta_cb);
+		break;
+
+	case 'guardarFila':
+		$idingreso_gf  = isset($_POST["idingreso"])  ? (int)$_POST["idingreso"]  : 0;
+		$iddetalle_gf  = isset($_POST["iddetalle"])  ? (int)$_POST["iddetalle"]  : 0;
+		$idarticulo_gf = isset($_POST["idarticulo"]) ? (int)$_POST["idarticulo"] : 0;
+		if (!compraEditable($idingreso_gf)) { echo json_encode(respuestaCompraBloqueada()); break; }
+		$rspta_gf = $ingreso->guardarFilaDetalle(
+			$idingreso_gf, $iddetalle_gf, $idarticulo_gf,
+			isset($_POST["cantidad"])          ? $_POST["cantidad"]                         : 0,
+			isset($_POST["precio_compra"])     ? $_POST["precio_compra"]                    : 0,
+			isset($_POST["precio_venta"])      ? $_POST["precio_venta"]                     : 0,
+			isset($_POST["numero_lote"])       ? limpiarCadena($_POST["numero_lote"])       : '',
+			isset($_POST["fecha_vencimiento"]) ? limpiarCadena($_POST["fecha_vencimiento"]) : '',
+			isset($_POST["idpresentacion"])    ? (int)$_POST["idpresentacion"]               : 0
+		);
+		echo json_encode($rspta_gf);
+		break;
+
+	case 'guardarCabecera':
+	case 'confirmarIngreso':
+		$idingreso_gc = isset($_POST["idingreso"]) ? (int)$_POST["idingreso"] : 0;
+		if (!compraEditable($idingreso_gc)) { echo json_encode(respuestaCompraBloqueada()); break; }
+		$campos_gc = array(
+			"idproveedor"      => $idproveedor,
+			"tipo_comprobante" => $tipo_comprobante,
+			"serie_comprobante"=> $serie_comprobante,
+			"num_comprobante"  => $num_comprobante,
+			"fecha_hora"       => $fecha_hora,
+			"impuesto"         => $impuesto,
+			"metodo_pago"      => isset($_POST["metodo_pago"]) ? limpiarCadena($_POST["metodo_pago"]) : 'EFECTIVO',
+			"temperatura_recepcion" => (isset($_POST["temperatura_recepcion"]) && $_POST["temperatura_recepcion"] !== '') ? (float)$_POST["temperatura_recepcion"] : null,
+			"temp_observacion" => isset($_POST["temp_observacion"]) ? $_POST["temp_observacion"] : ''
+		);
+		$rspta_gc = $ingreso->guardarCabecera($idingreso_gc, $campos_gc, $_GET["op"] === 'confirmarIngreso');
+		echo json_encode($rspta_gc);
+		break;
+
+	case 'descartarBorrador':
+		$idingreso_db = isset($_POST["idingreso"]) ? (int)$_POST["idingreso"] : 0;
+		echo json_encode($ingreso->descartarBorrador($idingreso_db));
+		break;
+
+	case 'borradorPendiente':
+		$bp = $ingreso->borradorPendiente($idusuario);
+		echo json_encode(array("ok"=>true, "borrador"=>$bp ? $bp : null));
+		break;
+
+	// Presentaciones con las que se puede comprar un producto (Caja x100, Blíster x10...)
+	case 'presentaciones':
+		require_once "../modelos/Presentacion.php";
+		$presMdl = new Presentacion();
+		echo json_encode(array("ok"=>true, "data"=>$presMdl->listarPorArticulo(isset($_GET['id']) ? (int)$_GET['id'] : 0)));
+		break;
+
+	case 'detalleJson':
+		$id_dj = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+		$cab_dj = $ingreso->mostrar($id_dj);
+		if (!$cab_dj) {
+			echo json_encode(array("ok"=>false, "message"=>"La compra no existe"));
+			break;
+		}
+		echo json_encode(array("ok"=>true, "cabecera"=>$cab_dj, "items"=>$ingreso->listarDetalleArray($id_dj)));
+		break;
+
 	case 'siguienteCorrelativo':
 		$tipo = isset($_GET["tipo_comprobante"]) ? limpiarCadena($_GET["tipo_comprobante"]) : "Boleta";
 		$serie = isset($_GET["serie_comprobante"]) ? limpiarCadena($_GET["serie_comprobante"]) : "";
@@ -141,17 +236,32 @@ switch ($_GET["op"]) {
 	
 
 	case 'anular':
+		if (!autPuede('ingreso', $idingreso)) {
+			echo json_encode(autRespuestaRequerida('Para anular una compra necesitas la autorización de un administrador.'));
+			break;
+		}
 		$rspta=$ingreso->anular($idingreso);
-		echo $rspta ? "Ingreso anulado correctamente" : "No se pudo anular el ingreso";
+		if ($rspta) autConsumir('ingreso', $idingreso);
+		echo json_encode(array("ok"=>(bool)$rspta, "message"=>$rspta ? "Compra anulada correctamente" : "No se pudo anular la compra. Inténtalo de nuevo."));
 		break;
 
 	case 'activar':
+		if (!autPuede('ingreso', $idingreso)) {
+			echo json_encode(autRespuestaRequerida('Para recuperar una compra anulada necesitas la autorización de un administrador.'));
+			break;
+		}
 		$rspta=$ingreso->activar($idingreso);
-		echo $rspta ? "Compra recuperada correctamente" : "No se pudo recuperar la compra";
+		if ($rspta) autConsumir('ingreso', $idingreso);
+		echo json_encode(array("ok"=>(bool)$rspta, "message"=>$rspta ? "Compra recuperada correctamente" : "No se pudo recuperar la compra. Inténtalo de nuevo."));
 		break;
 
 	case 'eliminarDefinitivo':
+		if (!autPuede('ingreso', $idingreso)) {
+			echo json_encode(autRespuestaRequerida('Para eliminar una compra necesitas la autorización de un administrador.'));
+			break;
+		}
 		$rspta_eldef = $ingreso->eliminarDefinitivo($idingreso);
+		if (!empty($rspta_eldef['ok'])) autConsumir('ingreso', $idingreso);
 		echo json_encode($rspta_eldef);
 		break;
 
@@ -164,6 +274,7 @@ switch ($_GET["op"]) {
 		$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 		$rspta = $ingreso->listarDetalle($id);
 		$total = 0;
+		$lockDet = autCandado('ingreso', $id);
 		echo '<thead style="background-color:#A9D0F5">
         <th></th>
         <th>Articulo</th>
@@ -196,8 +307,8 @@ switch ($_GET["op"]) {
 			<td><input type="text" name="det_numero_lote" value="'.$loteVal.'" maxlength="50" style="width:90px" placeholder="N° Lote" class="form-control input-sm"></td>
 			<td><input type="date" name="det_fecha_vencimiento" value="'.$vencVal.'" style="width:130px" class="form-control input-sm"></td>
 			<td><span class="det-subtotal">'.number_format($subtotal, 2).'</span></td>
-			<td><button type="button" class="btn btn-success btn-xs" onclick="guardarFilaDetalle('.$iddet.')"><i class="fa fa-save"></i> Guardar</button></td>
-			<td><button type="button" class="btn btn-danger btn-xs" onclick="eliminarFilaDetalle('.$iddet.')"><i class="fa fa-trash"></i> Eliminar</button></td>
+			<td><button type="button" class="btn btn-success btn-xs" onclick="guardarFilaDetalle('.$iddet.')"><i class="fa fa-save"></i> Guardar'.$lockDet.'</button></td>
+			<td><button type="button" class="btn btn-danger btn-xs" onclick="eliminarFilaDetalle('.$iddet.')"><i class="fa fa-trash"></i> Eliminar'.$lockDet.'</button></td>
 			</tr>';
 		}
 		echo '<tfoot>
@@ -210,6 +321,7 @@ switch ($_GET["op"]) {
 
 	case 'actualizarDetalle':
 		$iddetalle_upd      = isset($_POST['iddetalle'])        ? (int)$_POST['iddetalle']                : 0;
+		if (!compraEditable(idIngresoDeDetalle($iddetalle_upd))) { echo json_encode(respuestaCompraBloqueada()); break; }
 		$cantidad_upd       = isset($_POST['cantidad'])         ? $_POST['cantidad']                      : 0;
 		$precio_compra_upd  = isset($_POST['precio_compra'])    ? (float)$_POST['precio_compra']          : 0;
 		$precio_venta_upd   = isset($_POST['precio_venta'])     ? (float)$_POST['precio_venta']           : 0;
@@ -230,6 +342,7 @@ switch ($_GET["op"]) {
 
 	case 'eliminarDetalle':
 		$iddetalle_del = isset($_POST['iddetalle']) ? (int)$_POST['iddetalle'] : 0;
+		if (!compraEditable(idIngresoDeDetalle($iddetalle_del))) { echo json_encode(respuestaCompraBloqueada()); break; }
 		$rspta_del = $ingreso->eliminarDetalle($iddetalle_del);
 		echo json_encode($rspta_del);
 		break;
@@ -242,23 +355,28 @@ switch ($_GET["op"]) {
 
 		while ($reg=$rspta->fetch_object()) {
 			$url='../reportes/exIngreso.php?id=';
+			$compArg = htmlspecialchars(json_encode($reg->tipo_comprobante.' '.$reg->serie_comprobante.'-'.$reg->num_comprobante), ENT_QUOTES);
+			$lock = autCandado('ingreso', $reg->idingreso);
 			$data[]=array(
-            "0"=>(($reg->estado=='Aceptado')
+            "0"=>(($reg->estado=='Borrador')
+				?'<button class="btn btn-success btn-xs" onclick="continuarBorrador('.$reg->idingreso.')" title="Continuar registrando esta compra"><i class="fa fa-edit"></i> Continuar</button> '
+				 .'<button class="btn btn-danger btn-xs" onclick="descartarBorradorLista('.$reg->idingreso.')" title="Descartar borrador"><i class="fa fa-trash"></i></button>'
+				:(($reg->estado=='Aceptado')
 				?'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idingreso.')" title="Ver detalle"><i class="fa fa-eye"></i></button> '
-				 .'<button class="btn btn-success btn-xs" onclick="abrirAmpliarIngreso('.$reg->idingreso.')" title="Agregar artículos a esta compra"><i class="fa fa-plus"></i></button> '
-				 .'<button class="btn btn-danger btn-xs" onclick="anular('.$reg->idingreso.')" title="Anular compra"><i class="fa fa-close"></i></button> '
+				 .'<button class="btn btn-success btn-xs" onclick="abrirAmpliarIngreso('.$reg->idingreso.','.$compArg.')" title="Agregar artículos a esta compra"><i class="fa fa-plus"></i>'.$lock.'</button> '
+				 .'<button class="btn btn-danger btn-xs" onclick="anular('.$reg->idingreso.','.$compArg.')" title="Anular compra"><i class="fa fa-close"></i>'.$lock.'</button> '
 				 .'<a target="_blank" href="'.$url.$reg->idingreso.'"> <button class="btn btn-info btn-xs" title="Ver PDF"><i class="fa fa-file"></i></button></a>'
 				:'<button class="btn btn-warning btn-xs" onclick="mostrar('.$reg->idingreso.')" title="Ver detalle"><i class="fa fa-eye"></i></button> '
 				 .'<a target="_blank" href="'.$url.$reg->idingreso.'"> <button class="btn btn-info btn-xs" title="Ver PDF"><i class="fa fa-file"></i></button></a> '
-				 .'<button class="btn btn-primary btn-xs" onclick="recuperarIngreso('.$reg->idingreso.')" title="Recuperar / activar compra"><i class="fa fa-undo"></i></button> '
-				 .'<button class="btn btn-danger btn-xs" onclick="eliminarDefinitivoIngreso('.$reg->idingreso.')" title="Eliminar definitivamente"><i class="fa fa-trash"></i></button>'),
+				 .'<button class="btn btn-primary btn-xs" onclick="recuperarIngreso('.$reg->idingreso.','.$compArg.')" title="Recuperar / activar compra"><i class="fa fa-undo"></i>'.$lock.'</button> '
+				 .'<button class="btn btn-danger btn-xs" onclick="eliminarDefinitivoIngreso('.$reg->idingreso.','.$compArg.')" title="Eliminar definitivamente"><i class="fa fa-trash"></i>'.$lock.'</button>')),
             "1"=>$reg->fecha,
             "2"=>$reg->proveedor,
             "3"=>$reg->usuario,
             "4"=>$reg->tipo_comprobante,
             "5"=>$reg->serie_comprobante. '-' .$reg->num_comprobante,
             "6"=>formatearMoneda((float)$reg->total_compra),
-            "7"=>($reg->estado=='Aceptado')?'<span class="label bg-green">Aceptado</span>':'<span class="label bg-red">Anulado</span>'
+            "7"=>($reg->estado=='Aceptado')?'<span class="label bg-green">Aceptado</span>':(($reg->estado=='Borrador')?'<span class="label bg-yellow" title="Compra en borrador, aún no confirmada">Borrador</span>':'<span class="label bg-red">Anulado</span>')
               );
 		}
 		$results=array(

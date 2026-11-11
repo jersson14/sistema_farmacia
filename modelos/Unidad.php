@@ -6,7 +6,7 @@ class Unidad{
 	}
 
 	public function existeAbreviatura($abreviatura, $excluirId = null){
-		$sql = "SELECT idunidad FROM unidad_medida WHERE abreviatura='$abreviatura'";
+		$sql = "SELECT idunidad FROM unidad_medida WHERE abreviatura='$abreviatura' AND condicion<>2";
 		if ($excluirId) $sql .= " AND idunidad <> '$excluirId'";
 		$q = ejecutarConsulta($sql);
 		return $q && $q->num_rows > 0;
@@ -27,6 +27,10 @@ class Unidad{
 		return ejecutarConsulta($sql);
 	}
 
+	public function eliminar($idunidad){
+		return eliminarRegistro('unidad_medida', 'idunidad', $idunidad, 'La unidad de medida');
+	}
+
 	public function activar($idunidad){
 		$sql="UPDATE unidad_medida SET condicion='1' WHERE idunidad='$idunidad'";
 		return ejecutarConsulta($sql);
@@ -38,7 +42,7 @@ class Unidad{
 	}
 
 	public function listar(){
-		$sql="SELECT * FROM unidad_medida ORDER BY nombre ASC";
+		$sql="SELECT * FROM unidad_medida WHERE condicion<>2 ORDER BY nombre ASC";
 		return ejecutarConsulta($sql);
 	}
 

@@ -286,6 +286,22 @@ body.login-page {
   white-space: nowrap;
 }
 
+/* ── LAYOUT card ──────────────────────────────────────────── */
+.lwrap {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  max-width: 420px;
+}
+.lwrap .lcard { flex: 0 0 auto; width: 100%; }
+
+@media (max-width: 860px) {
+  body.login-page { overflow-x: hidden; overflow-y: auto; flex-direction: column; align-items: center; justify-content: flex-start; }
+  .lpage-credit { position: static; transform: none; margin-top: 18px; text-align: center; }
+}
+
 /* ── RESPONSIVE ───────────────────────────────────────────── */
 @media (max-width: 480px) {
   .lcard { border-radius: 18px; }
@@ -311,7 +327,8 @@ body.login-page {
   <div class="lbg-tint"></div>
 </div>
 
-<!-- CARD -->
+<!-- CARD + ACCESOS DEMO -->
+<div class="lwrap">
 <div class="lcard">
 
   <!-- Franja color marca -->
@@ -379,12 +396,16 @@ body.login-page {
 
 </div>
 
+</div><!-- /lwrap -->
+
 <!-- Crédito de página -->
 <div class="lpage-credit">
   &copy; <span id="lp-year"></span> FarmaSuyana &nbsp;·&nbsp; Sistema de Gestión Farmacéutica
 </div>
 
-<script>document.getElementById('lp-year').textContent = new Date().getFullYear();</script>
+<script>
+document.getElementById('lp-year').textContent = new Date().getFullYear();
+</script>
 <script src="../public/js/jquery.min.js"></script>
 <script src="../public/js/bootstrap.min.js"></script>
 <script src="../public/js/bootbox.min.js"></script>
