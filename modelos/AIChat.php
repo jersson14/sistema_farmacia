@@ -209,6 +209,22 @@ class AIChat
             }
         }
 
+        // Ninguna tabla fuera de la whitelist puede aparecer en NINGUNA parte del SQL
+        // (cierra joins con coma: "FROM articulo, ai_config" y referencias a otros esquemas).
+        if (preg_match('/\b(information_schema|performance_schema|mysql|sys)\s*\./i', $sql)) {
+            throw new RuntimeException("Consulta rechazada: no se permite consultar tablas del sistema.");
+        }
+        $rsTablas = ejecutarConsulta("SHOW TABLES");
+        if ($rsTablas) {
+            while ($fila = $rsTablas->fetch_row()) {
+                $t = $fila[0];
+                if (!in_array($t, $tablasPermitidas, true)
+                    && preg_match('/(?<![a-zA-Z0-9_])`?' . preg_quote($t, '/') . '`?(?![a-zA-Z0-9_])/i', $sql)) {
+                    throw new RuntimeException("Consulta rechazada: la tabla '$t' no esta permitida.");
+                }
+            }
+        }
+
         // Forzar LIMIT
         if (!preg_match('/\bLIMIT\s+\d+/i', $sql)) {
             $sql .= " LIMIT {$this->limitMax}";
