@@ -54,6 +54,9 @@ function demoBloquearVista()
         header('Location: login.html');
         exit;
     }
+    // header.php se incluye dentro de esta función: la conexión debe quedar global
+    require_once __DIR__ . '/Conexion.php';
+    if (isset($conexion)) $GLOBALS['conexion'] = $conexion;
     require __DIR__ . '/../vistas/header.php';
     ?>
     <div class="content-wrapper">
