@@ -6,11 +6,11 @@ require_once "modelos/Empresa.php";
 $empresa   = (new Empresa())->datosPublicos('');
 $nombreEmp = $empresa['nombre'];
 $telefono  = $empresa['telefono'] !== '' ? $empresa['telefono'] : '+51 999 999 999';
-$correo    = $empresa['correo']   !== '' ? $empresa['correo']   : 'contacto@farmasuyana.com';
+$correo    = $empresa['correo']   !== '' ? $empresa['correo']   : '';
 $ruc       = $empresa['ruc'];
 $waNro     = preg_replace('/\D/', '', $telefono);
-$direccion = $empresa['direccion'] !== '' ? $empresa['direccion'] : 'Urb. Patibamba Baja, Av. Sinchi Roca Lote 1 – al Costado de la Iglesia Cristiana';
-$logoUrl   = $empresa['logo_url'] !== '' ? $empresa['logo_url'] : 'files/famacia.png';
+$direccion = $empresa['direccion'] !== '' ? $empresa['direccion'] : '';
+$logoUrl   = $empresa['logo_url']; // logo de Empresa o el neutro por defecto
 
 // Todo el contenido restante se administra en Gestión Pro > Página web (modelos/Landing.php)
 require_once "modelos/Landing.php";

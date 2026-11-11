@@ -38,7 +38,7 @@ function cargarEmpresa() {
     if (r.logo) {
       $("#logomuestra").attr("src", "../files/empresa/" + r.logo).show();
     } else {
-      $("#logomuestra").attr("src", "../vistas/logo1.jpeg").show();
+      $("#logomuestra").attr("src", "../files/logo_default.png").show();
     }
   });
 }

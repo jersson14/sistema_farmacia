@@ -105,7 +105,7 @@ if ($_SESSION['acceso']==1) {
                   <input type="hidden" name="logoactual" id="logoactual">
                 </div>
                 <div class="form-group col-lg-12 col-md-12 col-sm-12 col-xs-12">
-                  <img id="logomuestra" src="../vistas/logo1.jpeg" alt="logo" style="max-height:90px;border:1px solid #e2e8f0;border-radius:10px;padding:4px;background:#fff;">
+                  <img id="logomuestra" src="../files/logo_default.png" alt="logo" style="max-height:90px;border:1px solid #e2e8f0;border-radius:10px;padding:4px;background:#fff;">
                 </div>
               </div>
 

@@ -333,7 +333,7 @@ if (!empty($empresa["logo"])) {
   }
 }
 if ($logo === "") {
-  $logo = __DIR__."/logo1.jpeg";
+  $logo = __DIR__."/../files/logo_default.png";
   if (!file_exists($logo)) {
     $logo = __DIR__."/logo.png";
   }

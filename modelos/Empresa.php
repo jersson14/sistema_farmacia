@@ -68,6 +68,43 @@ class Empresa
         return ejecutarConsulta($sql);
     }
 
+    /** Logo neutro que se usa solo si la empresa no subió el suyo (Acceso > Empresa). */
+    const LOGO_DEFECTO = 'files/logo_default.png';
+    /** Nombre que se muestra solo si la empresa no configuró nombre comercial ni razón social. */
+    const NOMBRE_DEFECTO = 'Mi Farmacia';
+
+    /**
+     * Archivo del logo relativo a la raíz del proyecto:
+     * el logo configurado en Empresa (files/empresa/...) o el logo neutro por defecto.
+     */
+    public function logoRelativo()
+    {
+        $cfg = $this->obtener();
+        if (!empty($cfg['logo'])) {
+            $fs = realpath(__DIR__ . '/../files/empresa/' . $cfg['logo']);
+            if ($fs && is_file($fs)) {
+                return 'files/empresa/' . $cfg['logo'];
+            }
+        }
+        return self::LOGO_DEFECTO;
+    }
+
+    /** Ruta absoluta en disco del logo (para FPDF y tickets). */
+    public function logoArchivo()
+    {
+        return realpath(__DIR__ . '/../' . $this->logoRelativo());
+    }
+
+    /** URL del logo desde una página, ej. logoUrl('../') desde /vistas o /reportes. Con cache-busting. */
+    public function logoUrl($rutaBase = '../')
+    {
+        $rel = $this->logoRelativo();
+        $fs  = __DIR__ . '/../' . $rel;
+        $partes = explode('/', $rel);
+        $partes[count($partes) - 1] = rawurlencode(end($partes));
+        return $rutaBase . implode('/', $partes) . (is_file($fs) ? '?v=' . filemtime($fs) : '');
+    }
+
     /**
      * Datos de la empresa para las páginas públicas (landing y tienda).
      * $rutaBase = prefijo relativo hasta la raíz del proyecto ('' desde index.php, '../' desde /tienda).
@@ -92,28 +129,13 @@ class Empresa
             $cfg = array();
         }
 
-        $raiz = __DIR__ . '/../';
-        $logoUrl = '';
-        if (!empty($cfg['logo'])) {
-            $logoFS = realpath($raiz . 'files/empresa/' . $cfg['logo']);
-            if ($logoFS && is_file($logoFS)) {
-                $logoUrl = $rutaBase . 'files/empresa/' . rawurlencode($cfg['logo']) . '?v=' . filemtime($logoFS);
-            }
-        }
-        if ($logoUrl === '') {
-            foreach (array('files/empresa/farmasuyana.png', 'files/famacia.png') as $fallback) {
-                if (is_file($raiz . $fallback)) {
-                    $logoUrl = $rutaBase . $fallback . '?v=' . filemtime($raiz . $fallback);
-                    break;
-                }
-            }
-        }
+        $logoUrl = $this->logoUrl($rutaBase);
 
         $nombreComercial = $decode($cfg['nombre_comercial'] ?? '');
         $razonSocial     = $decode($cfg['razon_social'] ?? '');
 
         return array(
-            'nombre'       => $nombreComercial !== '' ? $nombreComercial : ($razonSocial !== '' ? $razonSocial : 'Botica FarmaSuyana'),
+            'nombre'       => $nombreComercial !== '' ? $nombreComercial : ($razonSocial !== '' ? $razonSocial : self::NOMBRE_DEFECTO),
             'razon_social' => $razonSocial,
             'ruc'          => $decode($cfg['ruc'] ?? ''),
             'direccion'    => $decode($cfg['direccion'] ?? ''),
@@ -142,13 +164,17 @@ class Empresa
         $cfg = $this->obtener();
         if (!$cfg) {
             return array(
-                "nombre" => 'Botica FarmaSuyana',
+                "nombre" => self::NOMBRE_DEFECTO,
+                "nombre_comercial" => '',
                 "ruc" => '',
-                "direccion_linea1" => 'Urb. Patibamba Baja, Av. Sinchi Roca Lote 1',
-                "direccion_linea2" => 'Al costado de la Iglesia Cristiana',
+                "direccion_linea1" => '',
+                "direccion_linea2" => '',
                 "telefono" => '',
                 "email" => '',
-                "logo" => 'farmasuyana.png',
+                "web" => '',
+                "logo" => '',
+                "logo_path" => $this->logoArchivo(),
+                "logo_url" => $this->logoUrl('../'),
                 "moneda" => 'PEN'
             );
         }
@@ -171,7 +197,10 @@ class Empresa
             "telefono"         => $decode(!empty($cfg['telefono']) ? $cfg['telefono'] : $cfg['celular']),
             "email"            => $decode($cfg['correo']),
             "web"              => $decode(!empty($cfg['web']) ? $cfg['web'] : ''),
-            "logo"             => !empty($cfg['logo']) ? $cfg['logo'] : 'logo1.jpeg',
+            "logo"             => !empty($cfg['logo']) ? $cfg['logo'] : '',
+            // Logo listo para usar: ruta en disco (FPDF) y URL desde /reportes (ticket HTML)
+            "logo_path"        => $this->logoArchivo(),
+            "logo_url"         => $this->logoUrl('../'),
             "moneda"           => !empty($cfg['moneda']) ? strtoupper($cfg['moneda']) : 'PEN'
         );
     }

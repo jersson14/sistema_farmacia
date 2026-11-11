@@ -9,33 +9,14 @@ $empresa = new Empresa();
 
 switch ($_GET['op']) {
     case 'publicBrand':
+        // Marca pública (login): todo sale de Acceso > Empresa
         $rspta = $empresa->obtener();
-        if (!$rspta) {
-            echo json_encode(array(
-                'nombre_comercial' => 'PERNO CENTRO',
-                'razon_social' => 'SEÑOR DE HUANCA',
-                'color_primario' => '#0f766e',
-                'color_secundario' => '#f59e0b',
-                'logo_url' => 'logo1.jpeg',
-                'moneda' => 'PEN',
-                'simbolo_moneda' => 'S/'
-            ));
-            break;
-        }
-
-        $logoUrl = 'logo1.jpeg';
-        if (!empty($rspta['logo'])) {
-            $logoEmpresaFS = realpath(__DIR__ . '/../files/empresa/' . $rspta['logo']);
-            if ($logoEmpresaFS && file_exists($logoEmpresaFS)) {
-                $logoUrl = '../files/empresa/' . $rspta['logo'];
-            } elseif (file_exists(__DIR__ . '/../vistas/' . $rspta['logo'])) {
-                $logoUrl = $rspta['logo'];
-            }
-        }
+        if (!$rspta) $rspta = array();
+        $logoUrl = $empresa->logoUrl('../');
 
         echo json_encode(array(
-            'nombre_comercial' => !empty($rspta['nombre_comercial']) ? $rspta['nombre_comercial'] : 'PERNO CENTRO',
-            'razon_social' => !empty($rspta['razon_social']) ? $rspta['razon_social'] : 'SEÑOR DE HUANCA',
+            'nombre_comercial' => !empty($rspta['nombre_comercial']) ? $rspta['nombre_comercial'] : (!empty($rspta['razon_social']) ? $rspta['razon_social'] : Empresa::NOMBRE_DEFECTO),
+            'razon_social' => !empty($rspta['razon_social']) ? $rspta['razon_social'] : '',
             'color_primario' => !empty($rspta['color_primario']) ? $rspta['color_primario'] : '#0f766e',
             'color_secundario' => !empty($rspta['color_secundario']) ? $rspta['color_secundario'] : '#f59e0b',
             'logo_url' => $logoUrl,

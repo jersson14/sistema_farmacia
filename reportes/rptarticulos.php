@@ -26,8 +26,8 @@ if (!empty($empresa["logo"])) {
   }
 }
 if ($logoPath === "") {
-  if (file_exists(__DIR__."/logo1.jpeg")) {
-    $logoPath = __DIR__."/logo1.jpeg";
+  if (file_exists(__DIR__."/../files/logo_default.png")) {
+    $logoPath = __DIR__."/../files/logo_default.png";
   } elseif (file_exists(__DIR__."/logo.png")) {
     $logoPath = __DIR__."/logo.png";
   }
