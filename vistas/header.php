@@ -11,7 +11,7 @@ if (!function_exists('assetV')) {
   }
 }
 
-$brandNombre = "FARMASUYANA";
+$brandNombre = "FARMACIA DEMO";
 $brandSub = "AL CUIDADO DE TU SALUD";
 $brandLogo = "../files/famacia.png";
 $brandPrimary = "#1D4ED8";
@@ -88,7 +88,7 @@ if (!function_exists('darkenHexColor')) {
 <head>
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>FarmaSuyana | Sistema</title>
+  <title>Farmacia Demo | Sistema</title>
   <!-- Tell the browser to be responsive to screen width -->
   <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
   <!-- Bootstrap 3.3.7 -->

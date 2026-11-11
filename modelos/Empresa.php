@@ -113,7 +113,7 @@ class Empresa
         $razonSocial     = $decode($cfg['razon_social'] ?? '');
 
         return array(
-            'nombre'       => $nombreComercial !== '' ? $nombreComercial : ($razonSocial !== '' ? $razonSocial : 'Botica FarmaSuyana'),
+            'nombre'       => $nombreComercial !== '' ? $nombreComercial : ($razonSocial !== '' ? $razonSocial : 'Farmacia Demo'),
             'razon_social' => $razonSocial,
             'ruc'          => $decode($cfg['ruc'] ?? ''),
             'direccion'    => $decode($cfg['direccion'] ?? ''),
@@ -142,7 +142,7 @@ class Empresa
         $cfg = $this->obtener();
         if (!$cfg) {
             return array(
-                "nombre" => 'Botica FarmaSuyana',
+                "nombre" => 'Farmacia Demo',
                 "ruc" => '',
                 "direccion_linea1" => 'Urb. Patibamba Baja, Av. Sinchi Roca Lote 1',
                 "direccion_linea2" => 'Al costado de la Iglesia Cristiana',

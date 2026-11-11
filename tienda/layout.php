@@ -32,7 +32,7 @@ $_empNombreBD   = strtolower(trim($emp['nombre'] ?? ''));
 $nombreEmp = (!empty($emp['nombre']) && !in_array($_empNombreBD, $_viejosNombres)
               && stripos($emp['nombre'], 'PERNO') === false)
              ? $emp['nombre']
-             : 'Botica FarmaSuyana';
+             : 'Farmacia Demo';
 
 // Logo ya resuelto por el modelo (BD → farmasuyana.png → famacia.png), con cache-busting
 $logo = $emp['logo_url'];

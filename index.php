@@ -6,7 +6,7 @@ require_once "modelos/Empresa.php";
 $empresa   = (new Empresa())->datosPublicos('');
 $nombreEmp = $empresa['nombre'];
 $telefono  = $empresa['telefono'] !== '' ? $empresa['telefono'] : '+51 999 999 999';
-$correo    = $empresa['correo']   !== '' ? $empresa['correo']   : 'contacto@farmasuyana.com';
+$correo    = $empresa['correo']   !== '' ? $empresa['correo']   : 'contacto@farmaciademo.pe';
 $ruc       = $empresa['ruc'];
 $waNro     = preg_replace('/\D/', '', $telefono);
 $direccion = $empresa['direccion'] !== '' ? $empresa['direccion'] : 'Urb. Patibamba Baja, Av. Sinchi Roca Lote 1 – al Costado de la Iglesia Cristiana';
