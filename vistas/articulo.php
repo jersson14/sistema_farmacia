@@ -396,12 +396,27 @@ if ($_SESSION['almacen']==1) {
     <div class="col-lg-12 col-md-12 col-xs-12" style="margin-top:10px;">
       <div class="box box-warning box-solid">
         <div class="box-header with-border">
-          <h4 class="box-title"><i class="fa fa-tag"></i> Oferta / Descuento</h4>
+          <h4 class="box-title"><i class="fa fa-tag"></i> Precio con DNI y ofertas</h4>
           <div class="box-tools pull-right">
             <button type="button" class="btn btn-box-tool" data-widget="collapse"><i class="fa fa-minus"></i></button>
           </div>
         </div>
         <div class="box-body">
+          <div class="row">
+            <div class="form-group col-lg-3 col-md-4 col-xs-12">
+              <label for="precio_dni">Precio con DNI <small class="text-muted">(opcional)</small></label>
+              <div class="input-group">
+                <span class="input-group-addon">S/</span>
+                <input class="form-control" type="number" step="0.01" min="0" name="precio_dni" id="precio_dni" placeholder="Vacío = sin precio DNI">
+              </div>
+              <small class="text-muted">Lo paga el cliente registrado (tienda online o POS con cliente). Precio de 1 unidad base.</small>
+            </div>
+            <div class="col-lg-9 col-md-8 col-xs-12" id="precioDniSinMigracion" style="display:none">
+              <div class="alert alert-warning" style="margin:24px 0 0">
+                <i class="fa fa-exclamation-triangle"></i> Falta ejecutar la migración <b>20261110_precio_dni.sql</b> para guardar el precio con DNI.
+              </div>
+            </div>
+          </div>
           <div class="row">
             <div class="form-group col-lg-3 col-md-3 col-xs-12">
               <label>&nbsp;</label><br>

@@ -78,6 +78,9 @@ function cargarCarrito(){
           +   '<div class="ci-name">' + esc(item.nombre) + '</div>'
           +   (item.mostrar_presentacion ? '<div class="ci-pres"><i class="bi bi-boxes"></i> ' + esc(item.presentacion) + '</div>' : '')
           +   '<div class="ci-price">S/ ' + item.precio.toFixed(2) + ' c/u &nbsp;·&nbsp; <strong>S/ ' + item.subtotal.toFixed(2) + '</strong></div>'
+          +   (item.con_dni
+              ? '<div class="ci-dni"><i class="bi bi-person-vcard-fill"></i> Precio con DNI aplicado <s>S/ ' + parseFloat(item.precio_regular).toFixed(2) + '</s></div>'
+              : (item.precio_dni > 0 ? '<div class="ci-dni"><i class="bi bi-person-vcard-fill"></i> Con DNI: S/ ' + parseFloat(item.precio_dni).toFixed(2) + ' c/u · <a href="login.php">inicia sesión</a></div>' : ''))
           + '</div>'
           + '<div class="qty-control">'
           +   '<button onclick="cambiarQty(' + claveJs + ',' + (item.cantidad-1) + ')">−</button>'

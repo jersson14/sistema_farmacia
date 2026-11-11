@@ -49,6 +49,7 @@ $nombreCliente = $clienteLogado ? $_SESSION['tienda_cliente']['nombre'] : '';
   <link rel="stylesheet" href="css/tienda.css?v=<?php echo @filemtime(__DIR__ . '/css/tienda.css'); ?>">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <?php if (!empty($GLOBALS['pageHead'])) echo $GLOBALS['pageHead']; ?>
+  <script>window.TIENDA_LOGADO = <?php echo $clienteLogado ? 'true' : 'false'; ?>;</script>
 </head>
 <body>
 

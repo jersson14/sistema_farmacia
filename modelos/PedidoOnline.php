@@ -56,7 +56,7 @@ class PedidoOnline
                     $conexion->rollback(); $conexion->autocommit(true);
                     return array('ok'=>false,'message'=> 'Stock insuficiente para ' . $art['nombre'] . '. Reduce la cantidad en tu carrito.');
                 }
-                $precio   = (float)$pres['precio'];
+                $precio   = Presentacion::precioCliente($pres, true); // pedido = cliente identificado con DNI
                 $sub      = round($precio * $cantidad, 2);
                 $subtotal += $sub;
                 // En el nombre se ve lo que pidió: "Paracetamol 500 mg — Caja x100"

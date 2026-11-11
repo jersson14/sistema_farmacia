@@ -37,6 +37,34 @@ class Presentacion {
 		);
 	}
 
+	/** ¿Existe la columna articulo.precio_dni? (migración 20261110_precio_dni.sql) */
+	public static function dniDisponible() {
+		static $ok = null;
+		if ($ok === null) {
+			$r = ejecutarConsultaSimpleFila("SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+				WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='articulo' AND COLUMN_NAME='precio_dni'");
+			$ok = $r && (int)$r['n'] > 0;
+		}
+		return $ok;
+	}
+
+	/**
+	 * Precio con DNI de una presentación: la misma rebaja que tiene la unidad base.
+	 * Devuelve 0 si no hay precio DNI o si no mejora el precio actual (p. ej. la oferta ya es menor).
+	 */
+	private static function precioDni($precioLista, $precioBaseArt, $precioDniArt, $precioActual) {
+		$precioLista = (float)$precioLista; $precioBaseArt = (float)$precioBaseArt; $precioDniArt = (float)$precioDniArt;
+		if ($precioDniArt <= 0 || $precioBaseArt <= 0 || $precioDniArt >= $precioBaseArt || $precioLista <= 0) return 0;
+		$dni = round($precioLista * $precioDniArt / $precioBaseArt, 2);
+		return ($dni > 0 && $dni < round((float)$precioActual, 2)) ? $dni : 0;
+	}
+
+	/** Precio que paga el cliente: con DNI (si está identificado y hay precio DNI) o el normal/oferta */
+	public static function precioCliente($pres, $conDni) {
+		return ($conDni && !empty($pres['precio_dni']) && (float)$pres['precio_dni'] > 0)
+			? (float)$pres['precio_dni'] : (float)$pres['precio'];
+	}
+
 	/** Expresión de cantidad en unidades base de una línea de detalle */
 	public static function sqlCantidadBase($d = 'd') {
 		return self::disponible() ? "($d.cantidad*$d.factor)" : "$d.cantidad";
@@ -50,7 +78,8 @@ class Presentacion {
 
 	/**
 	 * Presentaciones activas de varios artículos: [idarticulo => [pres, ...]] (base primero).
-	 * Cada pres: id, idunidad, unidad, abrev, factor, precio (con oferta), precio_lista, codigo, es_base
+	 * Cada pres: id, idunidad, unidad, abrev, factor, precio (con oferta), precio_lista,
+	 *            precio_dni (0 = no aplica; ver precioCliente), codigo, es_base
 	 */
 	public function mapaPorArticulos(array $ids) {
 		$ids = array_values(array_filter(array_map('intval', $ids)));
@@ -59,16 +88,20 @@ class Presentacion {
 		$lista = implode(',', $ids);
 		$precioBase = sqlPrecioBaseExpr('a');
 		$vigente    = sqlOfertaVigenteExpr('a');
+		$dniSel     = self::dniDisponible() ? "IFNULL(a.precio_dni,0)" : "0";
 
 		if (!self::disponible()) {
 			$rs = ejecutarConsulta("SELECT a.idarticulo, a.idunidad, u.nombre, u.abreviatura, $precioBase AS precio,
-				$vigente AS vigente, a.descuento_porcentaje
+				$vigente AS vigente, a.descuento_porcentaje, $dniSel AS precio_dni_art
 				FROM articulo a LEFT JOIN unidad_medida u ON u.idunidad=a.idunidad WHERE a.idarticulo IN ($lista)");
 			while ($rs && $r = $rs->fetch_assoc()) {
+				$precio = self::precioConOferta($r['precio'], $r['vigente'], (float)$r['descuento_porcentaje']);
 				$out[(int)$r['idarticulo']] = array(array(
 					'id' => 0, 'idunidad' => (int)$r['idunidad'], 'unidad' => $r['nombre'], 'abrev' => $r['abreviatura'] ?: 'und',
-					'factor' => 1, 'precio' => self::precioConOferta($r['precio'], $r['vigente'], (float)$r['descuento_porcentaje']),
-					'precio_lista' => (float)$r['precio'], 'codigo' => '', 'es_base' => 1));
+					'factor' => 1, 'precio' => $precio,
+					'precio_lista' => (float)$r['precio'],
+					'precio_dni' => self::precioDni($r['precio'], $r['precio'], $r['precio_dni_art'], $precio),
+					'codigo' => '', 'es_base' => 1));
 			}
 			return $out;
 		}
@@ -76,6 +109,7 @@ class Presentacion {
 		$sql = "SELECT p.idpresentacion, p.idarticulo, p.idunidad, p.factor, p.es_base, IFNULL(p.codigo,'') AS codigo,
 				u.nombre AS unidad, u.abreviatura,
 				IF(p.es_base=1, $precioBase, p.precio_venta) AS precio,
+				$precioBase AS precio_base_art, $dniSel AS precio_dni_art,
 				$vigente AS vigente, a.descuento_porcentaje
 			FROM articulo_presentacion p
 			INNER JOIN articulo a ON a.idarticulo=p.idarticulo
@@ -84,14 +118,16 @@ class Presentacion {
 			ORDER BY p.idarticulo, p.factor ASC";
 		$rs = ejecutarConsulta($sql);
 		while ($rs && $r = $rs->fetch_assoc()) {
+			$precio = self::precioConOferta($r['precio'], $r['vigente'], (float)$r['descuento_porcentaje']);
 			$out[(int)$r['idarticulo']][] = array(
 				'id'           => (int)$r['idpresentacion'],
 				'idunidad'     => (int)$r['idunidad'],
 				'unidad'       => $r['unidad'],
 				'abrev'        => $r['abreviatura'] ?: 'und',
 				'factor'       => (float)$r['factor'],
-				'precio'       => self::precioConOferta($r['precio'], $r['vigente'], (float)$r['descuento_porcentaje']),
+				'precio'       => $precio,
 				'precio_lista' => round((float)$r['precio'], 2),
+				'precio_dni'   => self::precioDni($r['precio'], $r['precio_base_art'], $r['precio_dni_art'], $precio),
 				'codigo'       => $r['codigo'],
 				'es_base'      => (int)$r['es_base'],
 			);

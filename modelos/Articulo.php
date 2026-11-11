@@ -82,6 +82,22 @@ public function activar($idarticulo){
 }
 
 //metodo para mostrar registros
+// Precio con DNI (columna opcional: migración 20261110_precio_dni.sql)
+public function guardarPrecioDni($idarticulo, $precio_dni){
+	require_once __DIR__ . "/Presentacion.php";
+	if (!Presentacion::dniDisponible()) return false;
+	$idarticulo = (int)$idarticulo;
+	$valor = ((float)$precio_dni > 0) ? "'" . round((float)$precio_dni, 2) . "'" : "NULL";
+	return ejecutarConsulta("UPDATE articulo SET precio_dni=$valor WHERE idarticulo='$idarticulo'");
+}
+
+public function obtenerPrecioDni($idarticulo){
+	require_once __DIR__ . "/Presentacion.php";
+	if (!Presentacion::dniDisponible()) return 0;
+	$r = ejecutarConsultaSimpleFila("SELECT IFNULL(precio_dni,0) AS p FROM articulo WHERE idarticulo='" . (int)$idarticulo . "'");
+	return $r ? (float)$r['p'] : 0;
+}
+
 public function mostrar($idarticulo){
 	$sql="SELECT * FROM articulo WHERE idarticulo='$idarticulo'";
 	return ejecutarConsultaSimpleFila($sql);

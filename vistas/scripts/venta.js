@@ -235,6 +235,9 @@ function renderGrid() {
 				? '<div class="pos-card-pres" title="Se vende por: ' + $('<span>').text(p.presentaciones.map(etiquetaPresentacion).join(', ')).html() + '"><i class="fa fa-cubes"></i> ' +
 				  $('<span>').text(p.presentaciones.map(function(x){ return x.abrev; }).join(' · ')).html() + '</div>'
 				: '') +
+			((basePresentacion(p.presentaciones) && parseFloat(basePresentacion(p.presentaciones).precio_dni) > 0)
+				? '<div class="pos-card-dni" title="Precio para cliente registrado"><i class="fa fa-id-card"></i> Con DNI ' + simbolo + ' ' + parseFloat(basePresentacion(p.presentaciones).precio_dni).toFixed(2) + '</div>'
+				: '') +
 			'<div class="pos-card-footer">' +
 				'<span class="pos-card-precio">' + precioHtml + '</span>' +
 				'<span class="pos-card-badge ' + badgeCls + '">' + badgeTxt + '</span>' +
@@ -360,6 +363,9 @@ function renderCarritoVisual() {
 		var sym       = window.appCurrencySymbol || 'S/';
 		var presFila  = leerPresentacionesFila(fila);
 		var presSelId = String((fila.querySelector('input[name="idpresentacion[]"]') || {}).value || '');
+		var presActual = buscarPresentacion(presFila, presSelId);
+		var tagDni = (presActual && parseFloat(presActual.precio_dni) > 0 && Math.round(precio * 100) === Math.round(parseFloat(presActual.precio_dni) * 100))
+			? ' <span class="pos-item-dni" title="Precio regular ' + sym + ' ' + parseFloat(presActual.precio).toFixed(2) + '">DNI</span>' : '';
 		var lineaUnidad;
 		if (presFila.length > 1) {
 			var opts = '';
@@ -369,9 +375,9 @@ function renderCarritoVisual() {
 					$('<span>').text(etiquetaPresentacion(pr)).html() + '</option>';
 			}
 			lineaUnidad = '<select class="pos-item-pres" title="Cambiar presentación" onchange="cambiarPresentacionFila(' + idx + ', this.value)">' + opts + '</select> ' +
-				sym + ' ' + precio.toFixed(2) + ' c/u';
+				sym + ' ' + precio.toFixed(2) + ' c/u' + tagDni;
 		} else {
-			lineaUnidad = (unidad ? $('<span>').text(unidad).html() + ' · ' : '') + sym + ' ' + precio.toFixed(2) + ' c/u';
+			lineaUnidad = (unidad ? $('<span>').text(unidad).html() + ' · ' : '') + sym + ' ' + precio.toFixed(2) + ' c/u' + tagDni;
 		}
 
 		html += '<div class="pos-item" id="posItem' + idx + '">' +
@@ -662,6 +668,7 @@ function cargarClientes(idPreferido){
 		$("#idcliente").val(idFinal);
 		$('#idcliente').selectpicker('refresh');
 		clientesCargados = true;
+		aplicarPrecioClienteCarrito();
 	});
 }
 
@@ -769,6 +776,7 @@ function buscarClientePorDni(){
 			if (encontrado) {
 				$("#idcliente").val(r.idpersona);
 				$("#idcliente").selectpicker("refresh");
+				aplicarPrecioClienteCarrito();
 				notifyVenta("success", "Cliente: " + r.nombre);
 			} else {
 				cargarClientes(r.idpersona);
@@ -1471,6 +1479,47 @@ function etiquetaPresentacion(p){
 	return nom + (p.factor > 1 ? ' x' + (+p.factor) : '');
 }
 
+// ── Precio con DNI: se cobra cuando la venta tiene un cliente registrado (no "Consumidor Final") ──
+function clienteConDni(){
+	var v = String($("#idcliente").val() || "0").trim();
+	return v !== "" && v !== "0";
+}
+
+function precioParaCliente(pres){
+	var dni = parseFloat(pres && pres.precio_dni) || 0;
+	return (clienteConDni() && dni > 0) ? dni : (parseFloat(pres && pres.precio) || 0);
+}
+
+function basePresentacion(lista){
+	for (var i = 0; i < (lista || []).length; i++) { if (lista[i].es_base) return lista[i]; }
+	return (lista && lista[0]) || null;
+}
+
+// Al cambiar el cliente se recalculan los precios del carrito (solo los que el cajero no editó a mano)
+function aplicarPrecioClienteCarrito(){
+	var filas = document.querySelectorAll('#detalles .filas');
+	var cambiadas = 0;
+	for (var i = 0; i < filas.length; i++) {
+		var fila = filas[i];
+		var p = buscarPresentacion(leerPresentacionesFila(fila), (fila.querySelector('input[name="idpresentacion[]"]') || {}).value || 0);
+		if (!p || !(parseFloat(p.precio_dni) > 0)) continue;
+		var inp = fila.querySelector('input[name="precio_venta[]"]');
+		var actual = Math.round((parseFloat(inp.value) || 0) * 100);
+		var esAuto = actual === Math.round(parseFloat(p.precio) * 100) || actual === Math.round(parseFloat(p.precio_dni) * 100);
+		if (!esAuto) continue;
+		var nuevo = precioParaCliente(p);
+		if (Math.round(nuevo * 100) !== actual) { inp.value = nuevo.toFixed(2); cambiadas++; }
+	}
+	if (cambiadas > 0) {
+		modificarSubtotales();
+		renderCarritoVisual();
+		guardarBorradorVenta();
+		notifyVenta(clienteConDni() ? "success" : "warning", clienteConDni()
+			? "Precio con DNI aplicado a " + cambiadas + " producto(s)."
+			: "Consumidor Final: se volvió al precio regular en " + cambiadas + " producto(s).");
+	}
+}
+
 function presentacionesDe(idarticulo){
 	if (typeof posProductos === "undefined" || !posProductos) return null;
 	for (var i = 0; i < posProductos.length; i++) {
@@ -1557,7 +1606,7 @@ function agregarDetalle(idarticulo,articulo,precio_venta,unidad,stockDisponible,
 		guardarBorradorVenta();
 		return;
 	}
-	var precioPres = (pres.precio !== undefined && pres.precio !== null) ? parseFloat(pres.precio) : parseFloat(precio_venta || 0);
+	var precioPres = (pres.precio !== undefined && pres.precio !== null) ? precioParaCliente(pres) : parseFloat(precio_venta || 0);
 	if (!(precioPres > 0)) {
 		notifyVenta("warning", "La presentación " + etiquetaPresentacion(pres) + " no tiene precio. Actualízalo en el producto.");
 		return;
@@ -1594,7 +1643,7 @@ function cambiarPresentacionFila(idx, idpres){
 		return;
 	}
 	fila.querySelector('input[name="idpresentacion[]"]').value = p.id;
-	fila.querySelector('input[name="precio_venta[]"]').value = parseFloat(p.precio || 0).toFixed(2);
+	fila.querySelector('input[name="precio_venta[]"]').value = precioParaCliente(p).toFixed(2);
 	fila.querySelector('input[name="stock_disponible[]"]').value = max;
 	var cantInp = fila.querySelector('input[name="cantidad[]"]');
 	cantInp.setAttribute('max', max);
@@ -2022,3 +2071,9 @@ function descartarBorradorVenta() {
 	$("#bannerBorradorVenta").remove();
 	notifyVenta("info", "Carrito descartado.");
 }
+
+
+// Precio con DNI: recalcular el carrito cuando cambia el cliente
+$(function(){
+	$(document).on("change", "#idcliente", aplicarPrecioClienteCarrito);
+});

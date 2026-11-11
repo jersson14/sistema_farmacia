@@ -13,6 +13,8 @@ if (!isset($_SESSION['carrito_tienda'])) {
 }
 
 $presMdl = new Presentacion();
+// Cliente con sesión iniciada = identificado con DNI → paga el precio con DNI
+$conDni = !empty($_SESSION['tienda_cliente']);
 
 function _tiendaClave($idarticulo, $idpresentacion) {
     return (int)$idarticulo . ':' . (int)$idpresentacion;
@@ -67,7 +69,7 @@ switch ($op) {
             'idpresentacion' => (int)$pres['id'],
             'presentacion'   => Presentacion::etiqueta($pres),
             'nombre'         => $art['nombre'],
-            'precio'         => (float)$pres['precio'],
+            'precio'         => Presentacion::precioCliente($pres, $conDni),
             'cantidad'       => $cantNueva,
             'stock_max'      => $stockMax,
             'imagen'         => $art['imagen']
@@ -118,7 +120,7 @@ switch ($op) {
                 $item['clave']          = $clave;
                 $item['idpresentacion'] = (int)$pres['id'];
                 $item['presentacion']   = Presentacion::etiqueta($pres);
-                $item['precio']         = (float)$pres['precio'];
+                $item['precio']         = Presentacion::precioCliente($pres, $conDni);
                 $item['stock_max']      = (int)floor($stocks[$idA] / max(1, (float)$pres['factor']));
                 $nuevo[$clave] = $item;
                 $sub    = round($item['precio'] * $item['cantidad'], 2);
@@ -131,6 +133,9 @@ switch ($op) {
                     'mostrar_presentacion' => isset($mapa[$idA]) && count($mapa[$idA]) > 1,
                     'nombre'         => $item['nombre'],
                     'precio'         => $item['precio'],
+                    'precio_regular' => (float)$pres['precio'],
+                    'precio_dni'     => (float)$pres['precio_dni'],
+                    'con_dni'        => $conDni && $pres['precio_dni'] > 0,
                     'cantidad'       => $item['cantidad'],
                     'stock_max'      => $item['stock_max'],
                     'subtotal'       => $sub,

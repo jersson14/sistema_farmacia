@@ -62,7 +62,7 @@ function init(){
       });
    });
 
-   $("#precio_venta, #descuento_porcentaje, #en_oferta").on("input change", actualizarPreviewOferta);
+   $("#precio_venta, #descuento_porcentaje, #en_oferta, #precio_dni").on("input change", actualizarPreviewOferta);
 }
 
 //los 3 slots de imagen que admite un articulo (el primero es la imagen principal)
@@ -99,24 +99,36 @@ function quitarImagen(campo){
 	$("#quitar_" + campo).val("1");
 }
 
-//vista previa en vivo del precio con descuento
+//vista previa en vivo: precio regular, oferta y precio con DNI
 function actualizarPreviewOferta(){
 	var $prev = $("#ofertaPreview");
 	var activa = $("#en_oferta").is(":checked");
 	var precio = parseFloat($("#precio_venta").val()) || 0;
 	var pct    = parseFloat($("#descuento_porcentaje").val()) || 0;
+	var dni    = parseFloat($("#precio_dni").val()) || 0;
+	var simbolo = window.appCurrencySymbol || "S/";
+	var hayOferta = activa && pct > 0;
 
-	if (!activa || pct <= 0 || precio <= 0) {
+	if (precio <= 0 || (!hayOferta && dni <= 0)) {
 		$prev.hide();
+		return;
+	}
+	if (dni > 0 && dni >= precio) {
+		$prev.attr("class", "alert alert-danger").html('<i class="fa fa-exclamation-triangle"></i> El precio con DNI debe ser menor que el precio regular (' +
+			simbolo + ' ' + precio.toFixed(2) + ').').show();
 		return;
 	}
 
 	pct = Math.min(100, Math.max(0, pct));
-	var simbolo = window.appCurrencySymbol || "S/";
-	var final   = Math.round((precio * (1 - pct / 100)) * 100) / 100;
-
-	$prev.html("Precio de oferta: <strong>" + simbolo + " " + final.toFixed(2) + "</strong> " +
-		"<span style='text-decoration:line-through;color:#999;margin-left:6px'>" + simbolo + " " + precio.toFixed(2) + "</span>").show();
+	var oferta = hayOferta ? Math.round((precio * (1 - pct / 100)) * 100) / 100 : 0;
+	var html = '<div>Precio regular: <strong>' + simbolo + ' ' + precio.toFixed(2) + '</strong></div>';
+	if (hayOferta) html += '<div>Oferta -' + (+pct.toFixed(2)) + '%: <strong>' + simbolo + ' ' + oferta.toFixed(2) + '</strong> <small>(para todos, en sus fechas)</small></div>';
+	if (dni > 0) html += '<div>Precio con DNI: <strong>' + simbolo + ' ' + dni.toFixed(2) + '</strong> <small>(' + Math.round((1 - dni / precio) * 100) + '% menos, cliente registrado)</small></div>';
+	if (hayOferta && dni > 0) {
+		html += '<div style="margin-top:4px"><i class="fa fa-info-circle"></i> No se acumulan: el cliente con DNI paga el menor (' +
+			simbolo + ' ' + Math.min(oferta, dni).toFixed(2) + ').</div>';
+	}
+	$prev.attr("class", "alert alert-info").html(html).show();
 }
 
 //funcion limpiar
@@ -150,6 +162,8 @@ function limpiar(){
 	$("#tipo_venta").val("OTC");
 	try { $("#tipo_venta").selectpicker("refresh"); } catch(e) {}
 	// Oferta
+	$("#precio_dni").val("");
+	$("#precioDniSinMigracion").hide();
 	$("#en_oferta").prop("checked", false);
 	$("#descuento_porcentaje").val("0");
 	$("#oferta_fecha_inicio").val("");
@@ -300,6 +314,8 @@ function mostrar(idarticulo){
 			$("#tipo_venta").val(data.tipo_venta || "OTC");
 			try { $("#tipo_venta").selectpicker("refresh"); } catch(e) {}
 			// Oferta
+			$("#precio_dni").val(parseFloat(data.precio_dni || 0) > 0 ? parseFloat(data.precio_dni).toFixed(2) : "");
+			$("#precioDniSinMigracion").toggle(data.precio_dni_disponible === false);
 			$("#en_oferta").prop("checked", data.en_oferta == 1);
 			$("#descuento_porcentaje").val(parseFloat(data.descuento_porcentaje || 0));
 			$("#oferta_fecha_inicio").val(mysqlDatetimeALocal(data.oferta_fecha_inicio));
@@ -535,6 +551,14 @@ function validarPresentacionesForm(){
 		var f = parseFloat(p.factor);
 		if (!(f >= 2) || Math.floor(f) !== f) return 'Indica cuántas ' + abrevUnidad(idBase) + ' trae 1 "' + nom + '" (número entero desde 2).';
 		if (!(parseFloat(p.precio) > 0)) return 'Falta el precio de venta de "' + nom + '".';
+		// Una presentación que trae varias unidades no puede costar menos que 1 unidad suelta:
+		// casi siempre significa que la unidad base quedó al revés (ej. base Blíster y "Tableta x10").
+		var precioBase = parseFloat($("#precio_venta").val() || 0);
+		var nomBase = nombreUnidad(idBase);
+		if (precioBase > 0 && parseFloat(p.precio) < precioBase) {
+			return '1 "' + nom + '" (que trae ' + f + ' ' + nomBase.toLowerCase() + ') no puede costar menos que 1 ' + nomBase.toLowerCase() +
+				'. Revisa: la unidad base debe ser la MÁS PEQUEÑA que vendes (ej. Tableta) y las presentaciones las más grandes (Blíster x10, Caja x100).';
+		}
 	}
 	return "";
 }

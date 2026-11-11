@@ -70,6 +70,9 @@ $laboratorio        = isset($_POST["laboratorio"])        ? limpiarCadena($_POST
 $registro_sanitario = isset($_POST["registro_sanitario"]) ? limpiarCadena($_POST["registro_sanitario"]) : "";
 $requiere_frio      = isset($_POST["requiere_frio"])      ? 1 : 0;
 $tipo_venta         = isset($_POST["tipo_venta"])         ? limpiarCadena($_POST["tipo_venta"])         : "OTC";
+// Precio con DNI (vacío o 0 = sin precio DNI)
+$precio_dni = (isset($_POST["precio_dni"]) && trim($_POST["precio_dni"]) !== '') ? max(0, round((float)limpiarCadena($_POST["precio_dni"]), 2)) : 0;
+
 // Oferta por tiempo limitado
 $en_oferta            = isset($_POST["en_oferta"])            ? 1 : 0;
 $descuento_porcentaje = isset($_POST["descuento_porcentaje"]) ? max(0, min(100, (float)limpiarCadena($_POST["descuento_porcentaje"]))) : 0;
@@ -87,6 +90,10 @@ switch ($_GET["op"]) {
 	case 'guardaryeditar':
 	if (!isset($_SESSION['almacen']) || $_SESSION['almacen'] != 1) {
 		echo "Sin permiso para modificar artículos";
+		break;
+	}
+	if ($precio_dni > 0 && $precio_dni >= $precio_venta) {
+		echo "No se guardó: el precio con DNI (S/ ".number_format($precio_dni, 2).") debe ser menor que el precio regular (S/ ".number_format($precio_venta, 2)."). Déjalo vacío si este producto no tiene precio con DNI.";
 		break;
 	}
 	// Las presentaciones se revisan antes de guardar el producto: si algo no tiene sentido no se guarda nada.
@@ -118,6 +125,7 @@ switch ($_GET["op"]) {
 			$en_oferta,$descuento_porcentaje,$oferta_fecha_inicio,$oferta_fecha_fin,
 			$imagen2,$imagen3);
 		if ($rspta) {
+			$articulo->guardarPrecioDni((int)$rspta, $precio_dni);
 			$rp = $presMdl->sincronizar((int)$rspta, presentacionesDelFormulario());
 			echo $rp['ok'] ? "Datos registrados correctamente" : "Producto registrado, pero las presentaciones no se guardaron: ".$rp['message'];
 		} else {
@@ -130,6 +138,7 @@ switch ($_GET["op"]) {
 			$en_oferta,$descuento_porcentaje,$oferta_fecha_inicio,$oferta_fecha_fin,
 			$imagen2,$imagen3);
 		if ($rspta) {
+			$articulo->guardarPrecioDni((int)$idarticulo, $precio_dni);
 			$rp = $presMdl->sincronizar((int)$idarticulo, presentacionesDelFormulario());
 			echo $rp['ok'] ? "Datos actualizados correctamente" : "Producto actualizado, pero las presentaciones no se guardaron: ".$rp['message'];
 		} else {
@@ -173,6 +182,8 @@ switch ($_GET["op"]) {
 			$rspta["stock_minimo"] = (int)round((float)$rspta["stock_minimo"]);
 			$rspta["presentaciones"] = $presMdl->listarPorArticulo((int)$rspta["idarticulo"]);
 			$rspta["presentaciones_disponible"] = Presentacion::disponible();
+			$rspta["precio_dni"] = $articulo->obtenerPrecioDni((int)$rspta["idarticulo"]);
+			$rspta["precio_dni_disponible"] = Presentacion::dniDisponible();
 			$rspta["stock_desglose"] = Presentacion::desglosarStock($rspta["stock"], $rspta["presentaciones"]);
 		}
 		echo json_encode($rspta);

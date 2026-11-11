@@ -484,10 +484,49 @@ function cintaOferta(pct){
 
 // ── Tarjeta de producto ────────────────────────────────────
 // ── Presentaciones de venta (Tableta, Blíster x10, Caja x100...) ──
-function etiquetaPres(pr){
-  return (pr.unidad || pr.abrev || 'Unidad') + (pr.factor > 1 ? ' x' + (+pr.factor) : '');
+// Con base: "Blíster x 10 tabletas" (explícito). Sin base: "Blíster x10".
+function etiquetaPres(pr, base){
+  var nom = pr.unidad || pr.abrev || 'Unidad';
+  if (!(pr.factor > 1)) return nom;
+  var nomBase = base ? (base.unidad || base.abrev || '') : '';
+  return nomBase
+    ? nom + ' x ' + (+pr.factor) + ' ' + pluralUnidad(+pr.factor, nomBase)
+    : nom + ' x' + (+pr.factor);
+}
+function presBaseDe(p){
+  var l = (p && p.presentaciones) || [];
+  return l.filter(function(x){ return x.es_base; })[0] || l[0] || null;
+}
+// "Trae 10 tabletas" / "1 tableta"
+function textoContenidoPres(pr, base){
+  var nomBase = base ? (base.unidad || base.abrev || 'unidad') : 'unidad';
+  if (!(pr.factor > 1)) return '1 ' + pluralUnidad(1, nomBase);
+  return 'Trae ' + (+pr.factor) + ' ' + pluralUnidad(+pr.factor, nomBase);
 }
 function tieneVariasPres(p){ return p.presentaciones && p.presentaciones.length > 1; }
+
+// ── Precio con DNI (cliente registrado) ──
+// Menor precio con DNI entre las presentaciones del producto (0 = no tiene)
+function precioDniMin(p){
+  var min = 0;
+  ((p && p.presentaciones) || []).forEach(function(pr){
+    var d = parseFloat(pr.precio_dni) || 0;
+    if (d > 0 && (min === 0 || d < min)) min = d;
+  });
+  return min;
+}
+// Bloque del modal: precio con DNI de la presentación elegida
+function bloqueDniModal(pr, base){
+  var d = parseFloat(pr && pr.precio_dni) || 0;
+  if (!(d > 0)) return '';
+  var ahorro = Math.max(0, (parseFloat(pr.precio) || 0) - d);
+  return '<div class="pm-dni-precio"><span class="pm-dni-tag"><i class="bi bi-person-vcard-fill"></i> Precio con DNI</span>'
+    + '<strong>S/ ' + d.toFixed(2) + '</strong> <small>/ ' + esc(etiquetaPres(pr, base).toLowerCase()) + '</small>'
+    + (ahorro > 0 ? ' <span class="pm-dni-ahorro">Ahorras S/ ' + ahorro.toFixed(2) + '</span>' : '') + '</div>'
+    + (window.TIENDA_LOGADO
+        ? '<div class="pm-dni-nota ok"><i class="bi bi-check-circle-fill"></i> Ya iniciaste sesión: pagas este precio.</div>'
+        : '<div class="pm-dni-nota"><a href="login.php">Inicia sesión con tu DNI</a> para pagar este precio.</div>');
+}
 // Plural simple en español: tableta → tabletas, unidad → unidades
 function pluralUnidad(n, nombre){
   nombre = (nombre || '').toLowerCase();
@@ -528,9 +567,13 @@ function tarjetaProducto(p){
     +   '<div class="pcat">' + esc(p.categoria) + '</div>'
     +   '<div class="pname">' + esc(p.nombre) + '</div>'
     +   dci + lab
-    +   (variasPres ? '<div class="pc-pres"><i class="bi bi-boxes"></i> ' + p.presentaciones.map(function(pr){ return esc(etiquetaPres(pr)); }).join(' · ') + '</div>' : '')
+    +   (variasPres ? '<div class="pc-pres"><i class="bi bi-boxes"></i> ' + p.presentaciones.map(function(pr){ return esc(etiquetaPres(pr, presBaseDe(p))); }).join(' · ') + '</div>' : '')
     +   (enOferta && ahorro > 0 ? '<span class="pc-ahorro"><i class="bi bi-piggy-bank-fill"></i> Ahorras S/ ' + ahorro.toFixed(2) + '</span>' : '')
     +   '<div class="pprice">' + precioHtml + '</div>'
+    +   (precioDniMin(p) > 0
+        ? '<div class="pc-dni"><i class="bi bi-person-vcard-fill"></i> ' + (window.TIENDA_LOGADO ? 'Tu precio con DNI' : 'Con DNI') + (variasPres ? ' desde' : '')
+          + ' <strong>S/ ' + precioDniMin(p).toFixed(2) + '</strong></div>'
+        : '')
     +   (sinStock
         ? '<button class="btn-agregar" disabled onclick="event.stopPropagation()"><i class="bi bi-x-circle"></i> Sin stock</button>'
         : variasPres
@@ -654,9 +697,10 @@ function verProducto(id){
           presSec += '<button type="button" role="radio" class="pm-pres-opt' + (pr.id === pmPresSel ? ' activa' : '') + '"'
             + ' data-id="' + pr.id + '" aria-checked="' + (pr.id === pmPresSel) + '"' + (disp < 1 ? ' disabled title="Sin stock en esta presentación"' : '')
             + ' onclick="elegirPresentacionModal(' + pr.id + ')">'
-            + '<span class="pm-pres-nombre">' + esc(etiquetaPres(pr)) + '</span>'
+            + '<span class="pm-pres-nombre">' + esc(pr.unidad || pr.abrev || 'Unidad') + '</span>'
+            + '<span class="pm-pres-cont">' + esc(textoContenidoPres(pr, presBase)) + '</span>'
             + '<span class="pm-pres-precio">S/ ' + parseFloat(pr.precio || 0).toFixed(2) + '</span>'
-            + (pr.factor > 1 && presBase ? '<span class="pm-pres-equiv">' + (+pr.factor) + ' ' + esc(pluralUnidad(+pr.factor, presBase.unidad || presBase.abrev)) + '</span>' : '')
+            + (pr.factor > 1 && presBase && pr.precio > 0 ? '<span class="pm-pres-equiv">S/ ' + (pr.precio / pr.factor).toFixed(2) + ' c/' + esc((presBase.unidad || presBase.abrev || 'unidad').toLowerCase()) + '</span>' : '')
             + (disp < 1 ? '<span class="pm-pres-equiv">Sin stock</span>' : '')
             + '</button>';
         });
@@ -674,7 +718,7 @@ function verProducto(id){
 
       var precioModalHtml = precio > 0
         ? (enOferta ? '<span class="precio-tachado">S/ ' + parseFloat(p.precio_original || 0).toFixed(2) + '</span>' : '')
-          + 'S/ ' + precio.toFixed(2) + ' <small>/ ' + esc(presBase ? etiquetaPres(presBase).toLowerCase() : 'unidad') + '</small>'
+          + 'S/ ' + precio.toFixed(2) + ' <small>/ ' + esc(presBase ? etiquetaPres(presBase, presBase).toLowerCase() : 'unidad') + '</small>'
         : '<small style="font-size:16px">Consultar precio</small>';
 
       contenido.innerHTML = imgSec
@@ -684,6 +728,7 @@ function verProducto(id){
         + (meta ? '<div class="pm-meta">' + meta + '</div>' : '')
         + '<div class="pm-price" id="pmPrecio">' + precioModalHtml + '</div>'
         + (enOferta && ahorroModal > 0 ? '<div class="pc-ahorro" id="pmAhorro" style="margin:-6px 0 14px"><i class="bi bi-piggy-bank-fill"></i> Ahorras S/ ' + ahorroModal.toFixed(2) + '</div>' : '')
+        + '<div class="pm-dni" id="pmDni">' + (presBase ? bloqueDniModal(presBase, presBase) : '') + '</div>'
         + presSec
         + recetaSec
         + descSec
@@ -720,13 +765,15 @@ function elegirPresentacionModal(id){
   var $precio = document.getElementById('pmPrecio');
   if ($precio) {
     $precio.innerHTML = (enOferta && lista > precio ? '<span class="precio-tachado">S/ ' + lista.toFixed(2) + '</span>' : '')
-      + 'S/ ' + precio.toFixed(2) + ' <small>/ ' + esc(etiquetaPres(pr).toLowerCase()) + '</small>';
+      + 'S/ ' + precio.toFixed(2) + ' <small>/ ' + esc(etiquetaPres(pr, presBaseDe(pmProducto)).toLowerCase()) + '</small>';
   }
+  var $dni = document.getElementById('pmDni');
+  if ($dni) $dni.innerHTML = bloqueDniModal(pr, presBaseDe(pmProducto));
   var $ahorro = document.getElementById('pmAhorro');
   if ($ahorro) $ahorro.innerHTML = '<i class="bi bi-piggy-bank-fill"></i> Ahorras S/ ' + Math.max(0, lista - precio).toFixed(2);
   var disp = Math.floor((parseFloat(pmProducto.stock) || 0) / (parseFloat(pr.factor) || 1));
   var $stock = document.getElementById('pmStock');
-  if ($stock) $stock.innerHTML = '✅ En stock (' + disp + ' ' + esc(disp === 1 ? etiquetaPres(pr).toLowerCase() : 'disponibles') + ')';
+  if ($stock) $stock.innerHTML = '✅ En stock (' + disp + ' ' + esc(disp === 1 ? etiquetaPres(pr, presBaseDe(pmProducto)).toLowerCase() : 'disponibles') + ')';
   var btn = document.getElementById('btnModalAgregar');
   if (btn) { btn.disabled = false; btn.classList.remove('adding'); btn.innerHTML = '<i class="bi bi-cart-plus-fill"></i> Agregar al carrito'; }
 }
@@ -750,7 +797,7 @@ function agregarDesdeModal(id, nombre){
   fd.append('idpresentacion', pmPresSel || 0);
   fd.append('cantidad', 1);
   var prSel = pmProducto && tieneVariasPres(pmProducto) ? (pmProducto.presentaciones.filter(function(x){ return x.id === pmPresSel; })[0] || null) : null;
-  if (prSel) nombre = nombre + ' (' + etiquetaPres(prSel) + ')';
+  if (prSel) nombre = nombre + ' (' + etiquetaPres(prSel, presBaseDe(pmProducto)) + ')';
   fetch('ajax/carrito.php?op=agregar', {method:'POST', body:fd})
     .then(function(r){ return r.json(); })
     .then(function(d){
