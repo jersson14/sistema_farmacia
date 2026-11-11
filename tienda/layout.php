@@ -26,15 +26,10 @@ $direccionEmp = $emp['direccion'];
 $correoEmp    = $emp['correo'];
 $waNum    = $cfgTienda->obtener('whatsapp_numero','');
 
-// Nombre comercial (ignora datos viejos/genéricos del sistema base)
-$_viejosNombres = ['PERNO CENTRO', 'pernocentro', 'mi tienda', 'itiendas', 'farmacia', ''];
-$_empNombreBD   = strtolower(trim($emp['nombre'] ?? ''));
-$nombreEmp = (!empty($emp['nombre']) && !in_array($_empNombreBD, $_viejosNombres)
-              && stripos($emp['nombre'], 'PERNO') === false)
-             ? $emp['nombre']
-             : 'Botica FarmaSuyana';
+// Nombre comercial configurado en Acceso > Empresa (el modelo ya pone uno neutro si falta)
+$nombreEmp = $emp['nombre'];
 
-// Logo ya resuelto por el modelo (BD → farmasuyana.png → famacia.png), con cache-busting
+// Logo ya resuelto por el modelo (logo de Empresa o files/logo_default.png), con cache-busting
 $logo = $emp['logo_url'];
 
 $clienteLogado = !empty($_SESSION['tienda_cliente']);

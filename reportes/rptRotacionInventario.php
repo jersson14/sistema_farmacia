@@ -76,7 +76,7 @@ if (!empty($emp['logo'])) {
     if ($l && file_exists($l)) $_logoPath = $l;
 }
 if (!$_logoPath) {
-    foreach ([__DIR__.'/logo1.jpeg', __DIR__.'/logo.png'] as $_p) {
+    foreach ([__DIR__.'/../files/logo_default.png', __DIR__.'/logo.png'] as $_p) {
         if (file_exists($_p)) { $_logoPath = $_p; break; }
     }
 }

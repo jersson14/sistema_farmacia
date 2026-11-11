@@ -33,15 +33,20 @@
     return "#" + toHex(r) + toHex(g) + toHex(b);
   }
 
+  function mostrarLogoLogin() {
+    $("#loginBrandLogo").css("opacity", 1);
+  }
+
+  // Marca del login: logo, nombre y colores de Acceso > Empresa
   function aplicarBrandPublico() {
     $.get("../ajax/empresa.php?op=publicBrand", function (resp) {
       var cfg = null;
       try {
-        cfg = JSON.parse(resp);
+        cfg = typeof resp === "object" ? resp : JSON.parse(resp);
       } catch (e) {
         cfg = null;
       }
-      if (!cfg) return;
+      if (!cfg) { mostrarLogoLogin(); return; }
 
       var primary = cfg.color_primario || "#0f766e";
       var accent = cfg.color_secundario || "#f59e0b";
@@ -50,17 +55,22 @@
       document.documentElement.style.setProperty("--brand-accent", accent);
 
       if (cfg.logo_url) {
-        $("#loginBrandLogo").attr("src", cfg.logo_url);
+        $("#loginBrandLogo").one("load error", mostrarLogoLogin).attr("src", cfg.logo_url);
         $("#loginFavicon").attr("href", cfg.logo_url);
+      } else {
+        mostrarLogoLogin();
       }
 
-      var nombre = decodeHtml(cfg.nombre_comercial || "PERNO CENTRO").toUpperCase();
-      var subRaw = decodeHtml(cfg.razon_social || "SEÑOR DE HUANCA").toUpperCase();
+      var nombreReal = decodeHtml(cfg.nombre_comercial || "Mi Farmacia");
+      var nombre = nombreReal.toUpperCase();
+      var subRaw = decodeHtml(cfg.razon_social || "").toUpperCase();
       var sub = limpiarSubtitulo(nombre, subRaw);
       var titulo = escapeHtml(nombre) + (sub ? "<br>" + escapeHtml(sub) : "");
       $("#loginBrandTitle").html(titulo);
-      document.title = nombre + " | Login";
-    });
+      $("#loginBrandLogo").attr("alt", nombreReal);
+      $("#lp-brand").text(nombreReal);
+      document.title = nombreReal + " | Sistema de Gestión";
+    }).fail(mostrarLogoLogin);
   }
 
   function cargarRecordarme() {
