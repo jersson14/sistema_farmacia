@@ -455,6 +455,10 @@ if (!function_exists('darkenHexColor')) {
         <span class="sr-only">NAVEGACIÓM</span>
       </a>
 
+      <?php require_once __DIR__ . '/../config/demo.php'; $_demo = DEMO_MODE; ?>
+      <?php if ($_demo) { ?>
+      <span class="hidden-xs" style="float:left;margin:14px 0 0 10px;padding:3px 10px;border-radius:12px;background:#f39c12;color:#fff;font-weight:700;font-size:12px;letter-spacing:.5px;" title="Versión de demostración: la administración del sistema está deshabilitada">VERSIÓN DEMO</span>
+      <?php } ?>
       <div class="navbar-custom-menu">
         <ul class="nav navbar-nav">
 
@@ -564,7 +568,7 @@ if (!function_exists('darkenHexColor')) {
               </li>
               <!-- Menu Footer-->
               <li class="user-footer">
-                <div class="pull-left">
+                <div class="pull-left"<?php echo $_demo ? ' style="display:none"' : ''; ?>>
                   <a href="usuario.php?perfil=1&idusuario=<?php echo (int)$_SESSION['idusuario']; ?>" class="btn btn-default btn-flat">Mi Perfil</a>
                 </div>
                 <div class="pull-right">
@@ -646,7 +650,7 @@ if ($_SESSION['ventas']==1) {
 }
         ?>
         <?php
-if ($_SESSION['acceso']==1) {
+if ($_SESSION['acceso']==1 && !$_demo) {
   echo '<li class="treeview">
           <a href="#">
             <i class="bi bi-person-lock"></i> <span>Acceso</span>
@@ -682,10 +686,10 @@ if ($_SESSION['consultac']==1 || $_SESSION['consultav']==1) {
 }
         ?>
         <?php
-$_sEmpresa  = ($_SESSION['acceso']==1);
+$_sEmpresa  = ($_SESSION['acceso']==1) && !$_demo;
 $_sKardex   = ($_SESSION['acceso']==1 || $_SESSION['almacen']==1 || (!empty($_SESSION['kardex'])  && $_SESSION['kardex']==1));
 $_sCuentas  = ($_SESSION['acceso']==1 || (!empty($_SESSION['cuentas']) && $_SESSION['cuentas']==1));
-$_sBackup   = ($_SESSION['acceso']==1 || (!empty($_SESSION['backup'])  && $_SESSION['backup']==1));
+$_sBackup   = ($_SESSION['acceso']==1 || (!empty($_SESSION['backup'])  && $_SESSION['backup']==1)) && !$_demo;
 
 if ($_sEmpresa || $_sKardex || $_sCuentas || $_sBackup) {
   echo '<li class="treeview">
@@ -713,7 +717,7 @@ if ($_sIA) {
           <ul class="treeview-menu">
             <li><a href="ai_chat.php"><i class="bi bi-chat-dots"></i> AI Chat</a></li>
             <li><a href="ai_reportes.php"><i class="bi bi-envelope-paper"></i> Reportes por correo</a></li>
-            <li><a href="ai_config.php"><i class="bi bi-gear"></i> Integraciones (OpenAI + SMTP)</a></li>
+            ' . ($_demo ? '' : '<li><a href="ai_config.php"><i class="bi bi-gear"></i> Integraciones (OpenAI + SMTP)</a></li>') . '
           </ul>
         </li>';
 }

@@ -24,6 +24,7 @@ if (!$esAdmin && !$tieneIA) {
 
 require_once __DIR__ . "/../modelos/AIConfig.php";
 require_once __DIR__ . "/../modelos/AIService.php";
+require_once __DIR__ . "/../config/demo.php"; demoBloquearAjax();
 
 $op = $_GET['op'] ?? ($_POST['op'] ?? '');
 $config = new AIConfig();

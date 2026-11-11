@@ -2,6 +2,7 @@
 //activamos almacenamiento en el buffer
 ob_start();
 session_start();
+require_once '../config/demo.php'; demoBloquearVista();
 if (!isset($_SESSION['nombre'])) {
   header("Location: login.html");
 }else{

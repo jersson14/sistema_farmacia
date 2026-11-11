@@ -19,6 +19,9 @@ if (!$esAdmin && !$tieneIA) {
 }
 
 require_once __DIR__ . "/../modelos/AIReporte.php";
+// Demo: no se cambian destinatarios ni se envía a correos escritos a mano
+require_once __DIR__ . "/../config/demo.php";
+if (DEMO_MODE && (($_GET['op'] ?? ($_POST['op'] ?? '')) === 'guardar_destinatarios' || trim($_POST['destinatarios_override'] ?? '') !== '')) demoBloquearAjax();
 $rep = new AIReporte();
 
 $op = $_GET['op'] ?? ($_POST['op'] ?? '');

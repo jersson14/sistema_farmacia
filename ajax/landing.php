@@ -3,6 +3,7 @@ if (strlen(session_id()) < 1) {
     session_start();
 }
 require_once "../modelos/Landing.php";
+require_once "../config/demo.php"; demoBloquearAjax(array("cargar", "buscarArticulos"));
 
 header('Content-Type: application/json; charset=utf-8');
 

@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once "../modelos/Usuario.php";
+require_once "../config/demo.php"; demoBloquearAjax(array("verificar", "salir"));
 
 $op = $_GET["op"] ?? "";
 // Operaciones públicas (login/logout) no requieren sesión activa

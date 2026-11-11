@@ -1,5 +1,6 @@
  <?php 
 require_once "../modelos/Permiso.php";
+require_once "../config/demo.php"; demoBloquearAjax();
 
 $categoria=new Permiso();
 

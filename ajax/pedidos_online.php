@@ -9,6 +9,7 @@ if (!isset($_SESSION['nombre'])) {
 }
 require_once "../modelos/PedidoOnline.php";
 require_once "../modelos/ConfigTienda.php";
+require_once "../config/demo.php"; if (($_GET["op"] ?? "") === "guardarConfig") demoBloquearAjax();
 
 if (!function_exists('fechaFiltroSeguro')) {
     function fechaFiltroSeguro($v) {

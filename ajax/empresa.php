@@ -4,6 +4,7 @@ if (strlen(session_id()) < 1) {
 }
 
 require_once "../modelos/Empresa.php";
+require_once "../config/demo.php"; demoBloquearAjax(array("publicBrand", "defaults", "mostrar"));
 
 $empresa = new Empresa();
 

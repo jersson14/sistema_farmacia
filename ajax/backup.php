@@ -4,6 +4,7 @@ if (strlen(session_id()) < 1) {
 }
 
 require_once "../modelos/Backup.php";
+require_once "../config/demo.php"; demoBloquearAjax();
 
 if (!isset($_SESSION['acceso']) || (int)$_SESSION['acceso'] !== 1) {
     if (isset($_GET['op']) && $_GET['op'] === 'descargar') {
